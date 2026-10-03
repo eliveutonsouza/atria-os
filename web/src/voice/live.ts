@@ -132,3 +132,8 @@ function onChannelEvent(raw: string) {
 useYui.subscribe((st, prev) => {
   if (prev.listening && !st.listening && pc) teardown()
 })
+
+// aba fechada/recarregada com voz ligada: avisa o servidor para não deixar a sessão (cobrada por segundo) aberta
+window.addEventListener('pagehide', () => {
+  if (pc) navigator.sendBeacon('/api/live/end')
+})

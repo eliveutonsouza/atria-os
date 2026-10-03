@@ -185,7 +185,7 @@ function flushUserOf(st: LiveState) {
 
 // Ociosidade: sessão cobrada por segundo.
 setInterval(() => {
-  if (live && Date.now() - live.lastActivity > config.liveIdleMin * 60_000 && !agentsWorking()) endLive('idle');
+  if (live && Date.now() - live.lastActivity > config.liveIdleMin * 60_000) endLive('idle');
 }, 30_000).unref();
 
 // Texto digitado: com voz ativa, a Yui fala a resposta; sem voz, resposta vai só para a tela.
