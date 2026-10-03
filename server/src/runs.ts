@@ -166,7 +166,11 @@ const DANGER = [
   /\bpsql\b|\bmysql\b|\bDROP\s+TABLE\b/i,
 ];
 
+const SENSITIVE_MCP = /(send|reply|forward|delete|trash|remove|publish|deploy|merge|purchase|buy|pay|transfer|refund|share|invite|create_event|update_event|post_|tiktok_publish|execute_preset)/i;
+
 const toolLabel = (name: string) => {
+  if (name.startsWith('mcp__claude-in-chrome__')) return 'Chrome';
+  if (name.startsWith('mcp__playwright__')) return 'Navegador';
   const m = /^mcp__([^_]+(?:_[^_]+)*)__/.exec(name);
   if (m) return `${m[1].replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())} MCP`;
   return name;
@@ -193,8 +197,14 @@ function describeTool(name: string, input: Record<string, unknown>): string {
       return `Abrindo ${p('url').slice(0, 80)}`;
     case 'TodoWrite':
       return 'Atualizando plano';
-    default:
-      return toolLabel(name);
+    default: {
+      const op = name.split('__').pop() ?? name;
+      if (/navigate$/.test(op)) return `Navegando ${p('url').slice(0, 80)}`;
+      if (/screenshot/.test(op)) return 'Tirando screenshot';
+      if (/click$/.test(op)) return `Clicando ${p('element').slice(0, 60)}`;
+      if (/(type|fill|form_input)/.test(op)) return 'Preenchendo formulário';
+      return `${toolLabel(name)} · ${op}`;
+    }
   }
 }
 
@@ -261,6 +271,7 @@ function systemAppend(agent: AgentDef, projectName: string | null): string {
     '- Ações irreversíveis (push, deploy, docker, publicar) podem exigir aprovação humana: o sistema pausa e pergunta. Se for negada, siga sem ela.',
     '- Resposta final: 1 a 3 frases em português, no estilo de status para ser falado em voz alta (o que foi feito, resultado, próximo passo).',
     projectName ? `- Projeto atual: ${projectName}.` : '- Sem projeto específico: trabalhe em /workspace/.yui/scratch.',
+    '- Navegador: use as ferramentas mcp__playwright__* (Chromium headless na VPS) para navegar, testar sites, preencher formulários e tirar screenshots. Use mcp__claude-in-chrome__* só quando precisar do Chrome real do usuário (contas logadas dele) — chame list_connected_browsers antes; se não houver navegador conectado, use o Playwright e diga isso no resultado. Screenshots com filename relativo são salvos no diretório do projeto atual.',
     '- Relatórios: se pedirem um relatório, grave JSON em /workspace/.yui/reports/<AAAA-MM-DD-HHmm>.json com {title, lead, kpis:[{value,label}], sections:[{heading, tone:"cyan"|"warn"|"ok", items:[...]}]}.',
   ].join('\n');
 }
@@ -309,6 +320,20 @@ async function execute(run: RunRow, ac: AbortController) {
       }
       return { behavior: 'allow', updatedInput: input };
     }
+    // Conectores/MCP com efeito externo irreversível (enviar e-mail, publicar, pagar…) pedem aprovação.
+    if (toolName.startsWith('mcp__') && SENSITIVE_MCP.test(toolName.split('__').pop() ?? '')) {
+      const ok = await requestApproval(
+        run,
+        `${agent.name} quer usar ${toolLabel(toolName)}: ${toolName.split('__').pop()}.`,
+        [
+          { label: 'Ferramenta', value: toolName.split('__').pop() ?? toolName },
+          { label: 'Detalhe', value: JSON.stringify(input).slice(0, 80) },
+          { label: 'Agente', value: agent.name },
+        ],
+        signal,
+      );
+      return ok ? { behavior: 'allow', updatedInput: input } : { behavior: 'deny', message: 'O usuário rejeitou esta ação. Continue sem ela e explique no resultado.' };
+    }
     return { behavior: 'allow', updatedInput: input };
   };
 
@@ -328,6 +353,9 @@ async function execute(run: RunRow, ac: AbortController) {
       canUseTool,
       // user: plugins/settings instalados no HOME do container; claude.ai: conectores MCP do login.
       settingSources: ['user', 'project', 'local'],
+      // Navegador headless (sidecar Playwright) + Claude in Chrome (Chrome real do usuário, quando conectado).
+      mcpServers: { playwright: { type: 'http', url: config.browserMcpUrl } },
+      extraArgs: { chrome: null },
       model: agent.model || config.claudeModel || undefined,
       maxTurns: 80,
       env: claudeEnv(),

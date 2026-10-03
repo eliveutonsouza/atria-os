@@ -30,6 +30,31 @@ services:
       - traefik.http.routers.yui-console.service=yui-console
       - traefik.http.services.yui-console.loadbalancer.server.port=8080
 
+  # Navegador headless para os agentes (Playwright MCP via HTTP). Perfil persistente: logins feitos
+  # pelos agentes sobrevivem a reinícios. Monta o mesmo workspace: screenshots/PDFs caem no projeto do agente (caminho relativo) ou em /workspace/.yui/browser.
+  yui-browser:
+    image: mcr.microsoft.com/playwright/mcp@sha256:77dccc5ce9e94cb8ae7ebea87ddbb6cd54b05760c4d63c54e16accf2726b8734 # v0.0.82
+    restart: unless-stopped
+    entrypoint: ["node", "/app/cli.js"]
+    user: "0" # volume do perfil nasce root; chromium já roda com --no-sandbox num container isolado
+    command:
+      - --headless
+      - --browser=chromium
+      - --no-sandbox
+      - --host=0.0.0.0
+      - --port=8931
+      - --allowed-hosts=yui-browser,yui-browser:8931
+      - --user-data-dir=/profile
+      - --output-dir=/workspace/.yui/browser
+      - --viewport-size=1440x900
+    volumes:
+      - yui-browser-profile:/profile
+      - yui-workspace:/workspace
+    shm_size: 1g
+    mem_limit: 1g
+    labels:
+      - traefik.enable=false
+
   # Docker API somente leitura (lista containers + logs) para Infra/Logs. O app nunca recebe o socket.
   yui-dockerproxy:
     image: tecnativa/docker-socket-proxy:v0.4.1
@@ -47,3 +72,4 @@ services:
 volumes:
   yui-data:
   yui-workspace:
+  yui-browser-profile:

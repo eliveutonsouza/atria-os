@@ -28,6 +28,7 @@ export const config = {
   claudeToken: env('CLAUDE_CODE_OAUTH_TOKEN', ''),
   claudeModel: env('YUI_CLAUDE_MODEL', ''),
   maxConcurrentRuns: Number(env('YUI_MAX_CONCURRENT_RUNS', '2')),
+  browserMcpUrl: env('YUI_BROWSER_MCP', 'http://yui-browser:8931/mcp'),
   dockerApi: env('YUI_DOCKER_API', 'http://yui-dockerproxy:2375'),
   hostProc: env('YUI_HOST_PROC', '/host/proc'),
   timezone: env('TZ', 'America/Sao_Paulo'),
