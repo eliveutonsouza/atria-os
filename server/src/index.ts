@@ -225,7 +225,10 @@ app.get('/api/repos', () =>
     pushedAt: r.pushed_at, archived: !!r.archived, cloned: !!findProject(r.slug)?.cloned,
   })),
 );
-app.post('/api/repos/sync', async () => ({ count: await syncCatalog() }));
+app.post('/api/repos/sync', async () => {
+  await startGithub();
+  return { count: await syncCatalog() };
+});
 
 app.get('/api/capabilities', () => JSON.parse(kvGet('claude_capabilities') ?? '{}'));
 app.get('/api/approvals', () => pendingApprovals());

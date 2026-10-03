@@ -23,13 +23,10 @@ export interface RepoRow {
   url: string;
 }
 
-export const githubEnabled = () => !!process.env.GH_TOKEN;
+// GH_TOKEN no .env ou `gh auth login` feito dentro do container (fica em $HOME/.config/gh no volume).
+export const githubEnabled = () => !!process.env.GH_TOKEN || existsSync(join(process.env.HOME ?? '/data/home', '.config', 'gh', 'hosts.yml'));
 
 export async function initGithub(): Promise<void> {
-  if (!githubEnabled()) {
-    console.log('github: GH_TOKEN ausente — catálogo desligado');
-    return;
-  }
   await gh(['auth', 'setup-git']).catch((e) => console.error('gh setup-git', e.message));
   const me = await gh(['api', 'user', '-q', '.login + "\\t" + (.name // .login)']).then((r) => r.stdout.trim().split('\t')).catch(() => null);
   if (me) {
@@ -127,8 +124,17 @@ async function writeYuiJson(dir: string, name: string, nameWithOwner: string) {
   if (existsSync(exclude) && !readFileSync(exclude, 'utf8').includes('yui.json')) writeFileSync(exclude, `${readFileSync(exclude, 'utf8')}\nyui.json\n`);
 }
 
+let started = false;
+let syncTimer: NodeJS.Timeout | undefined;
+
 export async function startGithub(): Promise<void> {
-  if (!githubEnabled()) return;
+  syncTimer ??= setInterval(() => {
+    if (!githubEnabled()) return;
+    if (!started) void startGithub().catch((e) => console.error('github', e.message));
+    else void syncCatalog().catch((e) => console.error('sync', e.message));
+  }, 5 * 60_000).unref();
+  if (!githubEnabled() || started) return;
+  started = true;
   await initGithub();
   const n = await syncCatalog();
   console.log(`github: ${n} repositórios no catálogo`);
@@ -136,5 +142,4 @@ export async function startGithub(): Promise<void> {
   for (const r of recent) {
     await ensureCloned(r.name_with_owner).catch((e) => console.error(`clone ${r.name_with_owner}:`, e.message));
   }
-  setInterval(() => void syncCatalog().catch((e) => console.error('sync', e.message)), 30 * 60_000).unref();
 }
