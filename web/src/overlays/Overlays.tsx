@@ -102,6 +102,8 @@ export function CommandPalette() {
       { label: 'Relatório', hint: 'artifact', fn: go('report') },
       { label: 'Preview do site', hint: 'artifact', fn: go('website') },
       { label: 'Infraestrutura', hint: 'view', fn: go('infra') },
+      { label: 'Terminal · Claude Code', hint: 'Ctrl `', fn: go('terminal', { kind: 'claude' }) },
+      { label: 'Terminal · Shell', hint: 'view', fn: go('terminal', { kind: 'shell' }) },
       { label: 'Artefatos', hint: 'view', fn: go('artifact') },
       { label: 'Histórico da conversa', hint: '', fn: () => s().set({ palette: false, histOpen: true }) },
       { label: '+ Nova missão', hint: 'ação', fn: () => { close(); s().say('Qual é a missão? Descreva o objetivo e eu monto a equipe.'); setTimeout(() => dockInput.el?.focus(), 30) } },

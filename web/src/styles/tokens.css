@@ -49,3 +49,9 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+/* terminal: deixa o vidro do Canvas aparecer atrás do xterm */
+.yui-terminal .xterm,
+.yui-terminal .xterm-viewport,
+.yui-terminal .xterm-screen canvas { background: transparent !important; }
+.yui-terminal .xterm-viewport { scrollbar-width: thin; }

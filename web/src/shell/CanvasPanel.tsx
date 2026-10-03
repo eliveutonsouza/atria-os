@@ -11,6 +11,7 @@ import { ProjectView } from '../views/ProjectView'
 import { ReportView } from '../views/ReportView'
 import { RunsView } from '../views/RunsView'
 import { WebsiteView } from '../views/WebsiteView'
+import { TerminalView } from '../views/TerminalView'
 
 function ViewBody() {
   const view = useYui((s) => s.view)
@@ -25,6 +26,7 @@ function ViewBody() {
     case 'website': return <WebsiteView />
     case 'infra': return <InfraView />
     case 'artifact': return <ArtifactsView />
+    case 'terminal': return <TerminalView />
     default: return null
   }
 }

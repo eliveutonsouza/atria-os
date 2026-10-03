@@ -280,7 +280,7 @@ function systemAppend(agent: AgentDef, projectName: string | null): string {
 // sem ele, usa o token de inferência do setup-token.
 export const claudeLoggedIn = () => existsSync(join(process.env.HOME ?? '/data/home', '.claude', '.credentials.json'));
 
-function claudeEnv(): Record<string, string> {
+export function claudeEnv(): Record<string, string> {
   const env = { ...process.env } as Record<string, string>;
   delete env.CLAUDE_CODE_OAUTH_TOKEN;
   if (!claudeLoggedIn() && config.claudeToken) env.CLAUDE_CODE_OAUTH_TOKEN = config.claudeToken;

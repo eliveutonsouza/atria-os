@@ -21,7 +21,8 @@ export type ViewName =
   | 'report'
   | 'website'
   | 'infra'
-  | 'artifact';
+  | 'artifact'
+  | 'terminal';
 
 export const VIEW_NAMES: ViewName[] = [
   'brief',
@@ -34,12 +35,14 @@ export const VIEW_NAMES: ViewName[] = [
   'website',
   'infra',
   'artifact',
+  'terminal',
 ];
 
 export interface ViewParams {
   project?: string; // slug
   runId?: string;
   artifactId?: string;
+  kind?: 'claude' | 'shell'; // view terminal
 }
 
 export type Tone = 'ok' | 'warn' | 'crit' | 'cyan' | 'lav' | 'muted';

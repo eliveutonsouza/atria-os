@@ -21,6 +21,7 @@ function pathFor(mode: Mode, view: ViewName, p: ViewParams): string {
     case 'report': return '/report'
     case 'infra': return '/infra'
     case 'artifact': return '/artifacts'
+    case 'terminal': return p.kind === 'shell' ? '/terminal/shell' : '/terminal'
     case 'website': return p.artifactId ? `/website/${p.artifactId}` : p.project ? `/website/p/${p.project}` : '/website'
     case 'brief': return '/brief'
     case 'dashboard': return '/dashboard'
@@ -40,6 +41,7 @@ function parsePath(path: string): { view: ViewName; params: ViewParams } | null 
     case 'report': return { view: 'report', params: {} }
     case 'infra': return { view: 'infra', params: {} }
     case 'artifacts': return { view: 'artifact', params: {} }
+    case 'terminal': return { view: 'terminal', params: b === 'shell' ? { kind: 'shell' } : {} }
     case 'website': return { view: 'website', params: b === 'p' ? { project: c } : b ? { artifactId: b } : {} }
     case 'brief': return { view: 'brief', params: {} }
     case 'dashboard': return { view: 'dashboard', params: {} }
@@ -123,6 +125,16 @@ function onBlur() {
   }
 }
 
+// Ctrl/⌘+` alterna o terminal. Em captura: o xterm consome as teclas antes do listener normal.
+function onTerminalKey(e: KeyboardEvent) {
+  if (!(e.metaKey || e.ctrlKey) || (e.key !== '`' && e.code !== 'Backquote')) return
+  e.preventDefault()
+  e.stopPropagation()
+  const s = useYui.getState()
+  if (s.view === 'terminal' && s.mode !== 'center') s.close()
+  else s.show('terminal')
+}
+
 // ---------- teclado (cascata do design) ----------
 function onKey(e: KeyboardEvent) {
   onPttDown(e)
@@ -133,6 +145,8 @@ function onKey(e: KeyboardEvent) {
     s.set({ palette: !s.palette, inboxOpen: false })
     return
   }
+  // Dentro do terminal, Esc e demais teclas pertencem ao programa (Claude/vim/etc.).
+  if ((e.target as HTMLElement | null)?.closest?.('.yui-terminal')) return
   if (mod && e.key.toLowerCase() === 'l') {
     e.preventDefault()
     dockInput.el?.focus()
@@ -167,11 +181,13 @@ export function Shell() {
     onResize()
     window.addEventListener('resize', onResize)
     window.addEventListener('keydown', onKey)
+    window.addEventListener('keydown', onTerminalKey, true)
     window.addEventListener('keyup', onPttUp)
     window.addEventListener('blur', onBlur)
     return () => {
       window.removeEventListener('resize', onResize)
       window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keydown', onTerminalKey, true)
       window.removeEventListener('keyup', onPttUp)
       window.removeEventListener('blur', onBlur)
     }

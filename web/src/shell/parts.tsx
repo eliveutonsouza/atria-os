@@ -144,6 +144,19 @@ export function TopBar() {
           </button>
         )}
         <button
+          onClick={() => {
+            const s = useYui.getState()
+            if (s.view === 'terminal' && s.mode !== 'center') s.close()
+            else s.show('terminal')
+          }}
+          className="hov-txt"
+          title="Terminal (Ctrl+`)"
+          style={{ height: 32, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.03)', color: C.t2, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          <span className="mono" style={{ fontSize: 11, color: C.cyan }}>&gt;_</span>
+          Terminal
+        </button>
+        <button
           onClick={() => set({ histOpen: !useYui.getState().histOpen, inboxOpen: false })}
           className="hov-txt"
           title="Conversa"

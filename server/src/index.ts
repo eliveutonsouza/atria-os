@@ -3,6 +3,7 @@ import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
+import websocket from '@fastify/websocket';
 import { timingSafeEqual } from 'node:crypto';
 import { cpSync, existsSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
@@ -18,6 +19,7 @@ import { brief, infra, latestReport, overview } from './metrics.ts';
 import { getUiContext, recentMessages, setUiContext } from './brain.ts';
 import { endLive, handleText, liveActive, setUiContextNote, startLive } from './live.ts';
 import { startRoutines } from './routines.ts';
+import { initTerminal, registerTerminal } from './terminal.ts';
 import { sandboxUrl, sbToken } from './sandbox.ts';
 import { catalog, githubEnabled, startGithub, syncCatalog } from './github.ts';
 
@@ -48,7 +50,10 @@ await app.register(helmet, {
   crossOriginEmbedderPolicy: false,
 });
 
+await app.register(websocket);
 registerAuth(app);
+initTerminal();
+registerTerminal(app);
 
 app.get('/api/health', async () => ({ ok: true }));
 
