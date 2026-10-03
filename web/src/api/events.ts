@@ -59,6 +59,15 @@ export function applyEvent(ev: ServerEvent) {
     case 'ui.action':
       applyUiAction(ev.action)
       break
+    case 'mission.updated':
+      s.set({ missions: { ...s.missions, [ev.mission.id]: ev.mission } })
+      break
+    case 'workflow.run.updated':
+      s.set({ workflowRuns: { ...s.workflowRuns, [ev.run.id]: ev.run } })
+      break
+    case 'custom.created':
+      s.set({ customViews: { ...s.customViews, [ev.view.id]: ev.view } })
+      break
     case 'run.updated':
       s.upsertRun(ev.run)
       break

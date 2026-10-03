@@ -8,6 +8,7 @@ import { db, kvSet, now, uid } from './db.ts';
 import { emit } from './bus.ts';
 import { findAgent, agentsWorking, type AgentDef } from './agents.ts';
 import { ensureProject, findProject } from './projects.ts';
+import { agentOptions, runPromptExtras } from './extensions.ts';
 
 // Eventos para a camada de conversa (live.ts / brain.ts) narrar o trabalho.
 export const runBus = new EventEmitter<{
@@ -17,7 +18,7 @@ export const runBus = new EventEmitter<{
 }>();
 
 type RunRow = {
-  id: string; agent_id: string; project: string | null; instruction: string; task: string; state: RunState;
+  id: string; mission_id: string | null; step_id: string | null; workflow_run_id: string | null; display: 'blocks' | 'html' | null; agent_id: string; project: string | null; instruction: string; task: string; state: RunState;
   progress: number; current_op: string | null; tools: string; steps: string; result: string | null;
   session_id: string | null; tokens_in: number; tokens_out: number; cost_usd: number;
   created_at: string; started_at: string | null; finished_at: string | null;
@@ -89,8 +90,12 @@ export interface EnqueueInput {
   instruction: string;
   task?: string;
   selectedElement?: string | null;
-  origin?: 'yui' | 'manual' | 'routine';
+  origin?: 'yui' | 'manual' | 'routine' | 'mission' | 'workflow';
   routineId?: string;
+  missionId?: string;
+  stepId?: string;
+  workflowRunId?: string;
+  display?: 'blocks' | 'html' | null;
 }
 
 export function enqueueRun(input: EnqueueInput): RunInfo {
@@ -104,8 +109,10 @@ export function enqueueRun(input: EnqueueInput): RunInfo {
     ? `${input.instruction}\n\nContexto visual: o usuário selecionou o elemento \`${input.selectedElement}\` no preview.`
     : input.instruction;
   db.prepare(
-    `INSERT INTO runs(id, agent_id, project, instruction, task, state, origin, routine_id, created_at) VALUES(?, ?, ?, ?, ?, 'queued', ?, ?, ?)`,
-  ).run(id, agent.id, project?.slug ?? null, instruction, task, input.origin ?? 'yui', input.routineId ?? null, now());
+    `INSERT INTO runs(id, agent_id, project, instruction, task, state, origin, routine_id, mission_id, step_id, workflow_run_id, display, created_at)
+     VALUES(?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, agent.id, project?.slug ?? null, instruction, task, input.origin ?? 'yui', input.routineId ?? null,
+    input.missionId ?? null, input.stepId ?? null, input.workflowRunId ?? null, input.display ?? null, now());
   const info = getRun(id)!;
   emit({ type: 'run.updated', run: info });
   setImmediate(pump);
@@ -344,13 +351,18 @@ async function execute(run: RunRow, ac: AbortController) {
   let steps: RunStep[] = [];
   let turns = 0;
 
+  const perAgent = agentOptions(agent.id);
   const q = query({
     prompt: run.instruction,
     options: {
       cwd,
       abortController: ac,
       additionalDirectories: [yuiDir],
-      systemPrompt: { type: 'preset', preset: 'claude_code', append: systemAppend(agent, project?.name ?? null) },
+      systemPrompt: {
+        type: 'preset',
+        preset: 'claude_code',
+        append: [systemAppend(agent, project?.name ?? null), runPromptExtras({ runId: run.id, agentId: agent.id, project: project?.slug ?? null, display: run.display })].filter(Boolean).join('\n'),
+      },
       permissionMode: 'default',
       allowedTools: SAFE_TOOLS,
       canUseTool,
@@ -362,6 +374,7 @@ async function execute(run: RunRow, ac: AbortController) {
       model: agent.model || config.claudeModel || undefined,
       maxTurns: 80,
       env: claudeEnv(),
+      ...perAgent,
     },
   });
 

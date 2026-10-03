@@ -3,7 +3,6 @@ import { promisify } from 'node:util';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import pty from 'node-pty';
 import { config } from './config.ts';
 import { activeProject, ensureProject, findProject } from './projects.ts';
 import { claudeEnv } from './runs.ts';
@@ -52,6 +51,7 @@ export function registerTerminal(app: FastifyInstance) {
     trustDirs([dir]);
     // Ao sair do Claude a sessão cai num bash, para não fechar o terminal na sua cara.
     const cmd = kind === 'claude' ? 'claude; exec bash -l' : 'exec bash -l';
+    const pty = (await import('node-pty')).default; // nativo: só carrega quando um terminal abre
     const term = pty.spawn('tmux', ['new-session', '-A', '-s', name, '-c', dir, 'bash', '-lc', cmd], {
       name: 'xterm-256color',
       cols: Math.max(20, Math.min(400, Number(q.cols) || 120)),

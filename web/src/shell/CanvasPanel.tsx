@@ -12,6 +12,14 @@ import { ReportView } from '../views/ReportView'
 import { RunsView } from '../views/RunsView'
 import { WebsiteView } from '../views/WebsiteView'
 import { TerminalView } from '../views/TerminalView'
+import { MissionView } from '../views/MissionView'
+import { CustomView } from '../views/CustomView'
+import { ToolsView } from '../views/ToolsView'
+import { AgentDetailView } from '../views/AgentDetailView'
+import { WorkflowView } from '../views/WorkflowView'
+import { WorkflowsView } from '../views/WorkflowsView'
+import { RoutinesView } from '../views/RoutinesView'
+import { ClaudeGuideView } from '../views/ClaudeGuideView'
 
 function ViewBody() {
   const view = useYui((s) => s.view)
@@ -27,6 +35,14 @@ function ViewBody() {
     case 'infra': return <InfraView />
     case 'artifact': return <ArtifactsView />
     case 'terminal': return <TerminalView />
+    case 'mission': return <MissionView />
+    case 'custom': return <CustomView />
+    case 'tools': return <ToolsView />
+    case 'agent': return <AgentDetailView />
+    case 'workflow': return <WorkflowView />
+    case 'workflows': return <WorkflowsView />
+    case 'routines': return <RoutinesView />
+    case 'claude': return <ClaudeGuideView />
     default: return null
   }
 }
@@ -41,7 +57,7 @@ export function CanvasPanel() {
   const params = useYui((s) => s.viewParams)
   const nonce = useYui((s) => s.viewNonce)
   const isC = mode === 'center', isF = mode === 'focus'
-  const key = `${view}:${params.project ?? ''}:${params.artifactId ?? ''}`
+  const key = `${view}:${params.project ?? ''}:${params.artifactId ?? ''}:${params.missionId ?? ''}:${params.customId ?? ''}:${params.agentId ?? ''}:${params.workflowId ?? ''}`
   return (
     <section
       aria-label={header.title || 'Canvas'}

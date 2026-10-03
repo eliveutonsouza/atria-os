@@ -104,6 +104,17 @@ CREATE TABLE IF NOT EXISTS routines (
 );
 `);
 
+// Migrações aditivas (colunas novas em tabelas existentes).
+function addColumn(table: string, col: string, def: string) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+}
+addColumn('runs', 'mission_id', 'TEXT');
+addColumn('runs', 'step_id', 'TEXT');
+addColumn('runs', 'workflow_run_id', 'TEXT');
+addColumn('runs', 'display', 'TEXT');
+addColumn('routines', 'workflow_id', 'TEXT');
+
 export const now = () => new Date().toISOString();
 export const uid = () => randomUUID();
 

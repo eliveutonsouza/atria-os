@@ -22,6 +22,14 @@ function pathFor(mode: Mode, view: ViewName, p: ViewParams): string {
     case 'infra': return '/infra'
     case 'artifact': return '/artifacts'
     case 'terminal': return p.kind === 'shell' ? '/terminal/shell' : '/terminal'
+    case 'mission': return p.missionId ? `/missions/${p.missionId}` : '/runs'
+    case 'custom': return p.customId ? `/views/${p.customId}` : '/'
+    case 'tools': return p.tab ? `/tools/${p.tab}` : '/tools'
+    case 'agent': return p.agentId ? `/agents/${p.agentId}` : '/agents'
+    case 'workflow': return p.workflowId ? `/workflows/${p.workflowId}` : '/workflows/new'
+    case 'workflows': return '/workflows'
+    case 'routines': return '/routines'
+    case 'claude': return '/claude'
     case 'website': return p.artifactId ? `/website/${p.artifactId}` : p.project ? `/website/p/${p.project}` : '/website'
     case 'brief': return '/brief'
     case 'dashboard': return '/dashboard'
@@ -34,7 +42,7 @@ function parsePath(path: string): { view: ViewName; params: ViewParams } | null 
   if (!seg.length) return null
   const [a, b, c] = seg
   switch (a) {
-    case 'agents': return { view: 'agents', params: {} }
+    case 'agents': return b ? { view: 'agent', params: { agentId: b } } : { view: 'agents', params: {} }
     case 'runs': return { view: 'runs', params: b ? { runId: b } : {} }
     case 'projects': return { view: b ? 'project' : 'dashboard', params: b ? { project: b } : {} }
     case 'logs': return { view: 'logs', params: b ? { project: b } : {} }
@@ -42,6 +50,12 @@ function parsePath(path: string): { view: ViewName; params: ViewParams } | null 
     case 'infra': return { view: 'infra', params: {} }
     case 'artifacts': return { view: 'artifact', params: {} }
     case 'terminal': return { view: 'terminal', params: b === 'shell' ? { kind: 'shell' } : {} }
+    case 'missions': return b ? { view: 'mission', params: { missionId: b } } : { view: 'runs', params: {} }
+    case 'views': return b ? { view: 'custom', params: { customId: b } } : null
+    case 'tools': return { view: 'tools', params: b ? { tab: b } : {} }
+    case 'workflows': return b ? { view: 'workflow', params: b === 'new' ? {} : { workflowId: b } } : { view: 'workflows', params: {} }
+    case 'routines': return { view: 'routines', params: {} }
+    case 'claude': return { view: 'claude', params: {} }
     case 'website': return { view: 'website', params: b === 'p' ? { project: c } : b ? { artifactId: b } : {} }
     case 'brief': return { view: 'brief', params: {} }
     case 'dashboard': return { view: 'dashboard', params: {} }

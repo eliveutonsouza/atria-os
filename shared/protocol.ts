@@ -22,7 +22,15 @@ export type ViewName =
   | 'website'
   | 'infra'
   | 'artifact'
-  | 'terminal';
+  | 'terminal'
+  | 'mission'
+  | 'custom'
+  | 'tools'
+  | 'agent'
+  | 'workflow'
+  | 'workflows'
+  | 'routines'
+  | 'claude';
 
 export const VIEW_NAMES: ViewName[] = [
   'brief',
@@ -36,6 +44,14 @@ export const VIEW_NAMES: ViewName[] = [
   'infra',
   'artifact',
   'terminal',
+  'mission',
+  'custom',
+  'tools',
+  'agent',
+  'workflow',
+  'workflows',
+  'routines',
+  'claude',
 ];
 
 export interface ViewParams {
@@ -43,6 +59,12 @@ export interface ViewParams {
   runId?: string;
   artifactId?: string;
   kind?: 'claude' | 'shell'; // view terminal
+  missionId?: string;
+  customId?: string;
+  agentId?: string;
+  workflowId?: string; // slug
+  workflowRunId?: string;
+  tab?: string; // aba interna (tools: connectors|mcp|skills|plugins|apps)
 }
 
 export type Tone = 'ok' | 'warn' | 'crit' | 'cyan' | 'lav' | 'muted';
@@ -219,6 +241,9 @@ export type ServerEvent =
   | { type: 'inbox.updated'; inbox: InboxItem[] }
   | { type: 'artifact.created'; artifact: ArtifactInfo }
   | { type: 'live.status'; active: boolean; muted: boolean }
+  | { type: 'mission.updated'; mission: MissionInfo }
+  | { type: 'workflow.run.updated'; run: WorkflowRunInfo }
+  | { type: 'custom.created'; view: CustomViewInfo }
   | { type: 'ping' };
 
 // ---------- REST ----------
@@ -259,4 +284,144 @@ export interface RepoInfo {
   pushedAt: string | null;
   archived: boolean;
   cloned: boolean;
+}
+
+// ---------- missões (plano de execução multi-agente) ----------
+export type StepStatus = 'pending' | 'waiting_approval' | 'running' | 'done' | 'failed' | 'skipped' | 'cancelled';
+export interface MissionStep {
+  id: string;
+  title: string;
+  agentId: string;
+  agent: string;
+  instruction: string;
+  dependsOn: string[];
+  risky: boolean;
+  display: 'blocks' | 'html' | null;
+  status: StepStatus;
+  runId: string | null;
+  result: string | null;
+}
+export interface MissionInfo {
+  id: string;
+  title: string;
+  goal: string;
+  project: string | null;
+  status: 'running' | 'paused' | 'blocked' | 'done' | 'failed' | 'cancelled';
+  steps: MissionStep[];
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+// ---------- telas sob medida ----------
+export type Block =
+  | { type: 'kpis'; items: { label: string; value: string; tone?: Tone }[] }
+  | { type: 'chart'; chart: 'bar' | 'line' | 'area' | 'pie'; title?: string; labels: string[]; series: { name: string; values: number[] }[] }
+  | { type: 'table'; title?: string; columns: string[]; rows: (string | number | null)[][] }
+  | { type: 'list'; title?: string; items: { title: string; subtitle?: string; meta?: string; tone?: Tone; href?: string }[] }
+  | { type: 'markdown'; text: string }
+  | { type: 'timeline'; title?: string; items: { t: string; label: string; tone?: Tone }[] }
+  | { type: 'image'; src: string; alt?: string }
+  | { type: 'html'; url: string; height?: number }
+  | { type: 'link'; label: string; href: string };
+export interface CustomViewSpec {
+  title: string;
+  eyebrow?: string;
+  blocks: Block[];
+}
+export interface CustomViewInfo {
+  id: string;
+  title: string;
+  spec: CustomViewSpec;
+  source: string; // 'yui' | runId
+  createdAt: string;
+}
+
+// ---------- caixa de ferramentas / capacidades ----------
+export type ToolStatus = 'ok' | 'warn' | 'needs-auth' | 'down' | 'unknown';
+export interface ToolboxItem {
+  id: string;
+  name: string;
+  category: string; // Comunicação, Agenda, Código, Design, Deploy, Dados, CRM, Conteúdo, Pesquisa, Infra…
+  purpose: string;
+  access: { type: 'mcp' | 'cli' | 'url' | 'stack' | 'repo' | 'skill' | 'plugin' | 'browser'; ref: string };
+  agent: string | null; // agente padrão
+  examples: string[];
+  status: ToolStatus;
+  note?: string;
+}
+export interface ClaudeInitInfo {
+  at: string;
+  model: string;
+  tools: string[];
+  mcp: { name: string; status: string; source?: string }[];
+  skills: string[];
+  slashCommands: string[];
+  plugins: { name: string; path: string; version?: string }[];
+  agents: string[];
+}
+
+// ---------- agentes configuráveis ----------
+export interface AgentConfig {
+  id: string;
+  name: string;
+  description: string;
+  group: string;
+  prompt: string;
+  model: string | null;
+  maxTurns: number | null;
+  skills: string[]; // vazio = todas
+  mcp: string[]; // allowlist de servidores MCP; vazio = todos
+  plugins: string[];
+  color: string | null;
+  archived: boolean;
+}
+
+// ---------- workflows de decisão ----------
+export type WorkflowNodeType = 'start' | 'task' | 'decision' | 'approval' | 'parallel' | 'end';
+export interface WorkflowNode {
+  id: string; // "1", "2"… (número do passo no markdown)
+  type: WorkflowNodeType;
+  title: string;
+  agent?: string; // id do agente (task)
+  instruction?: string;
+  skills?: string[];
+  mcp?: string[];
+  output?: string; // nome da saída para passos seguintes
+  condition?: string; // decision
+  branches?: { label: string; to: string }[]; // decision
+  next?: string[]; // task/approval/parallel/start
+  position?: { x: number; y: number };
+}
+export interface WorkflowDef {
+  slug: string;
+  name: string;
+  description: string;
+  trigger: { type: 'manual' | 'cron'; cron?: string };
+  project: string | null;
+  team: string[];
+  nodes: WorkflowNode[];
+  markdown: string;
+  updatedAt: string;
+}
+export interface WorkflowRunInfo {
+  id: string;
+  workflow: string; // slug
+  status: 'running' | 'waiting_approval' | 'done' | 'failed' | 'cancelled';
+  current: string | null;
+  nodes: Record<string, { status: StepStatus; runId?: string | null; result?: string | null; decision?: string | null }>;
+  startedAt: string;
+  finishedAt: string | null;
+}
+export interface RoutineInfo {
+  id: string;
+  name: string;
+  cron: string;
+  nextRun: string | null;
+  lastRun: string | null;
+  lastStatus: string | null;
+  workflow: string | null;
+  agentId: string | null;
+  project: string | null;
+  instruction: string | null;
+  enabled: boolean;
 }

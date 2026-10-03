@@ -9,6 +9,7 @@ import { activeProject, findProject, listProjectConfigs, projectDetail, projectL
 import { enqueueRun, inboxItems, listRuns, pendingApprovals } from './runs.ts';
 import { infra, overview } from './metrics.ts';
 import { createRoutine } from './routines.ts';
+import { brainExtensions, type ToolCtx } from './extensions.ts';
 
 // "Cérebro" da Yui: modelo de texto (Responses API) com as ferramentas do console.
 // Recebe pedidos digitados ou delegações do GPT-Live e devolve uma frase curta para ser dita/mostrada.
@@ -101,6 +102,7 @@ function connectors(): string {
 }
 
 function snapshot(): string {
+  const extra = brainExtensions().map((e) => e.snapshot?.()).filter(Boolean);
   const ap = activeProject();
   const runs = listRuns(12);
   const lines = [
@@ -116,10 +118,14 @@ function snapshot(): string {
     `Navegador dos agentes: Playwright (Chromium na VPS) e Chrome real do usuário quando conectado.`,
     `Aprovações pendentes: ${pendingApprovals().length}.`,
   ];
-  return lines.filter(Boolean).join('\n');
+  return [...lines, ...extra].filter(Boolean).join('\n');
 }
 
-async function runTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx): Promise<unknown> {
+  if (ctx.dryRun) {
+    ctx.calls?.push({ name, args });
+    return dryResult(name);
+  }
   const proj = (k = 'project') => (typeof args[k] === 'string' && args[k] ? findProject(args[k] as string) : undefined);
   switch (name) {
     case 'show_view': {
@@ -198,20 +204,37 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<unk
       emit({ type: 'ui.action', action: { type: 'open_approval', approvalId: a.id } });
       return { ok: true, titulo: a.title };
     }
-    default:
+    default: {
+      for (const ext of brainExtensions()) {
+        const r = ext.run(name, args, ctx);
+        if (r !== undefined) return r;
+      }
       return { error: `ferramenta desconhecida ${name}` };
+    }
   }
 }
 
 export interface ThinkInput {
   request: string; // fala/texto do usuário (ou transcrição recente)
   source: 'text' | 'voice';
+  dryRun?: boolean; // avaliação: tools só são registradas (scripts/eval-brain.ts)
+  calls?: { name: string; args: Record<string, unknown> }[];
 }
 
+// Respostas plausíveis para o modo de avaliação (não toca em nada real).
+function dryResult(name: string): unknown {
+  if (name.startsWith('get_') || name.startsWith('list_')) return { ok: true, nota: 'dados de exemplo (avaliação)', itens: [] };
+  return { ok: true };
+}
+
+const allTools = () => [...TOOLS, ...brainExtensions().flatMap((e) => e.tools)];
+const allInstructions = () => [INSTRUCTIONS, ...brainExtensions().map((e) => e.instructions).filter(Boolean)].join('\n');
+
 // Retorna a frase final da Yui. Efeitos de UI já foram emitidos durante o loop.
-export async function think({ request }: ThinkInput): Promise<string> {
+export async function think({ request, dryRun = false, calls }: ThinkInput): Promise<string> {
+  const ctx: ToolCtx & { calls?: ThinkInput['calls'] } = { dryRun, calls };
   if (!config.openaiKey) return 'Ainda não tenho a chave da OpenAI configurada no servidor.';
-  setYuiState('thinking');
+  if (!dryRun) setYuiState('thinking');
   const history = recentMessages(20)
     .map((m) => `${m.who === 'user' ? 'Usuário' : 'Yui'}: ${m.text}`)
     .join('\n');
@@ -223,9 +246,9 @@ export async function think({ request }: ThinkInput): Promise<string> {
   for (let step = 0; step < 8; step++) {
     const res = await openai.responses.create({
       model: config.brainModel,
-      instructions: INSTRUCTIONS,
+      instructions: allInstructions(),
       input,
-      tools: TOOLS,
+      tools: allTools(),
       previous_response_id: previous,
       parallel_tool_calls: true,
     });
@@ -236,7 +259,7 @@ export async function think({ request }: ThinkInput): Promise<string> {
     for (const c of calls) {
       let out: unknown;
       try {
-        out = await runTool(c.name, JSON.parse(c.arguments || '{}'));
+        out = await runTool(c.name, JSON.parse(c.arguments || '{}'), ctx);
       } catch (e) {
         out = { error: (e as Error).message };
       }

@@ -21,6 +21,12 @@ import { endLive, handleText, liveActive, setUiContextNote, startLive } from './
 import { startRoutines } from './routines.ts';
 import { initTerminal, registerTerminal } from './terminal.ts';
 import { trustDirs } from './trust.ts';
+import { captureInit, getInit, startCapabilities } from './capabilities.ts';
+import * as missions from './missions.ts';
+import * as customViews from './customViews.ts';
+import * as toolbox from './toolbox.ts';
+import * as agentsAdmin from './agentsAdmin.ts';
+import * as workflows from './workflows.ts';
 import { sandboxUrl, sbToken } from './sandbox.ts';
 import { catalog, githubEnabled, startGithub, syncCatalog } from './github.ts';
 
@@ -55,6 +61,7 @@ await app.register(websocket);
 registerAuth(app);
 initTerminal();
 registerTerminal(app);
+for (const mod of [missions, customViews, toolbox, agentsAdmin, workflows]) mod.register(app);
 
 app.get('/api/health', async () => ({ ok: true }));
 
@@ -236,7 +243,8 @@ app.post('/api/repos/sync', async () => {
   return { count: await syncCatalog() };
 });
 
-app.get('/api/capabilities', () => JSON.parse(kvGet('claude_capabilities') ?? '{}'));
+app.get('/api/capabilities', () => getInit() ?? JSON.parse(kvGet('claude_capabilities') ?? '{}'));
+app.post('/api/capabilities/refresh', async () => (await captureInit()) ?? { error: 'falhou' });
 app.get('/api/approvals', () => pendingApprovals());
 app.post('/api/approvals/:id', async (req, reply) => {
   const approve = (req.body as { approve?: unknown } | undefined)?.approve;
@@ -301,6 +309,7 @@ if (existsSync(config.webDist)) {
 recoverRuns();
 startRoutines();
 startGithub().catch((e) => console.error('github', e));
+startCapabilities();
 trustDirs(listProjectConfigs().filter((p) => p.cloned).map((p) => p.dir));
 emit({ type: 'agents.updated', agentsWorking: agentsWorking() });
 await app.listen({ port: config.port, host: config.host });

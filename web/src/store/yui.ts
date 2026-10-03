@@ -1,15 +1,5 @@
 import { create } from 'zustand'
-import type {
-  ApprovalInfo,
-  Brief,
-  ChatMessage,
-  InboxItem,
-  ProjectSummary,
-  RunInfo,
-  ViewName,
-  ViewParams,
-  YuiState,
-} from '@shared/protocol'
+import type { ApprovalInfo, Brief, ChatMessage, CustomViewInfo, InboxItem, MissionInfo, ProjectSummary, RunInfo, ViewName, ViewParams, WorkflowRunInfo, YuiState } from '@shared/protocol'
 
 export type Mode = 'center' | 'canvas' | 'focus'
 
@@ -56,6 +46,9 @@ export interface YuiStore {
   liveMuted: boolean
   // off = sem voz; ptt = segurar espaço para falar; continuous = microfone sempre aberto
   voiceMode: 'off' | 'ptt' | 'continuous'
+  missions: Record<string, MissionInfo>
+  workflowRuns: Record<string, WorkflowRunInfo>
+  customViews: Record<string, CustomViewInfo>
   liveConnecting: boolean
   liveTranscript: string
   narrow: boolean
@@ -107,6 +100,9 @@ export const useYui = create<YuiStore>((set, get) => ({
   listening: false,
   liveMuted: false,
   voiceMode: 'off',
+  missions: {},
+  workflowRuns: {},
+  customViews: {},
   liveConnecting: false,
   liveTranscript: '',
   narrow: false,
