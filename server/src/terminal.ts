@@ -7,6 +7,7 @@ import pty from 'node-pty';
 import { config } from './config.ts';
 import { activeProject, ensureProject, findProject } from './projects.ts';
 import { claudeEnv } from './runs.ts';
+import { trustDirs } from './trust.ts';
 
 // Terminal web: sessões tmux persistentes no container (fechar a aba só desanexa).
 // kind=claude abre o Claude Code interativo no projeto; kind=shell abre bash.
@@ -48,6 +49,7 @@ export function registerTerminal(app: FastifyInstance) {
     const dir = project?.cloned ? project.dir : config.workspaceDir;
     const slug = project?.cloned ? project.slug : 'workspace';
     const name = sessionName(kind, slug);
+    trustDirs([dir]);
     // Ao sair do Claude a sessão cai num bash, para não fechar o terminal na sua cara.
     const cmd = kind === 'claude' ? 'claude; exec bash -l' : 'exec bash -l';
     const term = pty.spawn('tmux', ['new-session', '-A', '-s', name, '-c', dir, 'bash', '-lc', cmd], {

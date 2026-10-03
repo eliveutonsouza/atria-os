@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { config } from './config.ts';
 import { db, now } from './db.ts';
 import { listContainers } from './docker.ts';
+import { trustDirs } from './trust.ts';
 
 // Projetos do usuário = repositórios do GitHub. Catálogo automático (gh repo list) + clone sob demanda.
 
@@ -89,6 +90,7 @@ export function ensureCloned(nameWithOwner: string): Promise<string> {
     console.log(`github: clonando ${nameWithOwner}`);
     await git(['clone', '--filter=blob:none', `https://github.com/${nameWithOwner}.git`, dir]);
     await writeYuiJson(dir, repo.name, nameWithOwner);
+    trustDirs([dir]);
     return dir;
   })().finally(() => cloning.delete(nameWithOwner));
   cloning.set(nameWithOwner, p);

@@ -13,13 +13,14 @@ import { db, kvGet, kvSet, now } from './db.ts';
 import { addClient, emit, setYuiState, yuiState } from './bus.ts';
 import { isAuthed, registerAuth, requireAuth } from './auth.ts';
 import { agentInfos, agentsWorking } from './agents.ts';
-import { activeProject, ensureProject, findProject, projectDetail, projectLogs, projectSummaries, setActiveProject } from './projects.ts';
+import { activeProject, ensureProject, findProject, listProjectConfigs, projectDetail, projectLogs, projectSummaries, setActiveProject } from './projects.ts';
 import { cancelRun, claudeLoggedIn, enqueueRun, getRun, inboxItems, listRuns, pendingApprovals, recoverRuns, resolveApproval, runEvents } from './runs.ts';
 import { brief, infra, latestReport, overview } from './metrics.ts';
 import { getUiContext, recentMessages, setUiContext } from './brain.ts';
 import { endLive, handleText, liveActive, setUiContextNote, startLive } from './live.ts';
 import { startRoutines } from './routines.ts';
 import { initTerminal, registerTerminal } from './terminal.ts';
+import { trustDirs } from './trust.ts';
 import { sandboxUrl, sbToken } from './sandbox.ts';
 import { catalog, githubEnabled, startGithub, syncCatalog } from './github.ts';
 
@@ -300,5 +301,6 @@ if (existsSync(config.webDist)) {
 recoverRuns();
 startRoutines();
 startGithub().catch((e) => console.error('github', e));
+trustDirs(listProjectConfigs().filter((p) => p.cloned).map((p) => p.dir));
 emit({ type: 'agents.updated', agentsWorking: agentsWorking() });
 await app.listen({ port: config.port, host: config.host });
