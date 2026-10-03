@@ -252,6 +252,7 @@ export function Dock() {
   const listening = useYui((s) => s.listening)
   const connecting = useYui((s) => s.liveConnecting)
   const muted = useYui((s) => s.liveMuted)
+  const voiceMode = useYui((s) => s.voiceMode)
   const pending = useYui((s) => s.pending)
   const [input, setInput] = useState('')
   const isC = mode === 'center', isF = mode === 'focus'
@@ -304,7 +305,19 @@ export function Dock() {
           onKeyDown={(e) => {
             if (e.key === 'Enter') send()
           }}
-          placeholder={micOn ? (connecting ? 'Conectando…' : muted ? 'Microfone mudo' : 'Ouvindo…') : isC ? 'Pergunte ou fale com Yui…' : 'Continue conversando…'}
+          placeholder={
+            micOn
+              ? connecting
+                ? 'Conectando…'
+                : muted
+                  ? 'Segure espaço para falar · 3× espaço = contínuo'
+                  : voiceMode === 'continuous'
+                    ? 'Ouvindo (contínuo) · espaço para sair'
+                    : 'Ouvindo…'
+              : isC
+                ? 'Pergunte ou segure espaço para falar…'
+                : 'Continue conversando…'
+          }
           style={{ flex: 1, minWidth: 0, height: 40, border: 'none', outline: 'none', background: 'transparent', color: C.text, fontSize: 15, fontFamily: 'var(--sans)' }}
         />
         <button

@@ -5,6 +5,7 @@ import { api } from '../api/client'
 import { connectEvents } from '../api/events'
 import { sendContextDebounced } from '../lib/actions'
 import { ApprovalModal, CommandPalette, HistoryDrawer, Inbox } from '../overlays/Overlays'
+import { pttDown, pttUp } from '../voice/live'
 import { useYui, type Mode } from '../store/yui'
 import { CanvasPanel } from './CanvasPanel'
 import { Dock, dockInput, OrbButton, OrbLayer, TopBar, YuiCenter, YuiLeft } from './parts'
@@ -89,8 +90,42 @@ async function bootstrap() {
   connectEvents()
 }
 
+// ---------- push-to-talk (Espaço) ----------
+// Segurar Espaço = falar; 3 toques rápidos = conversa contínua. Não rouba o Espaço de quem está digitando:
+// só vale fora de campos de texto, ou no campo da Yui quando ele está vazio.
+let pttHeld = false
+function pttTarget(e: KeyboardEvent): boolean {
+  if (e.code !== 'Space' || e.metaKey || e.ctrlKey || e.altKey) return false
+  const el = e.target as HTMLElement | null
+  if (!el) return true
+  if (el === dockInput.el) return !(el as HTMLInputElement).value
+  if (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(el.tagName)) return false
+  const s = useYui.getState()
+  return !s.palette && !s.approvalOpen
+}
+function onPttDown(e: KeyboardEvent) {
+  if (!pttTarget(e)) return
+  e.preventDefault()
+  if (e.repeat || pttHeld) return
+  pttHeld = true
+  pttDown()
+}
+function onPttUp(e: KeyboardEvent) {
+  if (e.code !== 'Space' || !pttHeld) return
+  e.preventDefault()
+  pttHeld = false
+  pttUp()
+}
+function onBlur() {
+  if (pttHeld) {
+    pttHeld = false
+    pttUp()
+  }
+}
+
 // ---------- teclado (cascata do design) ----------
 function onKey(e: KeyboardEvent) {
+  onPttDown(e)
   const s = useYui.getState()
   const mod = e.metaKey || e.ctrlKey
   if (mod && e.key.toLowerCase() === 'k') {
@@ -132,9 +167,13 @@ export function Shell() {
     onResize()
     window.addEventListener('resize', onResize)
     window.addEventListener('keydown', onKey)
+    window.addEventListener('keyup', onPttUp)
+    window.addEventListener('blur', onBlur)
     return () => {
       window.removeEventListener('resize', onResize)
       window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onPttUp)
+      window.removeEventListener('blur', onBlur)
     }
   }, [])
 

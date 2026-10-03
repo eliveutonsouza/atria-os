@@ -54,6 +54,8 @@ export interface YuiStore {
   selEl: string | null
   listening: boolean
   liveMuted: boolean
+  // off = sem voz; ptt = segurar espaço para falar; continuous = microfone sempre aberto
+  voiceMode: 'off' | 'ptt' | 'continuous'
   liveConnecting: boolean
   liveTranscript: string
   narrow: boolean
@@ -104,6 +106,7 @@ export const useYui = create<YuiStore>((set, get) => ({
   selEl: null,
   listening: false,
   liveMuted: false,
+  voiceMode: 'off',
   liveConnecting: false,
   liveTranscript: '',
   narrow: false,
