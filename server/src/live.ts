@@ -1,6 +1,6 @@
 import { SidebandWS } from 'openai/resources/live/sideband/ws';
 import type OpenAI from 'openai';
-import type { RunInfo } from '../../shared/protocol.ts';
+import type { RunInfo, UiAction } from '../../shared/protocol.ts';
 import { config } from './config.ts';
 import { emit, setYuiState } from './bus.ts';
 import { openai, recentMessages, saveMessage, think } from './brain.ts';
@@ -13,8 +13,10 @@ import { agentsWorking } from './agents.ts';
 
 const LIVE_INSTRUCTIONS = `Você é a Yui, assistente pessoal de IA do ${config.userName}. Fale português do Brasil.
 Personalidade: calma, presente, precisa, levemente calorosa. Frases curtas. Nunca leia listas longas nem números demais; resuma.
-Você conversa; o trabalho e as consultas são feitos pelo seu backend. Delegue SEMPRE que o usuário:
-- pedir para ver/abrir/mostrar algo na tela (dashboard, agentes, execuções, projetos, logs, relatório, site, VPS),
+Você conversa; o trabalho e as consultas são feitos pelo seu backend. Você NÃO controla a tela nem executa nada sozinha:
+só o backend abre telas e faz trabalho. Nunca diga que abriu, mostrou ou fez algo antes de receber a confirmação do backend.
+Delegue SEMPRE que o usuário:
+- pedir para ver/abrir/mostrar algo na tela (terminal, dashboard, agentes, execuções, projetos, logs, relatório, site, VPS),
 - perguntar status, números ou fatos do ambiente,
 - pedir qualquer trabalho (corrigir, criar, pesquisar, revisar, publicar, agendar),
 - disser "volta", "fecha", "tela cheia", ou mudar de projeto.
@@ -37,9 +39,26 @@ interface LiveState {
 let live: LiveState | null = null;
 export const liveActive = () => !!live;
 
+// Comandos de tela inequívocos executados direto da transcrição, sem depender de o GPT-Live delegar.
+const FAST_UI: { re: RegExp; action: UiAction }[] = [
+  { re: /\b(abr[aei]|abrir|mostr[ae]|quero|liga)\b.*\bterminal\b|^terminal\b/i, action: { type: 'show_view', view: 'terminal' } },
+  { re: /^(volta|voltar|fecha|fechar)\b/i, action: { type: 'close_canvas' } },
+  { re: /\btela cheia\b/i, action: { type: 'set_focus', on: true } },
+];
+
+function fastUi(text: string): string | null {
+  const t = text.trim().toLowerCase();
+  const hit = FAST_UI.find((f) => f.re.test(t));
+  if (!hit) return null;
+  emit({ type: 'ui.action', action: hit.action });
+  return hit.action.type === 'show_view' ? `Tela aberta pelo sistema: ${hit.action.view}.` : hit.action.type === 'close_canvas' ? 'Canvas fechado pelo sistema.' : 'Tela cheia ativada pelo sistema.';
+}
+
 function flushUser() {
   if (!live || !live.userBuf.trim()) return;
   const text = live.userBuf.trim();
+  const done = fastUi(text);
+  if (done) send(live, { type: 'session.thinking.append', delegation_id: null, content: `${done} (pedido do usuário: "${text}")` });
   live.pendingRequest = `${live.pendingRequest} ${text}`.trim();
   saveMessage('user', text, 'voice');
   emit({ type: 'user.said', text, final: true });
@@ -123,6 +142,7 @@ function wire(st: LiveState) {
   sb.on('session.delegation.created', (e) => {
     if (live !== st) return;
     flushUser();
+    console.log(`live: delegação ${e.delegation.id} ← "${st.pendingRequest.slice(0, 120)}"`);
     const request = st.pendingRequest || 'O usuário pediu algo por voz; use o contexto recente.';
     st.pendingRequest = '';
     const delegationId = e.delegation.id;
@@ -252,6 +272,5 @@ runBus.on('approval', (a) => {
   emit({ type: 'ui.action', action: { type: 'open_approval', approvalId: a.id } });
 });
 
-export function setUiContextNote(note: string) {
-  if (live) send(live, { type: 'session.thinking.append', delegation_id: null, content: note });
-}
+// Contexto de tela vai só para o cérebro (getUiContext); mandar ao GPT-Live fazia a Yui narrar a tela.
+export function setUiContextNote(_note: string) {}
