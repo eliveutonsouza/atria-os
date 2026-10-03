@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import type { ChatContext, ViewName } from '../../shared/protocol.ts';
 import { VIEW_NAMES } from '../../shared/protocol.ts';
 import { config } from './config.ts';
-import { db, now, uid } from './db.ts';
+import { db, kvGet, now, uid } from './db.ts';
 import { emit, setYuiState } from './bus.ts';
 import { agentInfos, loadAgents } from './agents.ts';
 import { activeProject, findProject, listProjectConfigs, projectDetail, projectLogs, setActiveProject } from './projects.ts';
@@ -43,6 +43,7 @@ Como responder:
 - "Volta", "fecha", "sair" => close_canvas. "Tela cheia" => set_focus(true).
 - Pedidos de trabalho (corrigir, criar, pesquisar, revisar, gerar relatório, criar site) => delegate_task com o agente mais adequado e uma instrução completa e autossuficiente (o agente não vê esta conversa). Diga em uma frase quem você acordou e o que vai fazer.
 - Para trabalhos que o usuário quer recorrentes ("todo dia às 8h…") use create_routine.
+- Os agentes têm acesso real às contas do usuário pelos conectores listados em "Conectores dos agentes" (ex.: Google Calendar, Gmail, Drive, Linear, Vercel, Supabase) e a um navegador. NUNCA diga que não há acesso a um serviço dessa lista: delegue ao agente Assistente (agenda, e-mail, documentos, tarefas, consultas) com instrução completa (data, hora, fuso America/Sao_Paulo, título). Se faltar só a data, assuma a próxima ocorrência futura e diga qual assumiu.
 - Os projetos do usuário são os repositórios dele no GitHub (catálogo automático). Nunca peça para cadastrar projeto: se não reconhecer o nome, use list_repos. Projetos ainda não clonados são clonados sozinhos ao abrir ou delegar.
 - Se o usuário mudar de projeto ("agora no Stoqmate"), use switch_project.
 - Aprovações são sempre decididas pelo usuário no modal; use open_approval para mostrá-lo, nunca aprove sozinha.
@@ -88,6 +89,17 @@ const TOOLS: OpenAI.Responses.FunctionTool[] = [
   { type: 'function', name: 'open_approval', strict: true, description: 'Mostra ao usuário o modal da aprovação pendente mais antiga.', parameters: S({}, []) },
 ];
 
+// Conectores MCP vistos no último run (gravado por runs.ts no init do SDK).
+function connectors(): string {
+  try {
+    const caps = JSON.parse(kvGet('claude_capabilities') ?? '{}') as { mcp?: { name: string; status: string }[] };
+    const ok = (caps.mcp ?? []).filter((m) => !['needs-auth', 'failed', 'disabled'].includes(m.status)).map((m) => m.name.replace(/^claude\.ai /, ''));
+    return ok.length ? ok.join(', ') : 'Google Calendar, Gmail, Google Drive, Linear, Vercel, Supabase, Figma (via login claude.ai)';
+  } catch {
+    return 'desconhecidos';
+  }
+}
+
 function snapshot(): string {
   const ap = activeProject();
   const runs = listRuns(12);
@@ -100,6 +112,8 @@ function snapshot(): string {
     `Outros repositórios no GitHub (clonam sob demanda): ${listProjectConfigs().filter((p) => !p.cloned).map((p) => p.slug).join(', ') || 'nenhum'}.`,
     `Agentes: ${loadAgents().map((a) => `${a.name} [${a.id}] — ${a.description}`).join('; ')}.`,
     `Execuções: ${runs.filter((r) => ['running', 'queued', 'waiting_approval'].includes(r.state)).map((r) => `${r.agent}: ${r.task} (${r.state}, ${r.progress}%)`).join('; ') || 'nenhuma ativa'}.`,
+    `Conectores dos agentes: ${connectors()}.`,
+    `Navegador dos agentes: Playwright (Chromium na VPS) e Chrome real do usuário quando conectado.`,
     `Aprovações pendentes: ${pendingApprovals().length}.`,
   ];
   return lines.filter(Boolean).join('\n');

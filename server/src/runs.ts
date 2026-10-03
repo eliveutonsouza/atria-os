@@ -172,7 +172,10 @@ const toolLabel = (name: string) => {
   if (name.startsWith('mcp__claude-in-chrome__')) return 'Chrome';
   if (name.startsWith('mcp__playwright__')) return 'Navegador';
   const m = /^mcp__([^_]+(?:_[^_]+)*)__/.exec(name);
-  if (m) return `${m[1].replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())} MCP`;
+  if (m) {
+    const server = m[1].replace(/^claude_ai_/, '').replace(/[-_]/g, ' ');
+    return /^claude_ai_/.test(m[1]) ? server : `${server.replace(/\b\w/g, (c) => c.toUpperCase())} MCP`;
+  }
   return name;
 };
 
@@ -324,7 +327,7 @@ async function execute(run: RunRow, ac: AbortController) {
     if (toolName.startsWith('mcp__') && SENSITIVE_MCP.test(toolName.split('__').pop() ?? '')) {
       const ok = await requestApproval(
         run,
-        `${agent.name} quer usar ${toolLabel(toolName)}: ${toolName.split('__').pop()}.`,
+        `${agent.name} quer usar ${toolLabel(toolName)} (${toolName.split('__').pop()}).`,
         [
           { label: 'Ferramenta', value: toolName.split('__').pop() ?? toolName },
           { label: 'Detalhe', value: JSON.stringify(input).slice(0, 80) },
