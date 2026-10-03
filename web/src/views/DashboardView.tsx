@@ -3,6 +3,7 @@ import { useApi } from '../api/useApi'
 import { C, toneColor } from '../lib/colors'
 import { useYui } from '../store/yui'
 import { card, Empty, ErrorNote, Eyebrow, Skeleton, useHeader } from './ui'
+import { Bars, KpiTile, LineArea } from '../charts/Charts'
 
 function hourLabels(): string[] {
   const h = new Date().getHours()
@@ -22,15 +23,11 @@ export function DashboardView() {
   if (loading && !data) return <Skeleton rows={3} />
   if (error || !data) return <ErrorNote />
 
-  const max = Math.max(1, ...data.bars24h)
-  const bars = data.bars24h.map((b, i) => ({ h: `${Math.round((b / max) * 100)}%`, o: i === 23 ? 1 : 0.55 + (0.45 * b) / max, tip: `${b} execuções` }))
   // série de sucesso: nulos herdam o último valor conhecido
   let last = 100
   const vals = data.success30d.map((v) => (v == null ? last : (last = v)))
   const known = data.success30d.filter((v): v is number => v != null)
   const lo = Math.min(85, ...(known.length ? known.map((v) => v - 2) : [85]))
-  const span = Math.max(1, 100 - lo)
-  const pts = vals.map((v, i) => `${((i / Math.max(1, vals.length - 1)) * 300).toFixed(1)},${(100 - ((v - lo) / span) * 100).toFixed(1)}`)
   const hl = hourLabels()
   const kpis = [
     { l: 'Agentes', v: String(data.agentsTotal), color: C.text },
@@ -41,35 +38,17 @@ export function DashboardView() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 14 }}>
-        {kpis.map((k) => (
-          <div key={k.l} style={card}>
-            <div style={{ fontSize: 12, color: C.t2, marginBottom: 8 }}>{k.l}</div>
-            <div style={{ fontSize: 40, fontWeight: 300, lineHeight: 1, letterSpacing: '-.02em', color: k.color }}>{k.v}</div>
-          </div>
-        ))}
+        {kpis.map((k) => <KpiTile key={k.l} label={k.l} value={k.v} color={k.color} />)}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 14 }}>
         <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ fontWeight: 600 }}>Atividade dos agentes</span><span style={{ color: C.t3 }}>últimas 24h</span></div>
-          <div role="img" aria-label="Execuções por hora nas últimas 24 horas" style={{ height: 140, display: 'flex', alignItems: 'flex-end', gap: 4 }}>
-            {bars.map((b, i) => (
-              <div key={i} title={b.tip} style={{ flex: 1, height: b.h, minHeight: 2, borderRadius: '3px 3px 1px 1px', background: 'linear-gradient(180deg,#67d8f2,rgba(166,140,247,.35))', opacity: b.o }} />
-            ))}
-          </div>
+          <Bars values={data.bars24h} tips={data.bars24h.map((b) => `${b} execuções`)} label="Execuções por hora nas últimas 24 horas" />
           <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.t3 }}>{hl.map((l) => <span key={l}>{l}</span>)}</div>
         </div>
         <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ fontWeight: 600 }}>Taxa de sucesso</span><span style={{ color: C.t3 }}>30 dias</span></div>
-          <svg viewBox="0 0 300 100" preserveAspectRatio="none" role="img" aria-label="Taxa de sucesso nos últimos 30 dias" style={{ width: '100%', height: 140, display: 'block' }}>
-            <defs>
-              <linearGradient id="yuiArea" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor="#a68cf7" stopOpacity=".35" />
-                <stop offset="1" stopColor="#a68cf7" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path d={`M0,100 L${pts.join(' L')} L300,100 Z`} fill="url(#yuiArea)" />
-            <polyline points={pts.join(' ')} fill="none" stroke="#cbbcff" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-          </svg>
+          <LineArea series={[{ name: 'Sucesso', values: vals }]} area min={lo} max={100} label="Taxa de sucesso nos últimos 30 dias" />
           <div className="mono" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.t3 }}><span>{dayLabel(29)}</span><span>{dayLabel(15)}</span><span>hoje</span></div>
         </div>
       </div>

@@ -174,7 +174,15 @@ export function ApprovalModal() {
             </div>
           ))}
         </div>
-        <button ref={btnRef} onClick={() => useYui.getState().show('runs', { runId: ap.runId })} style={{ height: 40, borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.03)', color: '#dfe3f3', fontSize: 14, cursor: 'pointer' }}>Revisar alterações</button>
+        <button ref={btnRef} onClick={() => {
+            // aprovação pode ser de um run, de uma etapa de missão ou de um passo de workflow
+            const st = useYui.getState()
+            const wf = st.workflowRuns[ap.runId]
+            if (wf) return st.show('workflow', { workflowId: wf.workflow, workflowRunId: wf.id })
+            const ms = Object.values(st.missions).find((m) => m.id === ap.runId || m.steps.some((x) => x.runId === ap.runId))
+            if (ms) return st.show('mission', { missionId: ms.id })
+            st.show('runs', { runId: ap.runId })
+          }} style={{ height: 40, borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.03)', color: '#dfe3f3', fontSize: 14, cursor: 'pointer' }}>Revisar alterações</button>
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={() => resolveApproval(ap.id, false)} style={{ flex: 1, height: 44, borderRadius: 12, border: '1px solid rgba(240,98,114,.35)', background: 'transparent', color: '#f39aa4', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Rejeitar</button>
           <button onClick={() => resolveApproval(ap.id, true)} style={{ flex: 1, height: 44, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#4fe0b0,#67d8f2)', color: '#06221c', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Aprovar</button>

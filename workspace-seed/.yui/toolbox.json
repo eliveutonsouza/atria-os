@@ -1,0 +1,549 @@
+[
+  {
+    "id": "gmail",
+    "name": "Gmail",
+    "category": "Comunicação",
+    "purpose": "Ler, buscar, rascunhar e responder e-mails (enviar pede aprovação).",
+    "access": {
+      "type": "mcp",
+      "ref": "claude.ai Gmail"
+    },
+    "agent": "assistente",
+    "examples": [
+      "Mostra meus e-mails não lidos de hoje",
+      "Rascunha uma resposta para o último e-mail do cliente X"
+    ]
+  },
+  {
+    "id": "google-calendar",
+    "name": "Google Calendar",
+    "category": "Agenda",
+    "purpose": "Ver agenda, criar e mover eventos, sugerir horários (criar evento pede aprovação).",
+    "access": {
+      "type": "mcp",
+      "ref": "claude.ai Google Calendar"
+    },
+    "agent": "assistente",
+    "examples": [
+      "O que tenho agendado amanhã?",
+      "Cria um evento sexta 19h: reunião com a Fisioforma"
+    ]
+  },
+  {
+    "id": "google-drive",
+    "name": "Google Drive",
+    "category": "Documentos",
+    "purpose": "Buscar, ler e criar arquivos no Drive (Docs, Sheets, Slides).",
+    "access": {
+      "type": "mcp",
+      "ref": "claude.ai Google Drive"
+    },
+    "agent": "assistente",
+    "examples": [
+      "Acha a proposta da Jonyx no Drive",
+      "Cria uma planilha de leads de hoje"
+    ]
+  },
+  {
+    "id": "linear",
+    "name": "Linear",
+    "category": "Tarefas",
+    "purpose": "Issues, projetos, ciclos e status de trabalho no Linear.",
+    "access": {
+      "type": "mcp",
+      "ref": "claude.ai Linear"
+    },
+    "agent": "assistente",
+    "examples": [
+      "Quais issues estão abertas no Linear?",
+      "Cria uma issue para o bug do Stoqmate"
+    ]
+  },
+  {
+    "id": "github",
+    "name": "GitHub",
+    "category": "Código",
+    "purpose": "Repositórios eliveutonsouza e ESM-Softwares: clonar, ler, branches, PRs (gh CLI logado no container; push pede aprovação).",
+    "access": {
+      "type": "cli",
+      "ref": "gh"
+    },
+    "agent": "backend",
+    "examples": [
+      "Abre o stoqmate",
+      "Abre um PR com a correção",
+      "Quais PRs estão abertos no companyos?"
+    ]
+  },
+  {
+    "id": "vercel",
+    "name": "Vercel",
+    "category": "Deploy",
+    "purpose": "Projetos, deploys, logs e domínios na Vercel (deploy pede aprovação).",
+    "access": {
+      "type": "mcp",
+      "ref": "claude.ai Vercel"
+    },
+    "agent": "devops",
+    "examples": [
+      "Como está o último deploy do portfólio?",
+      "Mostra os erros de runtime do site X"
+    ]
+  },
+  {
+    "id": "supabase",
+    "name": "Supabase",
+    "category": "Dados",
+    "purpose": "Projetos, tabelas, SQL, migrations, edge functions e logs do Supabase.",
+    "access": {
+      "type": "mcp",
+      "ref": "claude.ai Supabase"
+    },
+    "agent": "backend",
+    "examples": [
+      "Lista as tabelas do projeto do Stoqmate",
+      "Mostra os logs de erro do Supabase de hoje"
+    ]
+  },
+  {
+    "id": "terminal",
+    "name": "Terminal (Claude Code + shell)",
+    "category": "Código",
+    "purpose": "Sessão interativa do Claude Code ou bash no projeto ativo, persistente em tmux.",
+    "access": {
+      "type": "cli",
+      "ref": "claude"
+    },
+    "agent": null,
+    "examples": [
+      "Abre o terminal",
+      "Abre o terminal no stoqmate"
+    ]
+  },
+  {
+    "id": "claude-design",
+    "name": "Claude Design",
+    "category": "Design",
+    "purpose": "Criar telas, protótipos, decks/slides e design systems no claude.ai/design (skills design e design-sync, ferramenta DesignSync).",
+    "access": {
+      "type": "skill",
+      "ref": "design"
+    },
+    "agent": "designer",
+    "examples": [
+      "Faz um deck sobre o Stoqmate",
+      "Cria um protótipo da tela de login da Yui",
+      "Sincroniza meus componentes com o design system"
+    ]
+  },
+  {
+    "id": "figma",
+    "name": "Figma",
+    "category": "Design",
+    "purpose": "Ler designs, contexto de componentes, screenshots e design systems do Figma.",
+    "access": {
+      "type": "mcp",
+      "ref": "claude.ai Figma"
+    },
+    "agent": "designer",
+    "examples": [
+      "Pega o design da landing no Figma e implementa"
+    ]
+  },
+  {
+    "id": "higgsfield",
+    "name": "Higgsfield",
+    "category": "Conteúdo",
+    "purpose": "Gerar imagens, vídeos, áudio e posts para redes (TikTok/Instagram).",
+    "access": {
+      "type": "mcp",
+      "ref": "claude.ai Higgsfield"
+    },
+    "agent": "designer",
+    "examples": [
+      "Gera 3 imagens para um post sobre IA",
+      "Cria um vídeo curto para o Instagram"
+    ]
+  },
+  {
+    "id": "canvas-design",
+    "name": "Arte estática (canvas)",
+    "category": "Design",
+    "purpose": "Pôsteres e peças visuais em PNG/PDF.",
+    "access": {
+      "type": "skill",
+      "ref": "anthropic-skills:canvas-design"
+    },
+    "agent": "designer",
+    "examples": [
+      "Cria um pôster para o lançamento"
+    ]
+  },
+  {
+    "id": "apify",
+    "name": "Apify",
+    "category": "Pesquisa",
+    "purpose": "Scrapers prontos (Google Maps, Instagram, sites) para leads e dados.",
+    "access": {
+      "type": "mcp",
+      "ref": "claude.ai Apify"
+    },
+    "agent": "research",
+    "examples": [
+      "Encontra 30 clínicas odontológicas em SP no Google Maps"
+    ]
+  },
+  {
+    "id": "firecrawl",
+    "name": "Firecrawl",
+    "category": "Pesquisa",
+    "purpose": "Busca web e extração de páginas em markdown/JSON.",
+    "access": {
+      "type": "mcp",
+      "ref": "claude.ai Firecrawl"
+    },
+    "agent": "research",
+    "examples": [
+      "Pesquisa os concorrentes do Stoqmate e resume"
+    ]
+  },
+  {
+    "id": "deep-research",
+    "name": "Pesquisa profunda",
+    "category": "Pesquisa",
+    "purpose": "Relatório de pesquisa com várias fontes (skill deep-research).",
+    "access": {
+      "type": "skill",
+      "ref": "deep-research"
+    },
+    "agent": "research",
+    "examples": [
+      "Faz uma pesquisa profunda sobre CRMs para clínicas"
+    ]
+  },
+  {
+    "id": "playwright",
+    "name": "Navegador da VPS (Playwright)",
+    "category": "Navegador",
+    "purpose": "Chromium headless: navegar, testar sites, preencher formulários, screenshots.",
+    "access": {
+      "type": "browser",
+      "ref": "playwright"
+    },
+    "agent": "qa",
+    "examples": [
+      "Abre meu site e tira um screenshot",
+      "Testa o fluxo de login do Stoqmate"
+    ]
+  },
+  {
+    "id": "chrome",
+    "name": "Meu Chrome (Claude in Chrome)",
+    "category": "Navegador",
+    "purpose": "Usa o seu Chrome real com suas contas, quando a extensão estiver conectada.",
+    "access": {
+      "type": "browser",
+      "ref": "claude-in-chrome"
+    },
+    "agent": "assistente",
+    "examples": [
+      "Abre meu Instagram no Chrome e vê as mensagens"
+    ],
+    "note": "Só funciona com o Chrome aberto e a extensão logada."
+  },
+  {
+    "id": "composio",
+    "name": "Composio",
+    "category": "Integrações",
+    "purpose": "Centenas de apps (Instagram, WhatsApp, Notion…) via Composio; conecte contas no Composio.",
+    "access": {
+      "type": "mcp",
+      "ref": "claude.ai composio"
+    },
+    "agent": "assistente",
+    "examples": [
+      "Publica este post no Instagram via Composio"
+    ],
+    "note": "Contas precisam estar conectadas no Composio."
+  },
+  {
+    "id": "n8n",
+    "name": "n8n",
+    "category": "Automação",
+    "purpose": "Workflows n8n em n8n.eliveutonsouza.cloud.",
+    "access": {
+      "type": "url",
+      "ref": "https://n8n.eliveutonsouza.cloud"
+    },
+    "agent": "devops",
+    "examples": [
+      "O n8n está no ar?",
+      "Mostra os logs do n8n"
+    ],
+    "note": "Conector MCP do n8n pede autorização no claude.ai."
+  },
+  {
+    "id": "n8n-mcp",
+    "name": "n8n (conector)",
+    "category": "Automação",
+    "purpose": "Executar/consultar workflows n8n pelo conector.",
+    "access": {
+      "type": "mcp",
+      "ref": "claude.ai n8n"
+    },
+    "agent": "devops",
+    "examples": [
+      "Roda o workflow X no n8n"
+    ],
+    "note": "Pede autorização no claude.ai → Configurações → Conectores."
+  },
+  {
+    "id": "facebook",
+    "name": "Facebook / Instagram (conector)",
+    "category": "Conteúdo",
+    "purpose": "Páginas e Instagram Business pelo conector Meta.",
+    "access": {
+      "type": "mcp",
+      "ref": "claude.ai Facebook"
+    },
+    "agent": "assistente",
+    "examples": [
+      "Quantos seguidores ganhei essa semana?"
+    ],
+    "note": "Pede autorização no claude.ai → Configurações → Conectores."
+  },
+  {
+    "id": "stripe",
+    "name": "Stripe",
+    "category": "Financeiro",
+    "purpose": "Pagamentos, clientes e assinaturas (ações pedem aprovação).",
+    "access": {
+      "type": "mcp",
+      "ref": "claude.ai Stripe"
+    },
+    "agent": "assistente",
+    "examples": [
+      "Quanto recebi este mês?"
+    ],
+    "note": "Pede autorização no claude.ai → Configurações → Conectores."
+  },
+  {
+    "id": "twenty-esm",
+    "name": "Twenty CRM (ESM Softwares)",
+    "category": "CRM",
+    "purpose": "CRM Twenty da ESM via conector: pessoas, empresas, oportunidades, tarefas.",
+    "access": {
+      "type": "mcp",
+      "ref": "claude.ai Twenty esm-softwares"
+    },
+    "agent": "assistente",
+    "examples": [
+      "Quais oportunidades estão abertas no CRM?",
+      "Cria uma empresa no CRM"
+    ]
+  },
+  {
+    "id": "twenty-qcjv",
+    "name": "Twenty CRM (crm.eliveutonsouza.cloud)",
+    "category": "CRM",
+    "purpose": "CRM pessoal antigo — só leitura de status/logs (stack protegido).",
+    "access": {
+      "type": "stack",
+      "ref": "twenty-qcjv"
+    },
+    "agent": "devops",
+    "examples": [
+      "O CRM antigo está no ar?"
+    ],
+    "note": "Stack protegido: nunca parar/remover."
+  },
+  {
+    "id": "twenty-jonyx",
+    "name": "Twenty CRM Jonyx Mídia",
+    "category": "CRM",
+    "purpose": "CRM do cliente Jonyx (crm.jonyxmidia.com.br) — status e logs.",
+    "access": {
+      "type": "stack",
+      "ref": "twentycrm-jonyxmidia"
+    },
+    "agent": "devops",
+    "examples": [
+      "O CRM da Jonyx está saudável?"
+    ],
+    "note": "Stack protegido de cliente: só leitura."
+  },
+  {
+    "id": "company-os",
+    "name": "Company OS",
+    "category": "Plataforma",
+    "purpose": "Fábrica de empresas: Paperclip, Hermes, Twenty, Chatwoot, gateway (cos-api.eliveutonsouza.cloud).",
+    "access": {
+      "type": "stack",
+      "ref": "companyos"
+    },
+    "agent": "devops",
+    "examples": [
+      "Como está o Company OS?",
+      "Mostra os logs do gateway do Company OS"
+    ]
+  },
+  {
+    "id": "company-os-repo",
+    "name": "Company OS (código)",
+    "category": "Código",
+    "purpose": "Repositório ESM-Softwares/companyos.",
+    "access": {
+      "type": "repo",
+      "ref": "ESM-Softwares/companyos"
+    },
+    "agent": "backend",
+    "examples": [
+      "Abre o companyos",
+      "Corrige o bug X no gateway do Company OS"
+    ]
+  },
+  {
+    "id": "frappe",
+    "name": "Frappe CRM / ERPNext",
+    "category": "CRM",
+    "purpose": "frappe.eliveutonsouza.cloud — CRM + ERPNext.",
+    "access": {
+      "type": "stack",
+      "ref": "frappe-crm"
+    },
+    "agent": "devops",
+    "examples": [
+      "O Frappe está no ar?"
+    ]
+  },
+  {
+    "id": "documenso",
+    "name": "Documenso",
+    "category": "Documentos",
+    "purpose": "Assinatura de documentos em assinaturas.eliveutonsouza.com.",
+    "access": {
+      "type": "stack",
+      "ref": "documenso-bn85"
+    },
+    "agent": "devops",
+    "examples": [
+      "O Documenso está no ar?"
+    ]
+  },
+  {
+    "id": "docuseal",
+    "name": "DocuSeal",
+    "category": "Documentos",
+    "purpose": "Assinaturas (docuseal-zce5).",
+    "access": {
+      "type": "stack",
+      "ref": "docuseal-zce5"
+    },
+    "agent": "devops",
+    "examples": [
+      "O DocuSeal está no ar?"
+    ]
+  },
+  {
+    "id": "compai",
+    "name": "Comp AI CRM",
+    "category": "CRM",
+    "purpose": "app.compai.eliveutonsouza.cloud.",
+    "access": {
+      "type": "stack",
+      "ref": "compai-crm"
+    },
+    "agent": "devops",
+    "examples": [
+      "O compai está no ar?"
+    ]
+  },
+  {
+    "id": "anythingllm",
+    "name": "AnythingLLM",
+    "category": "IA",
+    "purpose": "Instância AnythingLLM na VPS.",
+    "access": {
+      "type": "stack",
+      "ref": "anythingllm-h3wc"
+    },
+    "agent": "devops",
+    "examples": [
+      "O AnythingLLM está rodando?"
+    ]
+  },
+  {
+    "id": "vps",
+    "name": "VPS (infra)",
+    "category": "Infra",
+    "purpose": "CPU, RAM, disco e containers da VPS.",
+    "access": {
+      "type": "stack",
+      "ref": "traefik"
+    },
+    "agent": "devops",
+    "examples": [
+      "Como está minha VPS?"
+    ]
+  },
+  {
+    "id": "stoqmate",
+    "name": "Stoqmate",
+    "category": "Projetos",
+    "purpose": "Controle de estoque multi-loja com IA (Next.js + Supabase).",
+    "access": {
+      "type": "repo",
+      "ref": "eliveutonsouza/stoqmate"
+    },
+    "agent": "backend",
+    "examples": [
+      "Abre o stoqmate",
+      "Pede pro Frontend ligar o Supabase no Stoqmate"
+    ]
+  },
+  {
+    "id": "portfolio",
+    "name": "Portfólio",
+    "category": "Projetos",
+    "purpose": "Site pessoal eliveuton-dev-portifolio-v2.",
+    "access": {
+      "type": "repo",
+      "ref": "eliveutonsouza/eliveuton-dev-portifolio-v2"
+    },
+    "agent": "frontend",
+    "examples": [
+      "Mostra meu site pessoal",
+      "Atualiza a seção de projetos do portfólio"
+    ]
+  },
+  {
+    "id": "instagram",
+    "name": "Instagram (conteúdo)",
+    "category": "Conteúdo",
+    "purpose": "Repo eliveuton-instagram + criação de posts (Copy + Designer/Higgsfield); publicar só com aprovação.",
+    "access": {
+      "type": "repo",
+      "ref": "eliveutonsouza/eliveuton-instagram"
+    },
+    "agent": "copy",
+    "examples": [
+      "Cria 3 ideias de post para o Instagram",
+      "Roda o workflow de post do Instagram"
+    ],
+    "note": "Evite automação em massa em redes sociais (risco de bloqueio da conta)."
+  },
+  {
+    "id": "jonyxmidia",
+    "name": "Jonyx Mídia (site)",
+    "category": "Projetos",
+    "purpose": "Site/integrações do cliente Jonyx.",
+    "access": {
+      "type": "repo",
+      "ref": "eliveutonsouza/jonyxmidia"
+    },
+    "agent": "frontend",
+    "examples": [
+      "Abre o jonyxmidia"
+    ]
+  }
+]

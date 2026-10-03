@@ -1,16 +1,30 @@
-import type { AgentInfo } from '@shared/protocol'
+import type { AgentConfig, AgentInfo } from '@shared/protocol'
+import { api } from '../api/client'
 import { useApi } from '../api/useApi'
 import { C } from '../lib/colors'
 import { ago } from '../lib/format'
 import { useYui } from '../store/yui'
 import { ErrorNote, Empty, Skeleton, useHeader } from './ui'
 
-const GROUP_ORDER = ['Engineering', 'Operações', 'Growth']
+const GROUP_ORDER = ['Engineering', 'Design', 'Operações', 'Growth']
+
+async function newAgent() {
+  try {
+    const a = await api.post<AgentConfig>('/api/agents', { name: 'Novo agente', description: 'Descreva a especialidade', group: 'Geral', prompt: 'Instruções de trabalho do agente.' })
+    if (a) useYui.getState().show('agent', { agentId: a.id })
+  } catch {
+    useYui.getState().say('Não consegui criar o agente agora.', { state: 'warning' })
+  }
+}
 
 export function AgentsView() {
   const agentsWorking = useYui((s) => s.agentsWorking)
   const { data, loading, error } = useApi<AgentInfo[]>('/api/agents', [agentsWorking], 15000)
-  useHeader('Agent network', 'Agentes', [{ label: 'Execuções', fn: () => useYui.getState().show('runs') }])
+  useHeader('Agent network', 'Agentes', [
+    { label: '+ Novo agente', fn: () => void newAgent() },
+    { label: 'Ferramentas', fn: () => useYui.getState().show('tools') },
+    { label: 'Execuções', fn: () => useYui.getState().show('runs') },
+  ])
   if (loading && !data) return <Skeleton kpis={0} rows={8} />
   if (error || !data) return <ErrorNote />
   if (!data.length) return <Empty text="Nenhum agente configurado ainda." hint="Os agentes ficam em /workspace/.claude/agents." />
@@ -35,7 +49,17 @@ export function AgentsView() {
             const wait = ag.status === 'waiting'
             const dot = run ? C.cyan : wait ? C.warn : 'transparent'
             return (
-              <div key={ag.id} style={{ display: 'grid', gridTemplateColumns: '30px minmax(80px,160px) minmax(0,1fr) minmax(0,100px) minmax(0,100px)', minWidth: 0, alignItems: 'center', gap: 14, padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,.04)', fontSize: 14 }}>
+              <div
+                key={ag.id}
+                role="button"
+                tabIndex={0}
+                title={`Abrir ${ag.name}`}
+                onClick={() => useYui.getState().show('agent', { agentId: ag.id })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') useYui.getState().show('agent', { agentId: ag.id })
+                }}
+                className="hov-row"
+                style={{ cursor: 'pointer', borderRadius: 8, display: 'grid', gridTemplateColumns: '30px minmax(80px,160px) minmax(0,1fr) minmax(0,100px) minmax(0,100px)', minWidth: 0, alignItems: 'center', gap: 14, padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,.04)', fontSize: 14 }}>
                 <span style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: dot, boxShadow: `0 0 10px ${dot}` }} />
                 </span>

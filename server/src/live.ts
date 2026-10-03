@@ -15,14 +15,16 @@ const LIVE_INSTRUCTIONS = `Você é a Yui, assistente pessoal de IA do ${config.
 Personalidade: calma, presente, precisa, levemente calorosa. Frases curtas. Nunca leia listas longas nem números demais; resuma.
 Você conversa; o trabalho e as consultas são feitos pelo seu backend. Você NÃO controla a tela nem executa nada sozinha:
 só o backend abre telas e faz trabalho. Nunca diga que abriu, mostrou ou fez algo antes de receber a confirmação do backend.
-Delegue SEMPRE que o usuário:
-- pedir para ver/abrir/mostrar algo na tela (terminal, dashboard, agentes, execuções, projetos, logs, relatório, site, VPS),
-- perguntar status, números ou fatos do ambiente,
-- pedir qualquer trabalho (corrigir, criar, pesquisar, revisar, publicar, agendar),
-- disser "volta", "fecha", "tela cheia", ou mudar de projeto.
+Regra principal: DELEGUE TODO pedido do usuário. As únicas exceções são cumprimentos, agradecimentos e frases de
+preenchimento ("oi", "obrigado", "tá me ouvindo?", "calma") — essas você responde direto.
+Isso inclui: abrir/mostrar qualquer coisa (terminal, dashboard, agentes, execuções, projetos, logs, relatório, site, VPS,
+ferramentas, workflows, rotinas, gráficos), status e fatos do ambiente, agenda/e-mail/documentos/contas do usuário,
+qualquer trabalho (corrigir, criar, pesquisar, revisar, publicar, agendar, desenhar), "volta", "tela cheia", trocar de projeto,
+e respostas curtas a perguntas suas ("sim", "pode", "quero ver").
+Você e os agentes TÊM acesso às contas do usuário (Google Calendar, Gmail, Drive, Linear, Vercel, Supabase, Figma…) pelo backend.
+Nunca diga que não tem acesso a algo sem antes delegar.
 Enquanto o backend trabalha, mantenha a conversa natural (ex.: "Deixa eu ver."), sem inventar resultados.
-Quando receber resultado do backend, diga-o com naturalidade, sem repetir palavra por palavra.
-Papo leve, cumprimentos e esclarecimentos você responde direto, sem delegar.`;
+Quando receber resultado do backend, diga-o com naturalidade, sem repetir palavra por palavra.`;
 
 interface LiveState {
   sessionId: string;
@@ -34,7 +36,26 @@ interface LiveState {
   lastActivity: number;
   speakingTimer?: NodeJS.Timeout;
   lastProgressNote: Map<string, number>;
+  // watchdog de delegação
+  silenceTimer?: NodeJS.Timeout;
+  watchTimer?: NodeJS.Timeout;
+  inflight: Inflight | null;
 }
+
+// Pedido sendo atendido pelo servidor (watchdog). Se a delegação do GPT-Live chegar depois,
+// a resposta vai para ela em vez de duplicar.
+interface Inflight {
+  text: string;
+  at: number;
+  delegationId: string | null;
+  answered: boolean;
+  answer: string | null;
+}
+
+const SMALL_TALK = /^(oi+|ol[aá]|e a[ií]|opa|tudo (bem|bom|certo)|obrigad[oa]|valeu|beleza|bom dia|boa (tarde|noite)|t[aá] me ouvindo|est[aá] me ouvindo|calma|espera|hum+|ah+|eh+|ok(ay)?|tchau|at[eé] (mais|logo)|isso a[ií]|legal|show|perfeito|entendi|t[aá] bom|certo)\b[\s\S]{0,25}$/i;
+export const isSmallTalk = (t: string) => SMALL_TALK.test(t.trim().replace(/^yui[,!.]?\s*/i, '').replace(/[.!?]+$/, ''));
+const SILENCE_MS = 1200;
+const WATCH_MS = 2500;
 
 let live: LiveState | null = null;
 export const liveActive = () => !!live;
@@ -56,13 +77,43 @@ function fastUi(text: string): string | null {
 
 function flushUser() {
   if (!live || !live.userBuf.trim()) return;
-  const text = live.userBuf.trim();
+  const st = live;
+  const text = st.userBuf.trim();
+  clearTimeout(st.silenceTimer);
   const done = fastUi(text);
-  if (done) send(live, { type: 'session.thinking.append', delegation_id: null, content: `${done} (pedido do usuário: "${text}")` });
-  live.pendingRequest = `${live.pendingRequest} ${text}`.trim();
+  if (done) send(st, { type: 'session.thinking.append', delegation_id: null, content: `${done} (pedido do usuário: "${text}")` });
+  st.pendingRequest = `${st.pendingRequest} ${text}`.trim();
   saveMessage('user', text, 'voice');
   emit({ type: 'user.said', text, final: true });
-  live.userBuf = '';
+  st.userBuf = '';
+  // Watchdog: se o GPT-Live não delegar em WATCH_MS, o servidor atende o pedido ele mesmo.
+  clearTimeout(st.watchTimer);
+  if (!done && !isSmallTalk(text)) {
+    st.watchTimer = setTimeout(() => {
+      if (live !== st || !st.pendingRequest) return;
+      const request = st.pendingRequest;
+      st.pendingRequest = '';
+      console.log(`live: watchdog ← "${request.slice(0, 120)}"`);
+      void serve(st, request, null);
+    }, WATCH_MS);
+  }
+}
+
+// Atende um pedido de voz pelo cérebro. delegationId=null → veio do watchdog (resposta via commentary sem delegação).
+async function serve(st: LiveState, request: string, delegationId: string | null) {
+  const inf: Inflight = { text: request, at: Date.now(), delegationId, answered: false, answer: null };
+  st.inflight = inf;
+  let answer: string;
+  try {
+    answer = clip(await think({ request, source: 'voice' }));
+  } catch (err) {
+    console.error('cérebro (voz) falhou', err);
+    answer = 'Tive um problema para consultar isso agora. Pode tentar de novo?';
+  }
+  inf.answered = true;
+  inf.answer = answer;
+  if (live !== st) return;
+  send(st, { type: 'session.commentary.append', delegation_id: inf.delegationId, content: answer });
 }
 
 function flushYui() {
@@ -110,7 +161,7 @@ export async function startLive(offerSdp: string): Promise<{ sdp: string; sessio
   });
   const sessionId = res.session.id;
   const sideband = new SidebandWS(openai, { session_id: sessionId, graceful_close: true });
-  live = { sessionId, sideband, muted: false, userBuf: '', yuiBuf: '', pendingRequest: '', lastActivity: Date.now(), lastProgressNote: new Map() };
+  live = { sessionId, sideband, muted: false, userBuf: '', yuiBuf: '', pendingRequest: '', lastActivity: Date.now(), lastProgressNote: new Map(), inflight: null };
   wire(live);
   emit({ type: 'live.status', active: true, muted: false });
   return { sdp: res.transport.sdp, sessionId };
@@ -125,6 +176,10 @@ function wire(st: LiveState) {
     st.lastActivity = Date.now();
     emit({ type: 'user.said', text: st.userBuf, final: false });
     setYuiState('listening');
+    clearTimeout(st.silenceTimer);
+    st.silenceTimer = setTimeout(() => {
+      if (live === st) flushUser();
+    }, SILENCE_MS);
   });
   sb.on('session.output_transcript.delta', (e) => {
     if (live !== st) return;
@@ -142,18 +197,20 @@ function wire(st: LiveState) {
   sb.on('session.delegation.created', (e) => {
     if (live !== st) return;
     flushUser();
-    console.log(`live: delegação ${e.delegation.id} ← "${st.pendingRequest.slice(0, 120)}"`);
+    clearTimeout(st.watchTimer);
+    const delegationId = e.delegation.id;
+    const inf = st.inflight;
+    // Watchdog já pegou este pedido: a resposta vai para esta delegação, sem pensar de novo.
+    if (!st.pendingRequest && inf && !inf.delegationId && Date.now() - inf.at < 20_000) {
+      console.log(`live: delegação ${delegationId} ← reaproveita watchdog`);
+      if (inf.answered) send(st, { type: 'session.thinking.append', delegation_id: delegationId, content: `Resultado já entregue ao usuário: ${inf.answer ?? ''}` });
+      else inf.delegationId = delegationId;
+      return;
+    }
     const request = st.pendingRequest || 'O usuário pediu algo por voz; use o contexto recente.';
     st.pendingRequest = '';
-    const delegationId = e.delegation.id;
-    think({ request, source: 'voice' })
-      .then((answer) => {
-        if (live === st) send(st, { type: 'session.commentary.append', delegation_id: delegationId, content: clip(answer) });
-      })
-      .catch((err) => {
-        console.error('delegação falhou', err);
-        if (live === st) send(st, { type: 'session.commentary.append', delegation_id: delegationId, content: 'Tive um problema para consultar isso agora. Pode tentar de novo?' });
-      });
+    console.log(`live: delegação ${delegationId} ← "${request.slice(0, 120)}"`);
+    void serve(st, request, delegationId);
   });
   sb.on('session.input_audio.muted', () => {
     st.muted = true;
@@ -186,6 +243,9 @@ export function endLive(reason = 'user') {
   const st = live;
   if (!st) return;
   live = null;
+  clearTimeout(st.silenceTimer);
+  clearTimeout(st.watchTimer);
+  clearTimeout(st.speakingTimer);
   flushUserOf(st);
   try {
     st.sideband.send({ type: 'session.close' });
@@ -226,7 +286,8 @@ export async function handleText(text: string): Promise<void> {
   sayOnScreen(answer);
 }
 
-function sayOnScreen(text: string, end: 'idle' | 'success' | 'warning' = 'idle') {
+function sayOnScreen(raw: string, end: 'idle' | 'success' | 'warning' = 'idle') {
+  const text = raw.replace(/`([^`]*)`/g, '$1').replace(/\*\*([^*]+)\*\*/g, '$1'); // fala/tela sem marcação
   saveMessage('yui', text, 'text');
   setYuiState('speaking');
   emit({ type: 'yui.say', text, final: true });
@@ -234,8 +295,8 @@ function sayOnScreen(text: string, end: 'idle' | 'success' | 'warning' = 'idle')
   if (end !== 'idle') setTimeout(() => setYuiState(agentsWorking() ? 'working' : 'idle'), 3000).unref();
 }
 
-// Narração do trabalho dos agentes.
-function narrate(text: string, opts: { speak: boolean; end?: 'success' | 'warning' }) {
+// Narração do trabalho dos agentes (também usada por missões/workflows).
+export function narrate(text: string, opts: { speak: boolean; end?: 'success' | 'warning' }) {
   if (live) {
     send(live, { type: opts.speak ? 'session.commentary.append' : 'session.thinking.append', delegation_id: null, content: clip(text) });
     if (opts.end) setYuiState(opts.end);
@@ -254,7 +315,7 @@ function brief(text: string): string {
 }
 
 runBus.on('progress', (run: RunInfo) => {
-  if (!live) return;
+  if (!live || run.missionId || run.workflowRunId) return;
   const last = live.lastProgressNote.get(run.id) ?? 0;
   if (Date.now() - last < 20_000) return;
   live.lastProgressNote.set(run.id, Date.now());
@@ -262,6 +323,8 @@ runBus.on('progress', (run: RunInfo) => {
 });
 
 runBus.on('finished', (run: RunInfo) => {
+  // Etapas de missão/workflow são narradas pelo próprio módulo (resumo da missão, não de cada etapa).
+  if (run.missionId || run.workflowRunId) return;
   const ok = run.state === 'done';
   const prefix = ok ? `${run.agent} concluiu.` : run.state === 'cancelled' ? `${run.agent} foi cancelado.` : `${run.agent} não conseguiu concluir.`;
   narrate(`${prefix} ${run.result ?? ''}`.trim(), { speak: true, end: ok ? 'success' : 'warning' });

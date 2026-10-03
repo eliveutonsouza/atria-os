@@ -1,0 +1,55 @@
+/* Editor de workflow: @xyflow/react no idioma visual do Yui Console */
+.wf-canvas .react-flow { background: transparent; }
+.wf-canvas .react-flow__background { opacity: 0.55; }
+.wf-canvas .react-flow__edge-path { stroke: rgba(160, 170, 255, 0.45); stroke-width: 1.4; }
+.wf-canvas .react-flow__edge.selected .react-flow__edge-path { stroke: #67d8f2; stroke-width: 2; }
+.wf-canvas .react-flow__edge-text { fill: #cbbcff; font-size: 11px; font-family: Manrope, sans-serif; }
+.wf-canvas .react-flow__edge-textbg { fill: #0f1229; }
+.wf-canvas .react-flow__controls { box-shadow: none; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.08); }
+.wf-canvas .react-flow__controls-button { background: rgba(16, 20, 42, 0.9); border-bottom: 1px solid rgba(255, 255, 255, 0.06); fill: #9aa0bb; }
+.wf-canvas .react-flow__controls-button:hover { background: rgba(255, 255, 255, 0.07); }
+.wf-canvas .react-flow__minimap { background: rgba(10, 12, 29, 0.85); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.06); }
+.wf-canvas .react-flow__attribution { display: none; }
+.wf-canvas .react-flow__node { font-family: Manrope, sans-serif; }
+
+@keyframes wf-pulse {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.025); filter: brightness(1.18); }
+}
+.wf-pulse { animation: wf-pulse 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .wf-pulse { animation: none; } }
+
+.wf-input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.25);
+  color: #e8eaf4;
+  font-family: Manrope, sans-serif;
+  font-size: 13px;
+  outline: none;
+}
+.wf-input:focus { border-color: rgba(103, 216, 242, 0.45); }
+textarea.wf-input { resize: vertical; line-height: 1.5; }
+.wf-mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.wf-btn {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: #dfe3f3;
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: Manrope, sans-serif;
+}
+.wf-btn:hover { background: rgba(255, 255, 255, 0.08); }
+.wf-btn:disabled { opacity: 0.45; cursor: default; }
+.wf-btn.primary { border: none; background: linear-gradient(135deg, #67d8f2, #a68cf7); color: #0a0c1d; font-weight: 700; }
+.wf-btn.ghost { background: transparent; color: #9aa0bb; }
+.wf-label { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #6f7590; font-weight: 600; margin-bottom: 6px; display: block; }
+.wf-tab { border: none; background: transparent; color: #6f7590; font-size: 12.5px; padding: 6px 2px; cursor: pointer; border-bottom: 1px solid transparent; font-family: Manrope, sans-serif; }
+.wf-tab[aria-selected='true'] { color: #e8eaf4; border-bottom-color: #67d8f2; }

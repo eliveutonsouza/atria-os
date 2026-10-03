@@ -5,7 +5,7 @@ import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import { timingSafeEqual } from 'node:crypto';
-import { cpSync, existsSync, readFileSync, statSync } from 'node:fs';
+import { cpSync, existsSync, readFileSync, statSync, statfsSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import type { Bootstrap, ChatContext } from '../../shared/protocol.ts';
 import { config } from './config.ts';
@@ -64,6 +64,36 @@ registerTerminal(app);
 for (const mod of [missions, customViews, toolbox, agentsAdmin, workflows]) mod.register(app);
 
 app.get('/api/health', async () => ({ ok: true }));
+
+// Saúde detalhada (autenticada): cada dependência com status para o painel e para a auditoria.
+app.get('/api/health/full', async () => {
+  const check = async (fn: () => Promise<unknown>) => fn().then(() => true).catch(() => false);
+  const [docker, browser] = await Promise.all([
+    check(() => fetch(`${config.dockerApi}/_ping`, { signal: AbortSignal.timeout(3000) }).then((r) => { if (!r.ok) throw new Error(); })),
+    check(() => fetch(config.browserMcpUrl, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'health', version: '1' } } }), signal: AbortSignal.timeout(4000) }).then((r) => { if (!r.ok) throw new Error(); })),
+  ]);
+  let disk: number | null = null;
+  try {
+    const st = statfsSync(config.workspaceDir);
+    disk = Math.round((1 - st.bavail / st.blocks) * 100);
+  } catch {
+    /* ignora */
+  }
+  const init = getInit();
+  return {
+    openai: !!config.openaiKey,
+    claudeAuth: claudeLoggedIn() ? 'claude.ai' : config.claudeToken ? 'token' : 'none',
+    github: githubEnabled(),
+    repos: catalog().length,
+    dockerProxy: docker,
+    browser,
+    live: liveActive(),
+    capabilitiesAt: init?.at ?? null,
+    mcpConnected: init?.mcp.filter((m) => m.status === 'connected').length ?? null,
+    workspaceDiskPct: disk,
+    queue: db.prepare(`SELECT state, COUNT(*) AS n FROM runs WHERE state IN ('queued','running','waiting_approval') GROUP BY state`).all(),
+  };
+});
 
 // Tudo em /api (exceto auth/health) exige sessão.
 app.addHook('preHandler', async (req, reply) => {

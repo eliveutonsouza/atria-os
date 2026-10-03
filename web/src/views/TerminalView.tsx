@@ -27,6 +27,8 @@ const sessionName = (kind: Kind, slug: string | null) => `yui-${kind}-${slug ?? 
 
 export function TerminalView() {
   const paramKind = useYui((s) => s.viewParams.kind)
+  const paramCmd = useYui((s) => s.viewParams.cmd)
+  const sentCmd = useRef<string | null>(null) // comando pré-digitado já enviado (não repete ao reconectar)
   const slug = useYui((s) => s.viewParams.project ?? s.activeProject)
   const [kind, setKind] = useState<Kind>(paramKind ?? 'claude')
   const [status, setStatus] = useState<'connecting' | 'open' | 'closed'>('connecting')
@@ -82,6 +84,13 @@ export function TerminalView() {
       setStatus('open')
       sendResize()
       term.focus()
+      // Comando vindo do mapa do Claude/Ferramentas: digitado sem Enter, para você revisar.
+      if (paramCmd && sentCmd.current !== paramCmd) {
+        sentCmd.current = paramCmd
+        setTimeout(() => {
+          if (ws.readyState === WebSocket.OPEN) ws.send(paramCmd)
+        }, 900)
+      }
     }
     ws.onmessage = (e) => term.write(typeof e.data === 'string' ? e.data : new Uint8Array(e.data as ArrayBuffer))
     ws.onclose = (e) => {
@@ -106,7 +115,7 @@ export function TerminalView() {
       ws.close()
       term.dispose()
     }
-  }, [kind, slug, gen])
+  }, [kind, slug, gen, paramCmd])
 
   const tab = (k: Kind, label: string) => (
     <button

@@ -65,6 +65,7 @@ export interface ViewParams {
   workflowId?: string; // slug
   workflowRunId?: string;
   tab?: string; // aba interna (tools: connectors|mcp|skills|plugins|apps)
+  cmd?: string; // terminal: texto digitado ao conectar (sem Enter)
 }
 
 export type Tone = 'ok' | 'warn' | 'crit' | 'cyan' | 'lav' | 'muted';
@@ -126,6 +127,9 @@ export interface RunInfo {
   tokensIn: number;
   tokensOut: number;
   costUsd: number;
+  missionId?: string | null;
+  workflowRunId?: string | null;
+  display?: 'blocks' | 'html' | null;
 }
 
 export interface RunEventLine {

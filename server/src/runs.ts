@@ -44,6 +44,9 @@ export function toRunInfo(r: RunRow): RunInfo {
     tokensIn: r.tokens_in,
     tokensOut: r.tokens_out,
     costUsd: r.cost_usd,
+    missionId: r.mission_id,
+    workflowRunId: r.workflow_run_id,
+    display: r.display,
   };
 }
 
@@ -129,6 +132,11 @@ function pump() {
     emit({ type: 'agents.updated', agentsWorking: agentsWorking() });
     execute(next, ac)
       .catch((err) => {
+        if (ac.signal.aborted) {
+          logEvent(next.id, 'system', 'cancelado pelo usuário');
+          runBus.emit('finished', patch(next.id, { state: 'cancelled', finished_at: now(), current_op: 'Cancelado', result: 'Cancelado.' }));
+          return;
+        }
         logEvent(next.id, 'error', String(err?.message ?? err));
         const info = patch(next.id, { state: 'failed', finished_at: now(), result: `Falhou: ${String(err?.message ?? err).slice(0, 300)}` });
         runBus.emit('finished', info);
@@ -218,21 +226,38 @@ function describeTool(name: string, input: Record<string, unknown>): string {
   }
 }
 
-async function requestApproval(run: RunRow, title: string, rows: ApprovalInfo['rows'], signal: AbortSignal): Promise<boolean> {
+// Aprovação genérica (modal do console). `ownerId` = run, missão ou execução de workflow.
+export async function askApproval(ownerId: string, title: string, rows: ApprovalInfo['rows'], signal?: AbortSignal): Promise<boolean> {
   const id = uid();
-  db.prepare(`INSERT INTO approvals(id, run_id, title, rows, created_at) VALUES(?, ?, ?, ?, ?)`).run(id, run.id, title, JSON.stringify(rows), now());
-  const approval: ApprovalInfo = { id, runId: run.id, title, rows, createdAt: now() };
-  patch(run.id, { state: 'waiting_approval', current_op: 'Aguardando sua aprovação' });
+  db.prepare(`INSERT INTO approvals(id, run_id, title, rows, created_at) VALUES(?, ?, ?, ?, ?)`).run(id, ownerId, title, JSON.stringify(rows), now());
+  const approval: ApprovalInfo = { id, runId: ownerId, title, rows, createdAt: now() };
   emit({ type: 'approval.requested', approval });
   emit({ type: 'inbox.updated', inbox: inboxItems() });
   runBus.emit('approval', approval);
   const approved = await new Promise<boolean>((resolve) => {
     waiters.set(id, resolve);
-    signal.addEventListener('abort', () => resolve(false), { once: true });
+    signal?.addEventListener('abort', () => resolve(false), { once: true });
   });
   waiters.delete(id);
+  return approved;
+}
+
+async function requestApproval(run: RunRow, title: string, rows: ApprovalInfo['rows'], signal: AbortSignal): Promise<boolean> {
+  patch(run.id, { state: 'waiting_approval', current_op: 'Aguardando sua aprovação' });
+  const approved = await askApproval(run.id, title, rows, signal);
   patch(run.id, { state: 'running', current_op: approved ? 'Aprovado — continuando' : 'Rejeitado — ajustando' });
   return approved;
+}
+
+// Cancela todas as aprovações pendentes de um dono (missão/workflow cancelados).
+export function expireApprovals(ownerId: string) {
+  const rows = db.prepare(`SELECT id FROM approvals WHERE run_id = ? AND status = 'pending'`).all(ownerId) as { id: string }[];
+  for (const r of rows) {
+    db.prepare(`UPDATE approvals SET status = 'expired', resolved_at = ? WHERE id = ?`).run(now(), r.id);
+    waiters.get(r.id)?.(false);
+    emit({ type: 'approval.resolved', approvalId: r.id, approved: false });
+  }
+  if (rows.length) emit({ type: 'inbox.updated', inbox: inboxItems() });
 }
 
 const waiters = new Map<string, (ok: boolean) => void>();
@@ -423,7 +448,7 @@ async function execute(run: RunRow, ac: AbortController) {
         state: ok ? 'done' : 'failed',
         progress: ok ? 100 : undefined,
         finished_at: now(),
-        result: result.slice(0, 2000),
+        result: result.slice(0, 24000), // resultado completo: missões e workflows passam adiante
         current_op: ok ? 'Concluído' : 'Falhou',
         steps: JSON.stringify(ok ? steps.map((s) => ({ ...s, status: 'done' })) : steps),
         tokens_in: (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),

@@ -105,7 +105,7 @@ export function TopBar() {
   const name = projects.find((p) => p.slug === activeProject)?.name ?? activeProject ?? 'Nenhum'
   const set = useYui((s) => s.set)
   return (
-    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 60, padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, zIndex: 30 }}>
+    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 60, padding: narrow ? '0 12px' : '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, zIndex: 30 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
         <button
           onClick={() => set({ palette: true, inboxOpen: false })}
@@ -140,7 +140,7 @@ export function TopBar() {
             style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(245,181,74,.25)', background: 'rgba(245,181,74,.06)', color: '#f5c97a', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
           >
             <span>{inbox.length}</span>
-            <span style={{ fontWeight: 500 }}>pendências</span>
+            {!narrow && <span style={{ fontWeight: 500 }}>pendências</span>}
           </button>
         )}
         <button
@@ -154,7 +154,7 @@ export function TopBar() {
           style={{ height: 32, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.03)', color: C.t2, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
         >
           <span className="mono" style={{ fontSize: 11, color: C.cyan }}>&gt;_</span>
-          Terminal
+          {!narrow && 'Terminal'}
         </button>
         <button
           onClick={() => set({ histOpen: !useYui.getState().histOpen, inboxOpen: false })}
@@ -162,7 +162,7 @@ export function TopBar() {
           title="Conversa"
           style={{ height: 32, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.03)', color: C.t2, fontSize: 12, cursor: 'pointer' }}
         >
-          Histórico
+          {narrow ? '≡' : 'Histórico'}
         </button>
       </div>
     </div>

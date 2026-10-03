@@ -4,7 +4,9 @@ import { VIEW_NAMES } from '../../shared/protocol.ts';
 import { config } from './config.ts';
 import { db, kvGet, now, uid } from './db.ts';
 import { emit, setYuiState } from './bus.ts';
-import { agentInfos, loadAgents } from './agents.ts';
+import { existsSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { agentInfos, agentsDir, invalidateAgents, loadAgents, parseAgent, serializeAgent } from './agents.ts';
 import { activeProject, findProject, listProjectConfigs, projectDetail, projectLogs, setActiveProject } from './projects.ts';
 import { enqueueRun, inboxItems, listRuns, pendingApprovals } from './runs.ts';
 import { infra, overview } from './metrics.ts';
@@ -14,7 +16,8 @@ import { brainExtensions, type ToolCtx } from './extensions.ts';
 // "Cérebro" da Yui: modelo de texto (Responses API) com as ferramentas do console.
 // Recebe pedidos digitados ou delegações do GPT-Live e devolve uma frase curta para ser dita/mostrada.
 
-export const openai = new OpenAI({ apiKey: config.openaiKey || 'missing', maxRetries: 1 });
+// 429 (limite de tokens/min da conta) acontece sob carga: o SDK respeita retry-after com backoff.
+export const openai = new OpenAI({ apiKey: config.openaiKey || 'missing', maxRetries: 4 });
 
 let uiContext: ChatContext = { view: null, mode: 'center' };
 export function setUiContext(ctx: ChatContext) {
@@ -48,7 +51,19 @@ Como responder:
 - Os projetos do usuário são os repositórios dele no GitHub (catálogo automático). Nunca peça para cadastrar projeto: se não reconhecer o nome, use list_repos. Projetos ainda não clonados são clonados sozinhos ao abrir ou delegar.
 - Se o usuário mudar de projeto ("agora no Stoqmate"), use switch_project.
 - Aprovações são sempre decididas pelo usuário no modal; use open_approval para mostrá-lo, nunca aprove sozinha.
-- Se a fala parecer transcrição truncada ou ambígua, pergunte só o detalhe que falta.`;
+- Se a fala parecer transcrição truncada ou ambígua, pergunte só o detalhe que falta.
+
+Roteamento (quem faz o quê):
+- Ver/abrir telas: show_view. "o que está acontecendo agora", "execuções" => runs; "visão geral" => dashboard; "ferramentas, conectores, MCP, skills, plugins" => tools; "workflows" => workflows; "rotinas/agendamentos" => routines; "mapa/guia do Claude Code" => claude; um agente específico => agent.
+- "Tem aprovação pendente?" => open_approval (abre o modal se houver).
+- "Consegue acessar meus projetos/GitHub?" => list_repos e responda com o que existe.
+- Agenda, e-mail, Drive, documentos, Linear, Vercel, Supabase, Figma, contas pessoais => delegate_task agente "assistente" (com display "blocks" quando o usuário quer VER algo, ex.: e-mails, agenda, lista de issues).
+- Claude Design: designs, decks/slides, protótipos, telas, identidade visual => delegate_task agente "designer" (se não existir, crie com create_agent).
+- Código: backend (APIs, banco, bugs de servidor), frontend (telas, componentes, sites), qa (testes), security (segurança), devops (deploy, Docker, logs, incidentes).
+- Pesquisa web, leads, concorrência => research. Textos, legendas, roteiros => copy. Relatórios => report.
+- Nenhum agente serve => create_agent com um especialista e depois delegue a ele.
+- Trabalho de 2+ especialidades ou entregável grande => plan_mission (não faça vários delegate_task soltos). Criar site, landing page, app ou sistema novo => SEMPRE plan_mission.
+- "Abre/mostra o projeto X" => show_view project com project X (isso já troca o projeto ativo; switch_project sozinho não abre nada).`;
 
 const S = (props: Record<string, unknown>, required: string[]) => ({
   type: 'object',
@@ -80,7 +95,8 @@ const TOOLS: OpenAI.Responses.FunctionTool[] = [
       project: nullableStr('slug do projeto onde trabalhar; null para tarefas sem projeto'),
       instruction: { type: 'string', description: 'instrução completa e autossuficiente em português' },
       use_selected_element: { type: 'boolean', description: 'true se o pedido se refere ao elemento selecionado no preview' },
-    }, ['agent', 'project', 'instruction', 'use_selected_element']),
+      display: { type: 'string', enum: ['blocks', 'html', 'none'], description: 'blocks = o agente devolve uma tela de dados que abre sozinha (e-mails, agenda, leads, listas); html = página visual sob medida; none = só resposta falada' },
+    }, ['agent', 'project', 'instruction', 'use_selected_element', 'display']),
   },
   {
     type: 'function', name: 'create_routine', strict: true, description: 'Agenda trabalho recorrente de um agente (cron, fuso America/Sao_Paulo).',
@@ -88,6 +104,16 @@ const TOOLS: OpenAI.Responses.FunctionTool[] = [
   },
   { type: 'function', name: 'list_repos', strict: true, description: 'Busca nos repositórios GitHub do usuário (catálogo completo, clonados ou não).', parameters: S({ query: nullableStr('trecho do nome/descrição; null lista os mais recentes') }, ['query']) },
   { type: 'function', name: 'open_approval', strict: true, description: 'Mostra ao usuário o modal da aprovação pendente mais antiga.', parameters: S({}, []) },
+  {
+    type: 'function', name: 'create_agent', strict: true,
+    description: 'Cria um novo agente especialista (quando nenhum existente serve). Fica disponível na hora.',
+    parameters: S({
+      name: { type: 'string', description: 'nome curto, ex.: SEO' },
+      description: { type: 'string', description: 'uma linha: o que faz e quais ferramentas usa' },
+      group: { type: 'string', description: 'Engineering | Operações | Growth | Design' },
+      prompt: { type: 'string', description: 'instruções do agente em português (papel, como trabalhar, entregáveis)' },
+    }, ['name', 'description', 'group', 'prompt']),
+  },
 ];
 
 // Conectores MCP vistos no último run (gravado por runs.ts no init do SDK).
@@ -183,6 +209,7 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
         project,
         instruction: String(args.instruction),
         selectedElement: args.use_selected_element ? uiContext.selectedElement ?? null : null,
+        display: args.display === 'blocks' || args.display === 'html' ? args.display : null,
       });
       setYuiState('delegating');
       return { ok: true, run_id: run.id, agente: run.agent, estado: run.state };
@@ -197,6 +224,15 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
         .filter((p) => p.repo && (!q || `${p.repo} ${p.description ?? ''}`.toLowerCase().includes(q)))
         .slice(0, 25)
         .map((p) => ({ slug: p.slug, repo: p.repo, descricao: p.description, ultimo_push: p.pushedAt, clonado: p.cloned }));
+    }
+    case 'create_agent': {
+      const slug = String(args.name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'agente';
+      const file = join(agentsDir(), `${slug}.md`);
+      if (existsSync(file)) return { ok: true, id: slug, nota: 'já existia' };
+      const def = parseAgent(slug, `---\nname: x\n---\n`);
+      writeFileSync(file, serializeAgent({ ...def, name: String(args.name), description: String(args.description), group: String(args.group || 'Geral'), prompt: String(args.prompt) }));
+      invalidateAgents();
+      return { ok: true, id: slug };
     }
     case 'open_approval': {
       const a = pendingApprovals()[0];

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { RunEventLine, RunInfo } from '@shared/protocol'
+import type { RunEventLine, RunInfo, ViewName, ViewParams } from '@shared/protocol'
 import { api } from '../api/client'
 import { useApi } from '../api/useApi'
 import { C } from '../lib/colors'
@@ -37,6 +37,16 @@ function TechLines({ run }: { run: RunInfo }) {
   )
 }
 
+const resultBtn = { height: 30, padding: '0 12px', borderRadius: 9, border: '1px solid rgba(103,216,242,.3)', background: 'rgba(103,216,242,.08)', color: '#a9e9f8', fontSize: 12, cursor: 'pointer' } as const
+
+// Abre o que a execução produziu (tela sob medida, preview, relatório ou missão).
+function openResult(id: string) {
+  api
+    .get<{ view: ViewName; params: ViewParams }>(`/api/runs/${id}/result-view`)
+    .then((rv) => useYui.getState().show(rv.view, rv.params))
+    .catch(() => {})
+}
+
 export function RunsView() {
   const runsMap = useYui((s) => s.runs)
   const expanded = useYui((s) => s.expandedRun)
@@ -54,6 +64,11 @@ export function RunsView() {
     for (const r of data.runs) if (!merged[r.id]) merged[r.id] = r
     s.set({ runs: merged })
   }, [data])
+  // pedido de uma execução específica (/runs/:id, "Ver execução") expande ela
+  const wanted = useYui((s) => s.viewParams.runId)
+  useEffect(() => {
+    if (wanted) useYui.getState().set({ expandedRun: wanted })
+  }, [wanted])
   // como no design: abre já com a primeira execução ativa expandida
   useEffect(() => {
     const s = useYui.getState()
@@ -133,6 +148,17 @@ export function RunsView() {
                       })}
                     </div>
                   </div>
+                  {(r.state === 'done' || r.state === 'failed') && (
+                    <div style={{ padding: '0 18px 18px 46px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {r.result && (
+                        <div style={{ fontSize: 13, color: '#d6d9e8', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: 220, overflowY: 'auto' }}>{r.result}</div>
+                      )}
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button onClick={() => openResult(r.id)} style={resultBtn}>Ver resultado</button>
+                        {r.missionId && <button onClick={() => useYui.getState().show('mission', { missionId: r.missionId! })} style={resultBtn}>Ver missão</button>}
+                      </div>
+                    </div>
+                  )}
                   {tech && <TechLines run={r} />}
                 </>
               )}

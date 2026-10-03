@@ -1,0 +1,556 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "id": "sessao",
+      "title": "Sessão & modos",
+      "description": "Como conversar com o Claude Code e controlar quanto ele faz sozinho.",
+      "cards": [
+        {
+          "title": "Modos de permissão",
+          "what": "Alterna entre normal, aceitar edições, plano (só planeja) e auto (decide permissões sozinho, bloqueia o arriscado).",
+          "when": "Plano para tarefas grandes; auto para tarefas longas em ambiente isolado.",
+          "example": "Shift+Tab até aparecer 'plan mode'",
+          "kind": "shortcut"
+        },
+        {
+          "title": "/clear",
+          "what": "Começa uma conversa nova, limpando o contexto.",
+          "when": "Trocar de assunto sem herdar o contexto anterior.",
+          "example": "/clear",
+          "kind": "slash",
+          "command": "/clear",
+          "match": "clear"
+        },
+        {
+          "title": "/compact",
+          "what": "Resume a conversa para liberar contexto, mantendo o essencial.",
+          "when": "Sessão longa ficando lenta ou perto do limite.",
+          "example": "/compact foca no bug do login",
+          "kind": "slash",
+          "command": "/compact ",
+          "match": "compact"
+        },
+        {
+          "title": "/context",
+          "what": "Mostra quanto do contexto está em uso e com o quê.",
+          "when": "Entender por que a sessão está pesada.",
+          "example": "/context",
+          "kind": "slash",
+          "command": "/context",
+          "match": "context"
+        },
+        {
+          "title": "/model",
+          "what": "Troca o modelo (Opus, Sonnet, Haiku…).",
+          "when": "Tarefas simples num modelo mais rápido; difíceis no Opus.",
+          "example": "/model",
+          "kind": "slash",
+          "command": "/model",
+          "match": "model"
+        },
+        {
+          "title": "/effort",
+          "what": "Ajusta o esforço de raciocínio (low → max).",
+          "when": "Subir para bugs difíceis; baixar para coisas rápidas.",
+          "example": "/effort high",
+          "kind": "slash",
+          "command": "/effort ",
+          "match": "effort"
+        },
+        {
+          "title": "/fast",
+          "what": "Liga o modo rápido (mesmo modelo, saída mais veloz).",
+          "when": "Quando quer respostas mais ágeis.",
+          "example": "/fast",
+          "kind": "slash",
+          "command": "/fast",
+          "match": "fast"
+        },
+        {
+          "title": "Continuar sessão",
+          "what": "Retoma a última conversa da pasta ou escolhe uma antiga.",
+          "when": "Voltar a um trabalho de ontem.",
+          "example": "claude -c   ou   claude --resume",
+          "kind": "flag",
+          "command": "claude -c"
+        },
+        {
+          "title": "/rename",
+          "what": "Dá um nome à sessão para achar depois.",
+          "when": "Sessões que você vai retomar.",
+          "example": "/rename refatoração-auth",
+          "kind": "slash",
+          "command": "/rename ",
+          "match": "rename"
+        }
+      ]
+    },
+    {
+      "id": "comandos",
+      "title": "Comandos do dia a dia",
+      "description": "Slash commands úteis na rotina.",
+      "cards": [
+        {
+          "title": "/init",
+          "what": "Cria o CLAUDE.md do projeto com o que o Claude precisa saber.",
+          "when": "Primeira vez num repositório.",
+          "example": "/init",
+          "kind": "slash",
+          "command": "/init",
+          "match": "init"
+        },
+        {
+          "title": "/code-review",
+          "what": "Revisa o diff atual (ou um PR) procurando bugs.",
+          "when": "Antes de abrir/mergear PR.",
+          "example": "/code-review high",
+          "kind": "slash",
+          "command": "/code-review ",
+          "match": "code-review"
+        },
+        {
+          "title": "/security-review",
+          "what": "Revisão de segurança das mudanças da branch.",
+          "when": "Antes de publicar algo sensível.",
+          "example": "/security-review",
+          "kind": "slash",
+          "command": "/security-review",
+          "match": "security-review"
+        },
+        {
+          "title": "/ultrareview",
+          "what": "Revisão profunda multi-agente na nuvem (cobrada).",
+          "when": "PRs grandes e críticos.",
+          "example": "/ultrareview 482",
+          "kind": "slash",
+          "command": "/ultrareview ",
+          "match": "ultrareview"
+        },
+        {
+          "title": "/simplify",
+          "what": "Limpa e simplifica o código alterado.",
+          "when": "Depois que a feature funciona.",
+          "example": "/simplify",
+          "kind": "slash",
+          "command": "/simplify",
+          "match": "simplify"
+        },
+        {
+          "title": "/debug",
+          "what": "Fluxo guiado de depuração.",
+          "when": "Bug difícil de reproduzir.",
+          "example": "/debug o login falha às vezes",
+          "kind": "slash",
+          "command": "/debug ",
+          "match": "debug"
+        },
+        {
+          "title": "/verify",
+          "what": "Confere se a mudança realmente funciona rodando o app.",
+          "when": "Antes de dizer 'pronto'.",
+          "example": "/verify",
+          "kind": "slash",
+          "command": "/verify",
+          "match": "verify"
+        },
+        {
+          "title": "/goal",
+          "what": "Define um objetivo e o Claude itera até cumprir.",
+          "when": "Ex.: fazer todos os testes passarem.",
+          "example": "/goal todos os testes verdes",
+          "kind": "slash",
+          "command": "/goal ",
+          "match": "goal"
+        },
+        {
+          "title": "/usage",
+          "what": "Mostra uso do plano e limites.",
+          "when": "Acompanhar consumo do Max.",
+          "example": "/usage",
+          "kind": "slash",
+          "command": "/usage",
+          "match": "usage"
+        },
+        {
+          "title": "/doctor",
+          "what": "Diagnostica a instalação do Claude Code.",
+          "when": "Algo estranho no CLI.",
+          "example": "/doctor",
+          "kind": "slash",
+          "command": "/doctor",
+          "match": "doctor"
+        },
+        {
+          "title": "/recap e /insights",
+          "what": "Resumo do que foi feito e análise das suas sessões.",
+          "when": "Fim do dia / revisão semanal.",
+          "example": "/recap",
+          "kind": "slash",
+          "command": "/recap",
+          "match": "recap"
+        }
+      ]
+    },
+    {
+      "id": "atalhos",
+      "title": "Atalhos",
+      "description": "Teclas e prefixos no prompt.",
+      "cards": [
+        {
+          "title": "Esc",
+          "what": "Interrompe o Claude no meio da resposta.",
+          "when": "Ele foi para o caminho errado.",
+          "example": "Esc",
+          "kind": "shortcut"
+        },
+        {
+          "title": "Esc Esc",
+          "what": "Volta a uma mensagem anterior para reescrever (rewind).",
+          "when": "Desfazer uma direção errada.",
+          "example": "Esc duas vezes",
+          "kind": "shortcut"
+        },
+        {
+          "title": "! comando",
+          "what": "Roda um comando de shell e põe a saída na conversa.",
+          "when": "Mostrar um log ou status rapidamente.",
+          "example": "! git status",
+          "kind": "shortcut",
+          "command": "! "
+        },
+        {
+          "title": "@ arquivo",
+          "what": "Menciona um arquivo para o Claude ler.",
+          "when": "Apontar exatamente o arquivo certo.",
+          "example": "@src/app/page.tsx explica isso",
+          "kind": "shortcut",
+          "command": "@"
+        },
+        {
+          "title": "Shift+Tab",
+          "what": "Alterna o modo de permissão.",
+          "when": "Entrar/sair do modo plano.",
+          "example": "Shift+Tab",
+          "kind": "shortcut"
+        }
+      ]
+    },
+    {
+      "id": "skills",
+      "title": "Skills",
+      "description": "Habilidades empacotadas que o Claude carrega quando precisa (você também chama com /nome).",
+      "cards": [
+        {
+          "title": "Skills instaladas",
+          "what": "Lista viva das skills disponíveis neste Claude (veja abaixo).",
+          "when": "Descobrir o que já sabe fazer.",
+          "example": "/<nome-da-skill>",
+          "kind": "concept"
+        },
+        {
+          "title": "/skill-creator",
+          "what": "Cria ou melhora uma skill sua.",
+          "when": "Transformar uma rotina sua em skill reutilizável.",
+          "example": "/anthropic-skills:skill-creator",
+          "kind": "slash",
+          "command": "/anthropic-skills:skill-creator",
+          "match": "anthropic-skills:skill-creator"
+        },
+        {
+          "title": "/reload-skills",
+          "what": "Recarrega skills após instalar/editar.",
+          "when": "Depois de mexer em .claude/skills.",
+          "example": "/reload-skills",
+          "kind": "slash",
+          "command": "/reload-skills",
+          "match": "reload-skills"
+        }
+      ]
+    },
+    {
+      "id": "plugins",
+      "title": "Plugins",
+      "description": "Pacotes com skills, agentes, hooks e MCP.",
+      "cards": [
+        {
+          "title": "/plugin",
+          "what": "Instala, ativa e remove plugins e marketplaces.",
+          "when": "Adicionar capacidades novas ao Claude.",
+          "example": "/plugin",
+          "kind": "slash",
+          "command": "/plugin"
+        },
+        {
+          "title": "/reload-plugins",
+          "what": "Recarrega plugins sem reiniciar.",
+          "when": "Depois de instalar/atualizar plugin.",
+          "example": "/reload-plugins",
+          "kind": "slash",
+          "command": "/reload-plugins",
+          "match": "reload-plugins"
+        },
+        {
+          "title": "Plugins sincronizados",
+          "what": "Plugins ativos na sua conta claude.ai aparecem aqui automaticamente.",
+          "when": "Ver o que está ligado.",
+          "example": "(lista abaixo)",
+          "kind": "concept"
+        }
+      ]
+    },
+    {
+      "id": "mcp",
+      "title": "MCP & conectores",
+      "description": "Ferramentas externas que o Claude usa (Gmail, Calendar, Vercel, Supabase, Figma…).",
+      "cards": [
+        {
+          "title": "/mcp",
+          "what": "Lista servidores MCP, status e autenticação.",
+          "when": "Conector falhando ou pedindo login.",
+          "example": "/mcp",
+          "kind": "slash",
+          "command": "/mcp",
+          "match": "mcp"
+        },
+        {
+          "title": "Conectores claude.ai",
+          "what": "Conectores da sua conta (Gmail, Calendar, Drive, Linear…) chegam por login claude.ai.",
+          "when": "Autorizar novos em claude.ai → Configurações → Conectores.",
+          "example": "Facebook/Stripe/n8n pedem autorização",
+          "kind": "concept"
+        },
+        {
+          "title": "MCP do projeto",
+          "what": "Arquivo .mcp.json no repo define MCPs só daquele projeto.",
+          "when": "Ferramenta específica de um projeto.",
+          "example": "claude mcp add …",
+          "kind": "flag"
+        }
+      ]
+    },
+    {
+      "id": "subagentes",
+      "title": "Subagentes",
+      "description": "Especialistas que o Claude delega (os agentes da Yui são subagentes).",
+      "cards": [
+        {
+          "title": "/agents",
+          "what": "Cria e edita subagentes (.claude/agents).",
+          "when": "Montar um especialista novo.",
+          "example": "/agents",
+          "kind": "slash",
+          "command": "/agents",
+          "match": "agents"
+        },
+        {
+          "title": "Usar um agente",
+          "what": "Inicia a sessão já como um agente específico.",
+          "when": "Trabalhar direto com o Designer, por exemplo.",
+          "example": "claude --agent Designer",
+          "kind": "flag",
+          "command": "claude --agent "
+        },
+        {
+          "title": "/list-agents",
+          "what": "Lista agentes disponíveis.",
+          "when": "Lembrar quem existe.",
+          "example": "/list-agents",
+          "kind": "slash",
+          "command": "/list-agents",
+          "match": "list-agents"
+        }
+      ]
+    },
+    {
+      "id": "hooks",
+      "title": "Hooks & configuração",
+      "description": "Automatizar comportamentos (antes/depois de ferramentas, ao parar…).",
+      "cards": [
+        {
+          "title": "/hooks e settings.json",
+          "what": "Hooks rodam comandos em eventos (PreToolUse, PostToolUse, Stop, SessionStart…).",
+          "when": "'Sempre rode o lint depois de editar'.",
+          "example": "/update-config sempre rode npm run lint após editar",
+          "kind": "slash",
+          "command": "/update-config ",
+          "match": "update-config"
+        },
+        {
+          "title": "/config",
+          "what": "Configurações do Claude Code (tema, modelo, comportamento).",
+          "when": "Ajustes gerais.",
+          "example": "/config",
+          "kind": "slash",
+          "command": "/config",
+          "match": "config"
+        },
+        {
+          "title": "/output-style",
+          "what": "Muda o estilo das respostas.",
+          "when": "Respostas mais curtas/explicativas.",
+          "example": "/output-style",
+          "kind": "slash",
+          "command": "/output-style",
+          "match": "output-style"
+        }
+      ]
+    },
+    {
+      "id": "rotinas",
+      "title": "Rotinas & loops",
+      "description": "Trabalho recorrente ou auto-ritmado.",
+      "cards": [
+        {
+          "title": "/loop",
+          "what": "Repete um prompt num intervalo (ou o Claude decide o ritmo).",
+          "when": "Vigiar deploy, CI, fila.",
+          "example": "/loop 5m /verify",
+          "kind": "slash",
+          "command": "/loop ",
+          "match": "loop"
+        },
+        {
+          "title": "/schedule",
+          "what": "Agenda agentes na nuvem por cron (rotinas).",
+          "when": "Relatório toda segunda 8h.",
+          "example": "/schedule toda segunda 8h gere o status",
+          "kind": "slash",
+          "command": "/schedule ",
+          "match": "schedule"
+        },
+        {
+          "title": "Rotinas da Yui",
+          "what": "Workflows da Yui rodam por cron no próprio console.",
+          "when": "Rotina com vários agentes e decisões.",
+          "example": "Peça: 'cria um workflow de post toda segunda 9h'",
+          "kind": "concept"
+        }
+      ]
+    },
+    {
+      "id": "background",
+      "title": "Background & multi-sessão",
+      "description": "Rodar sessões em paralelo sem prender o terminal.",
+      "cards": [
+        {
+          "title": "--bg",
+          "what": "Inicia uma sessão em segundo plano e devolve o id.",
+          "when": "Tarefa longa enquanto você faz outra coisa.",
+          "example": "claude --bg \"migra os testes para vitest\"",
+          "kind": "flag",
+          "command": "claude --bg \""
+        },
+        {
+          "title": "claude agents",
+          "what": "Lista sessões em background e permite acompanhar.",
+          "when": "Ver o que está rodando.",
+          "example": "claude agents",
+          "kind": "flag",
+          "command": "claude agents"
+        },
+        {
+          "title": "Worktrees",
+          "what": "Sessão isolada numa cópia (git worktree) do repo.",
+          "when": "Duas features em paralelo sem conflito.",
+          "example": "claude -w feature-x",
+          "kind": "flag",
+          "command": "claude -w "
+        }
+      ]
+    },
+    {
+      "id": "cloud",
+      "title": "Nuvem & remoto",
+      "description": "Sessões na nuvem da Anthropic e acesso remoto.",
+      "cards": [
+        {
+          "title": "--cloud",
+          "what": "Cria (ou reabre) uma sessão na nuvem.",
+          "when": "Trabalho pesado fora da VPS.",
+          "example": "claude --cloud \"refatorar o módulo X\"",
+          "kind": "flag",
+          "command": "claude --cloud \""
+        },
+        {
+          "title": "--desktop",
+          "what": "Abre a sessão no app Claude Desktop.",
+          "when": "Continuar no desktop.",
+          "example": "claude -c --desktop",
+          "kind": "flag",
+          "command": "claude -c --desktop"
+        },
+        {
+          "title": "--chrome",
+          "what": "Liga o Claude in Chrome (seu navegador real).",
+          "when": "Ações em sites onde você está logado.",
+          "example": "claude --chrome",
+          "kind": "flag",
+          "command": "claude --chrome"
+        }
+      ]
+    },
+    {
+      "id": "memoria",
+      "title": "Memória",
+      "description": "O que o Claude lembra entre sessões.",
+      "cards": [
+        {
+          "title": "CLAUDE.md",
+          "what": "Instruções permanentes do projeto (e ~/.claude/CLAUDE.md global).",
+          "when": "Regras do projeto, comandos de build, convenções.",
+          "example": "/init gera um CLAUDE.md",
+          "kind": "concept"
+        },
+        {
+          "title": "Memória automática",
+          "what": "O Claude grava fatos úteis entre sessões.",
+          "when": "Preferências e decisões recorrentes.",
+          "example": "'lembra que o deploy é via Vercel'",
+          "kind": "concept"
+        }
+      ]
+    },
+    {
+      "id": "design",
+      "title": "Claude Design",
+      "description": "Telas, protótipos, decks e design systems no claude.ai/design.",
+      "cards": [
+        {
+          "title": "/design",
+          "what": "Cria designs, protótipos, decks e páginas visuais no Claude Design.",
+          "when": "Qualquer entrega visual.",
+          "example": "/design deck de 6 slides sobre o Stoqmate",
+          "kind": "slash",
+          "command": "/design ",
+          "match": "design"
+        },
+        {
+          "title": "/design-sync",
+          "what": "Sincroniza sua biblioteca de componentes com um design system do claude.ai/design.",
+          "when": "Manter código e design alinhados.",
+          "example": "/design-sync",
+          "kind": "slash",
+          "command": "/design-sync",
+          "match": "design-sync"
+        },
+        {
+          "title": "/design-consent",
+          "what": "Autoriza (ou revoga com /design-revoke) o acesso do Claude ao Claude Design.",
+          "when": "Primeira vez ou para revogar.",
+          "example": "/design-consent",
+          "kind": "slash",
+          "command": "/design-consent",
+          "match": "design-consent"
+        },
+        {
+          "title": "Agente Designer",
+          "what": "Na Yui, peça 'faz um design/deck/protótipo' e o Designer usa o Claude Design.",
+          "when": "Do dia a dia, por voz.",
+          "example": "'Yui, cria um protótipo da tela de login'",
+          "kind": "concept"
+        }
+      ]
+    }
+  ]
+}
