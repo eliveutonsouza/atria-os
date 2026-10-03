@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { InboxItem, ViewName } from '@shared/protocol'
+import type { InboxItem, RepoInfo, ViewName } from '@shared/protocol'
+import { api } from '../api/client'
 import { resolveApproval } from '../lib/actions'
 import { C, toneColor } from '../lib/colors'
 import { dockInput } from '../shell/parts'
@@ -72,12 +73,14 @@ export function CommandPalette() {
   const projects = useYui((s) => s.projects)
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(0)
+  const [repos, setRepos] = useState<RepoInfo[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (open) {
       setQ('')
       setSel(0)
       setTimeout(() => inputRef.current?.focus(), 30)
+      api.get<RepoInfo[]>('/api/repos').then(setRepos).catch(() => {})
     }
   }, [open])
   const items = useMemo<PalItem[]>(() => {
@@ -91,6 +94,10 @@ export function CommandPalette() {
       { label: 'Agentes', hint: 'view', fn: go('agents') },
       { label: 'Execuções', hint: 'view', fn: go('runs') },
       ...projects.map((p) => ({ label: `Projeto · ${p.name}`, hint: 'view', fn: go('project', { project: p.slug }) })),
+      // demais repositórios do GitHub: abrir clona sob demanda
+      ...repos
+        .filter((r) => !r.archived && !projects.some((p) => p.slug === r.slug))
+        .map((r) => ({ label: `Projeto · ${r.slug}`, hint: 'GitHub', fn: go('project', { project: r.slug }) })),
       { label: 'Logs', hint: 'view', fn: go('logs') },
       { label: 'Relatório', hint: 'artifact', fn: go('report') },
       { label: 'Preview do site', hint: 'artifact', fn: go('website') },
@@ -102,7 +109,7 @@ export function CommandPalette() {
     ]
     const n = q.toLowerCase()
     return all.filter((p) => !n || p.label.toLowerCase().includes(n))
-  }, [q, projects])
+  }, [q, projects, repos])
   if (!open) return null
   const pick = (i: number) => items[i]?.fn()
   return (

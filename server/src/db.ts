@@ -80,6 +80,18 @@ CREATE TABLE IF NOT EXISTS artifacts (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS repos (
+  name_with_owner TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  owner TEXT NOT NULL,
+  description TEXT,
+  language TEXT,
+  pushed_at TEXT,
+  archived INTEGER NOT NULL DEFAULT 0,
+  url TEXT NOT NULL,
+  synced_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS routines (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

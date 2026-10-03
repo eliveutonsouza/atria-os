@@ -5,6 +5,7 @@ import { config } from './config.ts';
 import { db, kvGet, kvSet } from './db.ts';
 import { containerLogs } from './docker.ts';
 import { sandboxUrl } from './sandbox.ts';
+import { catalog, ensureCloned } from './github.ts';
 
 // Projeto = diretório em /workspace/<slug>. Configuração opcional em /workspace/<slug>/yui.json:
 // { "name": "Stoqmate", "healthUrl": "https://...", "container": "stoqmate-api", "preview": "dist",
@@ -13,13 +14,17 @@ export interface ProjectConfig {
   slug: string;
   name: string;
   dir: string;
+  cloned: boolean; // false = só no catálogo do GitHub, clona sob demanda
+  repo?: string; // owner/name
+  description?: string | null;
+  pushedAt?: string | null;
   healthUrl?: string;
   container?: string;
   preview?: string;
   approvalPatterns?: string[];
 }
 
-export function listProjectConfigs(): ProjectConfig[] {
+function localProjects(): ProjectConfig[] {
   if (!existsSync(config.workspaceDir)) return [];
   return readdirSync(config.workspaceDir)
     .filter((d) => !d.startsWith('.') && statSync(join(config.workspaceDir, d)).isDirectory())
@@ -35,16 +40,76 @@ export function listProjectConfigs(): ProjectConfig[] {
           /* yui.json inválido: ignora */
         }
       }
-      return { ...cfg, slug, dir, name: cfg.name ?? slug } as ProjectConfig;
+      return { ...cfg, slug, dir, cloned: true, name: cfg.name ?? slug } as ProjectConfig;
     });
+}
+
+// Pastas do workspace + repositórios do GitHub ainda não clonados.
+export function listProjectConfigs(): ProjectConfig[] {
+  const local = localProjects();
+  const repos = catalog();
+  const byRepo = new Map(repos.map((r) => [r.name_with_owner, r]));
+  for (const p of local) {
+    const r = p.repo ? byRepo.get(p.repo) : repos.find((x) => x.slug === p.slug);
+    if (r) {
+      p.repo ??= r.name_with_owner;
+      p.description ??= r.description;
+      p.pushedAt = r.pushed_at;
+      byRepo.delete(r.name_with_owner);
+    }
+  }
+  const remote = [...byRepo.values()]
+    .filter((r) => !r.archived)
+    .map((r) => ({
+      slug: r.slug, name: r.name, dir: join(config.workspaceDir, r.slug), cloned: false,
+      repo: r.name_with_owner, description: r.description, pushedAt: r.pushed_at,
+    }) satisfies ProjectConfig);
+  return [...local, ...remote];
 }
 
 export function findProject(q: string | null | undefined): ProjectConfig | undefined {
   if (!q) return undefined;
-  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
   const k = norm(q);
-  return listProjectConfigs().find((p) => norm(p.slug) === k || norm(p.name) === k) ??
-    listProjectConfigs().find((p) => norm(p.name).includes(k) || k.includes(norm(p.name)));
+  if (!k) return undefined;
+  const all = listProjectConfigs();
+  return all.find((p) => norm(p.slug) === k || norm(p.name) === k || (p.repo && norm(p.repo) === k)) ??
+    all.find((p) => norm(p.name).startsWith(k) || k.startsWith(norm(p.name))) ??
+    all.find((p) => norm(p.name).includes(k) || (k.length > 4 && k.includes(norm(p.name)))) ??
+    closest(all, k, norm);
+}
+
+// Fala/transcrição erra nomes ("autocomissão" vs repo "autocomiss-o"): menor distância de edição, até 2.
+function closest(all: ProjectConfig[], k: string, norm: (s: string) => string): ProjectConfig | undefined {
+  if (k.length < 5) return undefined;
+  let best: ProjectConfig | undefined;
+  let bestD = 3;
+  for (const p of all) {
+    const d = editDistance(k, norm(p.name));
+    if (d < bestD) {
+      bestD = d;
+      best = p;
+    }
+  }
+  return best;
+}
+
+function editDistance(a: string, b: string): number {
+  if (Math.abs(a.length - b.length) > 2) return 99;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+// Clona se o projeto ainda só existe no GitHub; devolve a config já local.
+export async function ensureProject(p: ProjectConfig): Promise<ProjectConfig> {
+  if (p.cloned || !p.repo) return p;
+  await ensureCloned(p.repo);
+  return findProject(p.slug) ?? p;
 }
 
 export const activeProject = () => kvGet('active_project');
@@ -72,6 +137,12 @@ function runStats(slug: string) {
 }
 
 export async function projectSummary(p: ProjectConfig): Promise<ProjectSummary> {
+  if (!p.cloned) {
+    return {
+      slug: p.slug, name: p.name, status: 'No GitHub', tone: 'muted', health: null,
+      note: [p.description, p.pushedAt ? `push ${relTime(p.pushedAt)}` : null].filter(Boolean).join(' · ') || p.repo || '',
+    };
+  }
   const ok = await probe(p);
   const s = runStats(p.slug);
   let tone: Tone = 'ok';
@@ -96,7 +167,7 @@ export async function projectSummary(p: ProjectConfig): Promise<ProjectSummary> 
 }
 
 export async function projectSummaries(): Promise<ProjectSummary[]> {
-  return Promise.all(listProjectConfigs().map(projectSummary));
+  return Promise.all(listProjectConfigs().filter((p) => p.cloned).map(projectSummary));
 }
 
 export async function projectDetail(p: ProjectConfig): Promise<ProjectDetail> {

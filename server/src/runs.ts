@@ -1,13 +1,13 @@
 import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { query, type CanUseTool, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { ApprovalInfo, InboxItem, RunInfo, RunEventLine, RunState, RunStep } from '../../shared/protocol.ts';
 import { config } from './config.ts';
-import { db, now, uid } from './db.ts';
+import { db, kvSet, now, uid } from './db.ts';
 import { emit } from './bus.ts';
 import { findAgent, agentsWorking, type AgentDef } from './agents.ts';
-import { findProject } from './projects.ts';
+import { ensureProject, findProject } from './projects.ts';
 
 // Eventos para a camada de conversa (live.ts / brain.ts) narrar o trabalho.
 export const runBus = new EventEmitter<{
@@ -265,10 +265,25 @@ function systemAppend(agent: AgentDef, projectName: string | null): string {
   ].join('\n');
 }
 
+// Login claude.ai no container (docker exec … claude → /login) traz conectores MCP e tem prioridade;
+// sem ele, usa o token de inferência do setup-token.
+export const claudeLoggedIn = () => existsSync(join(process.env.HOME ?? '/data/home', '.claude', '.credentials.json'));
+
+function claudeEnv(): Record<string, string> {
+  const env = { ...process.env } as Record<string, string>;
+  delete env.CLAUDE_CODE_OAUTH_TOKEN;
+  if (!claudeLoggedIn() && config.claudeToken) env.CLAUDE_CODE_OAUTH_TOKEN = config.claudeToken;
+  return env;
+}
+
 async function execute(run: RunRow, ac: AbortController) {
   const agent = findAgent(run.agent_id);
   if (!agent) throw new Error(`agente ${run.agent_id} não existe mais`);
-  const project = run.project ? findProject(run.project) : undefined;
+  let project = run.project ? findProject(run.project) : undefined;
+  if (project && !project.cloned) {
+    patch(run.id, { current_op: `Clonando ${project.repo}…` });
+    project = await ensureProject(project);
+  }
   const scratch = join(config.workspaceDir, '.yui', 'scratch');
   const yuiDir = join(config.workspaceDir, '.yui');
   mkdirSync(join(yuiDir, 'reports'), { recursive: true });
@@ -311,17 +326,22 @@ async function execute(run: RunRow, ac: AbortController) {
       permissionMode: 'default',
       allowedTools: SAFE_TOOLS,
       canUseTool,
-      settingSources: ['project'],
+      // user: plugins/settings instalados no HOME do container; claude.ai: conectores MCP do login.
+      settingSources: ['user', 'project', 'local'],
       model: agent.model || config.claudeModel || undefined,
       maxTurns: 80,
-      env: { ...process.env, ...(config.claudeToken ? { CLAUDE_CODE_OAUTH_TOKEN: config.claudeToken } : {}) } as Record<string, string>,
+      env: claudeEnv(),
     },
   });
 
   for await (const msg of q as AsyncIterable<SDKMessage>) {
-    if (msg.type === 'system' && 'session_id' in msg && msg.subtype === 'init') {
+    if (msg.type === 'system' && msg.subtype === 'init') {
       patch(run.id, { session_id: msg.session_id });
       logEvent(run.id, 'system', `session ${msg.session_id} · cwd ${cwd}`);
+      const mcp = msg.mcp_servers.map((m) => `${m.name}${m.status === 'connected' ? '' : ` (${m.status})`}`);
+      if (mcp.length) logEvent(run.id, 'system', `MCP: ${mcp.join(', ')}`);
+      if (msg.plugins.length) logEvent(run.id, 'system', `plugins: ${msg.plugins.map((p) => p.name).join(', ')}`);
+      kvSet('claude_capabilities', JSON.stringify({ at: now(), mcp: msg.mcp_servers, plugins: msg.plugins.map((p) => p.name), apiKeySource: msg.apiKeySource }));
     } else if (msg.type === 'assistant') {
       turns++;
       for (const block of msg.message.content) {

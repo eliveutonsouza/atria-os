@@ -12,13 +12,14 @@ import { db, kvGet, kvSet, now } from './db.ts';
 import { addClient, emit, setYuiState, yuiState } from './bus.ts';
 import { isAuthed, registerAuth, requireAuth } from './auth.ts';
 import { agentInfos, agentsWorking } from './agents.ts';
-import { activeProject, findProject, projectDetail, projectLogs, projectSummaries, setActiveProject } from './projects.ts';
-import { cancelRun, enqueueRun, getRun, inboxItems, listRuns, pendingApprovals, recoverRuns, resolveApproval, runEvents } from './runs.ts';
+import { activeProject, ensureProject, findProject, projectDetail, projectLogs, projectSummaries, setActiveProject } from './projects.ts';
+import { cancelRun, claudeLoggedIn, enqueueRun, getRun, inboxItems, listRuns, pendingApprovals, recoverRuns, resolveApproval, runEvents } from './runs.ts';
 import { brief, infra, latestReport, overview } from './metrics.ts';
 import { getUiContext, recentMessages, setUiContext } from './brain.ts';
 import { endLive, handleText, liveActive, setUiContextNote, startLive } from './live.ts';
 import { startRoutines } from './routines.ts';
 import { sandboxUrl, sbToken } from './sandbox.ts';
+import { catalog, githubEnabled, startGithub, syncCatalog } from './github.ts';
 
 // ---------- workspace seed (agentes padrão) ----------
 const agentsDir = join(config.workspaceDir, '.claude', 'agents');
@@ -98,7 +99,14 @@ app.get('/api/bootstrap', async () => {
     inbox: inboxItems(),
     history: recentMessages(60).map((m, i) => ({ id: `${m.at}-${i}`, who: m.who, text: m.text, at: m.at })),
     greeting: g,
-    status: { claude: !!config.claudeToken, openai: !!config.openaiKey, live: liveActive() },
+    status: {
+      claude: claudeLoggedIn() || !!config.claudeToken,
+      openai: !!config.openaiKey,
+      live: liveActive(),
+      claudeAuth: claudeLoggedIn() ? 'claude.ai' : config.claudeToken ? 'token' : 'none',
+      github: githubEnabled(),
+      repos: catalog().length,
+    },
   };
   return body;
 });
@@ -184,8 +192,9 @@ app.post('/api/runs/:id/cancel', async (req, reply) => {
 });
 
 app.get('/api/projects/:slug', async (req, reply) => {
-  const p = findProject((req.params as { slug: string }).slug);
-  if (!p) return reply.code(404).send({ error: 'not found' });
+  const found = findProject((req.params as { slug: string }).slug);
+  if (!found) return reply.code(404).send({ error: 'not found' });
+  const p = await ensureProject(found).catch(() => found);
   return projectDetail(p);
 });
 app.get('/api/projects/:slug/logs', async (req, reply) => {
@@ -210,6 +219,15 @@ app.get('/api/artifacts', async () => {
   return out;
 });
 
+app.get('/api/repos', () =>
+  catalog().map((r) => ({
+    slug: r.slug, nameWithOwner: r.name_with_owner, description: r.description, language: r.language,
+    pushedAt: r.pushed_at, archived: !!r.archived, cloned: !!findProject(r.slug)?.cloned,
+  })),
+);
+app.post('/api/repos/sync', async () => ({ count: await syncCatalog() }));
+
+app.get('/api/capabilities', () => JSON.parse(kvGet('claude_capabilities') ?? '{}'));
 app.get('/api/approvals', () => pendingApprovals());
 app.post('/api/approvals/:id', async (req, reply) => {
   const approve = (req.body as { approve?: unknown } | undefined)?.approve;
@@ -273,5 +291,6 @@ if (existsSync(config.webDist)) {
 
 recoverRuns();
 startRoutines();
+startGithub().catch((e) => console.error('github', e));
 emit({ type: 'agents.updated', agentsWorking: agentsWorking() });
 await app.listen({ port: config.port, host: config.host });

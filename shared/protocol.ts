@@ -191,7 +191,7 @@ export interface Bootstrap {
   inbox: InboxItem[];
   history: ChatMessage[];
   greeting: { msg: string; showBrief: boolean; brief: Brief | null };
-  status: { claude: boolean; openai: boolean; live: boolean };
+  status: { claude: boolean; openai: boolean; live: boolean; claudeAuth?: 'claude.ai' | 'token' | 'none'; github?: boolean; repos?: number };
 }
 
 // ---------- eventos SSE (/api/events) ----------
@@ -235,6 +235,8 @@ export type ServerEvent =
 // GET  /api/projects/:slug/logs            -> LogsPayload
 // GET  /api/reports/latest                 -> ReportPayload | 404
 // GET  /api/infra                          -> InfraPayload
+// GET  /api/repos                          -> RepoInfo[]
+// GET  /api/capabilities                   -> {mcp, plugins} do último run
 // GET  /api/artifacts                      -> ArtifactInfo[]
 // POST /api/approvals/:id {approve:boolean}-> 204
 // POST /api/runs {agentId, project, instruction} -> RunInfo  (ação manual "Pedir correção")
@@ -244,4 +246,14 @@ export interface ChatContext {
   params?: ViewParams;
   selectedElement?: string | null;
   mode: 'center' | 'canvas' | 'focus';
+}
+
+export interface RepoInfo {
+  slug: string;
+  nameWithOwner: string;
+  description: string | null;
+  language: string | null;
+  pushedAt: string | null;
+  archived: boolean;
+  cloned: boolean;
 }

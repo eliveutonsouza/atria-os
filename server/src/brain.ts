@@ -43,6 +43,7 @@ Como responder:
 - "Volta", "fecha", "sair" => close_canvas. "Tela cheia" => set_focus(true).
 - Pedidos de trabalho (corrigir, criar, pesquisar, revisar, gerar relatório, criar site) => delegate_task com o agente mais adequado e uma instrução completa e autossuficiente (o agente não vê esta conversa). Diga em uma frase quem você acordou e o que vai fazer.
 - Para trabalhos que o usuário quer recorrentes ("todo dia às 8h…") use create_routine.
+- Os projetos do usuário são os repositórios dele no GitHub (catálogo automático). Nunca peça para cadastrar projeto: se não reconhecer o nome, use list_repos. Projetos ainda não clonados são clonados sozinhos ao abrir ou delegar.
 - Se o usuário mudar de projeto ("agora no Stoqmate"), use switch_project.
 - Aprovações são sempre decididas pelo usuário no modal; use open_approval para mostrá-lo, nunca aprove sozinha.
 - Se a fala parecer transcrição truncada ou ambígua, pergunte só o detalhe que falta.`;
@@ -83,6 +84,7 @@ const TOOLS: OpenAI.Responses.FunctionTool[] = [
     type: 'function', name: 'create_routine', strict: true, description: 'Agenda trabalho recorrente de um agente (cron, fuso America/Sao_Paulo).',
     parameters: S({ name: { type: 'string' }, cron: { type: 'string', description: 'expressão cron de 5 campos' }, agent: { type: 'string' }, project: nullableStr('slug'), instruction: { type: 'string' } }, ['name', 'cron', 'agent', 'project', 'instruction']),
   },
+  { type: 'function', name: 'list_repos', strict: true, description: 'Busca nos repositórios GitHub do usuário (catálogo completo, clonados ou não).', parameters: S({ query: nullableStr('trecho do nome/descrição; null lista os mais recentes') }, ['query']) },
   { type: 'function', name: 'open_approval', strict: true, description: 'Mostra ao usuário o modal da aprovação pendente mais antiga.', parameters: S({}, []) },
 ];
 
@@ -94,7 +96,8 @@ function snapshot(): string {
     `Projeto ativo: ${ap ?? 'nenhum'}.`,
     `Tela atual: ${uiContext.mode === 'center' ? 'Yui ao centro, sem Canvas' : `Canvas com view "${uiContext.view}"${uiContext.params?.project ? ` do projeto ${uiContext.params.project}` : ''}${uiContext.mode === 'focus' ? ' em tela cheia' : ''}`}.`,
     uiContext.selectedElement ? `Elemento selecionado no preview: ${uiContext.selectedElement}.` : '',
-    `Projetos: ${listProjectConfigs().map((p) => `${p.name} (${p.slug})`).join(', ') || 'nenhum ainda'}.`,
+    `Projetos no workspace: ${listProjectConfigs().filter((p) => p.cloned).map((p) => `${p.name} (${p.slug})`).join(', ') || 'nenhum'}.`,
+    `Outros repositórios no GitHub (clonam sob demanda): ${listProjectConfigs().filter((p) => !p.cloned).map((p) => p.slug).join(', ') || 'nenhum'}.`,
     `Agentes: ${loadAgents().map((a) => `${a.name} [${a.id}] — ${a.description}`).join('; ')}.`,
     `Execuções: ${runs.filter((r) => ['running', 'queued', 'waiting_approval'].includes(r.state)).map((r) => `${r.agent}: ${r.task} (${r.state}, ${r.progress}%)`).join('; ') || 'nenhuma ativa'}.`,
     `Aprovações pendentes: ${pendingApprovals().length}.`,
@@ -167,6 +170,13 @@ async function runTool(name: string, args: Record<string, unknown>): Promise<unk
     case 'create_routine': {
       const r = createRoutine({ name: String(args.name), cron: String(args.cron), agentId: String(args.agent), project: (args.project as string | null) ?? null, instruction: String(args.instruction) });
       return { ok: true, id: r.id };
+    }
+    case 'list_repos': {
+      const q = String(args.query ?? '').toLowerCase();
+      return listProjectConfigs()
+        .filter((p) => p.repo && (!q || `${p.repo} ${p.description ?? ''}`.toLowerCase().includes(q)))
+        .slice(0, 25)
+        .map((p) => ({ slug: p.slug, repo: p.repo, descricao: p.description, ultimo_push: p.pushedAt, clonado: p.cloned }));
     }
     case 'open_approval': {
       const a = pendingApprovals()[0];
