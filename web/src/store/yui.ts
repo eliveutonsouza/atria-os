@@ -1,0 +1,179 @@
+import { create } from 'zustand'
+import type {
+  ApprovalInfo,
+  Brief,
+  ChatMessage,
+  InboxItem,
+  ProjectSummary,
+  RunInfo,
+  ViewName,
+  ViewParams,
+  YuiState,
+} from '@shared/protocol'
+
+export type Mode = 'center' | 'canvas' | 'focus'
+
+export interface Pending {
+  view: ViewName | 'approval'
+  params?: ViewParams
+  label?: string
+  approvalId?: string
+}
+
+export interface HeaderAction {
+  label: string
+  fn: () => void
+}
+
+export interface ViewHeader {
+  eyebrow: string
+  title: string
+  actions: HeaderAction[]
+}
+
+export interface YuiStore {
+  authed: boolean | null
+  userName: string
+  mode: Mode
+  view: ViewName
+  viewParams: ViewParams
+  viewNonce: number
+  header: ViewHeader
+  yst: YuiState
+  msg: string
+  showLines: boolean
+  brief: Brief | null
+  pending: Pending | null
+  hist: ChatMessage[]
+  activeProject: string | null
+  projects: ProjectSummary[]
+  agentsWorking: number
+  inbox: InboxItem[]
+  approvals: Record<string, ApprovalInfo>
+  approvalOpen: string | null
+  selEl: string | null
+  listening: boolean
+  liveMuted: boolean
+  liveConnecting: boolean
+  liveTranscript: string
+  narrow: boolean
+  short: boolean
+  palette: boolean
+  inboxOpen: boolean
+  histOpen: boolean
+  tech: boolean
+  expandedRun: string | null
+  runs: Record<string, RunInfo>
+  status: { claude: boolean; openai: boolean; live: boolean }
+  loadedAt: number
+
+  set: (p: Partial<YuiStore>) => void
+  show: (view: ViewName, params?: ViewParams) => void
+  close: () => void
+  setFocus: (on: boolean) => void
+  say: (text: string, opts?: { state?: YuiState; hist?: boolean }) => void
+  pushHist: (who: 'user' | 'yui', text: string) => void
+  baseState: () => YuiState
+  setHeader: (h: ViewHeader) => void
+  upsertRun: (r: RunInfo) => void
+}
+
+let showTimer: ReturnType<typeof setTimeout> | undefined
+let msgSeq = 0
+
+export const useYui = create<YuiStore>((set, get) => ({
+  authed: null,
+  userName: '',
+  mode: 'center',
+  view: 'brief',
+  viewParams: {},
+  viewNonce: 0,
+  header: { eyebrow: '', title: '', actions: [] },
+  yst: 'idle',
+  msg: '',
+  showLines: false,
+  brief: null,
+  pending: null,
+  hist: [],
+  activeProject: null,
+  projects: [],
+  agentsWorking: 0,
+  inbox: [],
+  approvals: {},
+  approvalOpen: null,
+  selEl: null,
+  listening: false,
+  liveMuted: false,
+  liveConnecting: false,
+  liveTranscript: '',
+  narrow: false,
+  short: false,
+  palette: false,
+  inboxOpen: false,
+  histOpen: false,
+  tech: false,
+  expandedRun: null,
+  runs: {},
+  status: { claude: false, openai: false, live: false },
+  loadedAt: Date.now(),
+
+  set: (p) => set(p),
+
+  baseState: () => {
+    const s = get()
+    if (s.listening) return 'listening'
+    const mine = Object.values(s.runs).some(
+      (r) => (r.state === 'running' || r.state === 'queued') && r.startedAt && new Date(r.startedAt).getTime() >= s.loadedAt,
+    )
+    return mine ? 'working' : 'idle'
+  },
+
+  show: (view, params = {}) => {
+    const s = get()
+    const sameView = s.view === view
+    set({
+      view,
+      viewParams: params,
+      viewNonce: s.viewNonce + 1,
+      mode: s.mode === 'focus' ? 'focus' : 'canvas',
+      yst: 'showing',
+      pending: null,
+      approvalOpen: null,
+      showLines: false,
+      inboxOpen: false,
+      palette: false,
+      selEl: sameView && view === 'website' ? s.selEl : null,
+      expandedRun: params.runId ?? s.expandedRun,
+    })
+    clearTimeout(showTimer)
+    showTimer = setTimeout(() => {
+      const st = get()
+      if (st.yst === 'showing') set({ yst: st.baseState() })
+    }, 900)
+  },
+
+  close: () => set({ mode: 'center', yst: get().baseState(), selEl: null }),
+
+  setFocus: (on) => {
+    const s = get()
+    if (on) set({ mode: 'focus' })
+    else if (s.mode === 'focus') set({ mode: 'canvas' })
+  },
+
+  say: (text, opts = {}) => {
+    const s = get()
+    set({ msg: text, showLines: false, yst: opts.state ?? s.yst })
+    if (opts.hist !== false) s.pushHist('yui', text)
+  },
+
+  pushHist: (who, text) =>
+    set((s) => ({
+      hist: [...s.hist, { id: `local-${++msgSeq}`, who, text, at: new Date().toISOString() }].slice(-300),
+    })),
+
+  setHeader: (h) => set({ header: h }),
+
+  upsertRun: (r) => set((s) => ({ runs: { ...s.runs, [r.id]: r } })),
+}))
+
+export const yui = () => useYui.getState()

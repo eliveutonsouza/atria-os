@@ -1,0 +1,377 @@
+import { EventEmitter } from 'node:events';
+import { join } from 'node:path';
+import { mkdirSync } from 'node:fs';
+import { query, type CanUseTool, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
+import type { ApprovalInfo, InboxItem, RunInfo, RunEventLine, RunState, RunStep } from '../../shared/protocol.ts';
+import { config } from './config.ts';
+import { db, now, uid } from './db.ts';
+import { emit } from './bus.ts';
+import { findAgent, agentsWorking, type AgentDef } from './agents.ts';
+import { findProject } from './projects.ts';
+
+// Eventos para a camada de conversa (live.ts / brain.ts) narrar o trabalho.
+export const runBus = new EventEmitter<{
+  progress: [RunInfo];
+  finished: [RunInfo];
+  approval: [ApprovalInfo];
+}>();
+
+type RunRow = {
+  id: string; agent_id: string; project: string | null; instruction: string; task: string; state: RunState;
+  progress: number; current_op: string | null; tools: string; steps: string; result: string | null;
+  session_id: string | null; tokens_in: number; tokens_out: number; cost_usd: number;
+  created_at: string; started_at: string | null; finished_at: string | null;
+};
+
+export function toRunInfo(r: RunRow): RunInfo {
+  const agent = findAgent(r.agent_id);
+  return {
+    id: r.id,
+    agent: agent?.name ?? r.agent_id,
+    agentId: r.agent_id,
+    project: r.project,
+    task: r.task,
+    state: r.state,
+    progress: Math.round(r.progress),
+    currentOp: r.current_op,
+    tools: JSON.parse(r.tools),
+    steps: JSON.parse(r.steps),
+    startedAt: r.started_at,
+    finishedAt: r.finished_at,
+    result: r.result,
+    sessionId: r.session_id,
+    tokensIn: r.tokens_in,
+    tokensOut: r.tokens_out,
+    costUsd: r.cost_usd,
+  };
+}
+
+export function getRun(id: string): RunInfo | null {
+  const r = db.prepare('SELECT * FROM runs WHERE id = ?').get(id) as RunRow | undefined;
+  return r ? toRunInfo(r) : null;
+}
+
+export function listRuns(limit = 30): RunInfo[] {
+  const rows = db
+    .prepare(
+      `SELECT * FROM runs ORDER BY CASE state WHEN 'running' THEN 0 WHEN 'waiting_approval' THEN 1 WHEN 'queued' THEN 2 ELSE 3 END, created_at DESC LIMIT ?`,
+    )
+    .all(limit) as RunRow[];
+  return rows.map(toRunInfo);
+}
+
+export function runEvents(id: string): RunEventLine[] {
+  return db.prepare('SELECT t, kind, text FROM run_events WHERE run_id = ? ORDER BY id').all(id) as RunEventLine[];
+}
+
+function patch(id: string, fields: Partial<Record<keyof RunRow, unknown>>): RunInfo {
+  const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
+  const keys = Object.keys(clean);
+  if (keys.length) {
+    db.prepare(`UPDATE runs SET ${keys.map((k) => `${k} = @${k}`).join(', ')} WHERE id = @id`).run({ ...clean, id });
+  }
+  const info = getRun(id)!;
+  emit({ type: 'run.updated', run: info });
+  return info;
+}
+
+function logEvent(runId: string, kind: RunEventLine['kind'], text: string) {
+  db.prepare('INSERT INTO run_events(run_id, t, kind, text) VALUES(?, ?, ?, ?)').run(runId, now(), kind, text.slice(0, 4000));
+}
+
+// ---------- fila ----------
+
+const running = new Map<string, AbortController>();
+
+export interface EnqueueInput {
+  agentId: string;
+  project: string | null;
+  instruction: string;
+  task?: string;
+  selectedElement?: string | null;
+  origin?: 'yui' | 'manual' | 'routine';
+  routineId?: string;
+}
+
+export function enqueueRun(input: EnqueueInput): RunInfo {
+  const agent = findAgent(input.agentId);
+  if (!agent) throw new Error(`agente desconhecido: ${input.agentId}`);
+  const project = input.project ? findProject(input.project) : undefined;
+  if (input.project && !project) throw new Error(`projeto desconhecido: ${input.project}`);
+  const id = uid();
+  const task = (input.task ?? input.instruction).replace(/\s+/g, ' ').slice(0, 110);
+  const instruction = input.selectedElement
+    ? `${input.instruction}\n\nContexto visual: o usuário selecionou o elemento \`${input.selectedElement}\` no preview.`
+    : input.instruction;
+  db.prepare(
+    `INSERT INTO runs(id, agent_id, project, instruction, task, state, origin, routine_id, created_at) VALUES(?, ?, ?, ?, ?, 'queued', ?, ?, ?)`,
+  ).run(id, agent.id, project?.slug ?? null, instruction, task, input.origin ?? 'yui', input.routineId ?? null, now());
+  const info = getRun(id)!;
+  emit({ type: 'run.updated', run: info });
+  setImmediate(pump);
+  return info;
+}
+
+function pump() {
+  while (running.size < config.maxConcurrentRuns) {
+    const next = db.prepare(`SELECT * FROM runs WHERE state = 'queued' ORDER BY created_at LIMIT 1`).get() as RunRow | undefined;
+    if (!next) return;
+    const ac = new AbortController();
+    running.set(next.id, ac);
+    patch(next.id, { state: 'running', started_at: now(), current_op: 'Acordando…' });
+    emit({ type: 'agents.updated', agentsWorking: agentsWorking() });
+    execute(next, ac)
+      .catch((err) => {
+        logEvent(next.id, 'error', String(err?.message ?? err));
+        const info = patch(next.id, { state: 'failed', finished_at: now(), result: `Falhou: ${String(err?.message ?? err).slice(0, 300)}` });
+        runBus.emit('finished', info);
+      })
+      .finally(() => {
+        running.delete(next.id);
+        emit({ type: 'agents.updated', agentsWorking: agentsWorking() });
+        setImmediate(pump);
+      });
+  }
+}
+
+export function cancelRun(id: string): boolean {
+  const ac = running.get(id);
+  if (ac) {
+    ac.abort();
+    return true;
+  }
+  const r = db.prepare(`UPDATE runs SET state = 'cancelled', finished_at = ? WHERE id = ? AND state = 'queued'`).run(now(), id);
+  return r.changes > 0;
+}
+
+// Runs "running" de um processo anterior morreram com ele.
+export function recoverRuns() {
+  db.prepare(`UPDATE runs SET state = 'failed', finished_at = ?, result = 'Interrompido por reinício do Yui Console.' WHERE state IN ('running','waiting_approval')`).run(now());
+  db.prepare(`UPDATE approvals SET status = 'expired', resolved_at = ? WHERE status = 'pending'`).run(now());
+  setImmediate(pump);
+}
+
+// ---------- execução via Claude Agent SDK ----------
+
+const SAFE_TOOLS = ['Read', 'Glob', 'Grep', 'Edit', 'Write', 'NotebookEdit', 'TodoWrite', 'WebSearch', 'WebFetch', 'Task'];
+const DANGER = [
+  /\bgit\s+push\b/,
+  /\bdocker\b/,
+  /\brm\s+-[a-z]*r[a-z]*f?\b/i,
+  /\b(deploy|publish|release)\b/i,
+  /\bnpm\s+publish\b/,
+  /\bkubectl\b|\bssh\b|\bscp\b|\brsync\b/,
+  /\bcurl\b[^|]*\s-X\s*(POST|PUT|DELETE|PATCH)/i,
+  /\bgh\s+(pr\s+merge|release|repo\s+delete)\b/,
+  /\bpsql\b|\bmysql\b|\bDROP\s+TABLE\b/i,
+];
+
+const toolLabel = (name: string) => {
+  const m = /^mcp__([^_]+(?:_[^_]+)*)__/.exec(name);
+  if (m) return `${m[1].replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())} MCP`;
+  return name;
+};
+
+function describeTool(name: string, input: Record<string, unknown>): string {
+  const p = (k: string) => (typeof input[k] === 'string' ? (input[k] as string) : '');
+  const short = (s: string) => s.replace(/^\/workspace\/[^/]+\//, '');
+  switch (name) {
+    case 'Read':
+      return `Lendo ${short(p('file_path'))}`;
+    case 'Edit':
+    case 'Write':
+      return `Editando ${short(p('file_path'))}`;
+    case 'Bash':
+      return `$ ${p('command').split('\n')[0].slice(0, 120)}`;
+    case 'Grep':
+      return `Buscando "${p('pattern').slice(0, 60)}"`;
+    case 'Glob':
+      return `Listando ${p('pattern')}`;
+    case 'WebSearch':
+      return `Pesquisando "${p('query').slice(0, 80)}"`;
+    case 'WebFetch':
+      return `Abrindo ${p('url').slice(0, 80)}`;
+    case 'TodoWrite':
+      return 'Atualizando plano';
+    default:
+      return toolLabel(name);
+  }
+}
+
+async function requestApproval(run: RunRow, title: string, rows: ApprovalInfo['rows'], signal: AbortSignal): Promise<boolean> {
+  const id = uid();
+  db.prepare(`INSERT INTO approvals(id, run_id, title, rows, created_at) VALUES(?, ?, ?, ?, ?)`).run(id, run.id, title, JSON.stringify(rows), now());
+  const approval: ApprovalInfo = { id, runId: run.id, title, rows, createdAt: now() };
+  patch(run.id, { state: 'waiting_approval', current_op: 'Aguardando sua aprovação' });
+  emit({ type: 'approval.requested', approval });
+  emit({ type: 'inbox.updated', inbox: inboxItems() });
+  runBus.emit('approval', approval);
+  const approved = await new Promise<boolean>((resolve) => {
+    waiters.set(id, resolve);
+    signal.addEventListener('abort', () => resolve(false), { once: true });
+  });
+  waiters.delete(id);
+  patch(run.id, { state: 'running', current_op: approved ? 'Aprovado — continuando' : 'Rejeitado — ajustando' });
+  return approved;
+}
+
+const waiters = new Map<string, (ok: boolean) => void>();
+
+export function resolveApproval(id: string, approved: boolean): boolean {
+  const r = db.prepare(`UPDATE approvals SET status = ?, resolved_at = ? WHERE id = ? AND status = 'pending'`).run(approved ? 'approved' : 'rejected', now(), id);
+  if (!r.changes) return false;
+  waiters.get(id)?.(approved);
+  emit({ type: 'approval.resolved', approvalId: id, approved });
+  emit({ type: 'inbox.updated', inbox: inboxItems() });
+  return true;
+}
+
+export function pendingApprovals(): ApprovalInfo[] {
+  const rows = db.prepare(`SELECT * FROM approvals WHERE status = 'pending' ORDER BY created_at`).all() as {
+    id: string; run_id: string; title: string; rows: string; created_at: string;
+  }[];
+  return rows.map((r) => ({ id: r.id, runId: r.run_id, title: r.title, rows: JSON.parse(r.rows), createdAt: r.created_at }));
+}
+
+export function inboxItems(): InboxItem[] {
+  const items: InboxItem[] = pendingApprovals().map((a) => ({
+    id: `approval:${a.id}`,
+    tag: 'Aprovação',
+    label: a.title,
+    tone: 'warn',
+    action: { type: 'approval', approvalId: a.id },
+  }));
+  const failed = db
+    .prepare(`SELECT id, task, project FROM runs WHERE state = 'failed' AND finished_at > ? ORDER BY finished_at DESC LIMIT 3`)
+    .all(new Date(Date.now() - 24 * 3600_000).toISOString()) as { id: string; task: string; project: string | null }[];
+  for (const f of failed) {
+    items.push({ id: `failed:${f.id}`, tag: 'Falha', label: f.task, tone: 'crit', action: { type: 'view', view: 'runs', params: { runId: f.id } } });
+  }
+  return items;
+}
+
+function systemAppend(agent: AgentDef, projectName: string | null): string {
+  return [
+    `Você é o ${agent.name}, um agente da força de trabalho da Yui (Yui Console).`,
+    agent.prompt,
+    '',
+    'Regras de execução:',
+    '- Use TodoWrite logo no início com 3 a 6 passos curtos em português; mantenha-o atualizado — ele vira a timeline que o usuário vê.',
+    '- Trabalhe de forma autônoma; não faça perguntas ao usuário. Se algo bloquear, explique no resultado final.',
+    '- Ações irreversíveis (push, deploy, docker, publicar) podem exigir aprovação humana: o sistema pausa e pergunta. Se for negada, siga sem ela.',
+    '- Resposta final: 1 a 3 frases em português, no estilo de status para ser falado em voz alta (o que foi feito, resultado, próximo passo).',
+    projectName ? `- Projeto atual: ${projectName}.` : '- Sem projeto específico: trabalhe em /workspace/.yui/scratch.',
+    '- Relatórios: se pedirem um relatório, grave JSON em /workspace/.yui/reports/<AAAA-MM-DD-HHmm>.json com {title, lead, kpis:[{value,label}], sections:[{heading, tone:"cyan"|"warn"|"ok", items:[...]}]}.',
+  ].join('\n');
+}
+
+async function execute(run: RunRow, ac: AbortController) {
+  const agent = findAgent(run.agent_id);
+  if (!agent) throw new Error(`agente ${run.agent_id} não existe mais`);
+  const project = run.project ? findProject(run.project) : undefined;
+  const scratch = join(config.workspaceDir, '.yui', 'scratch');
+  const yuiDir = join(config.workspaceDir, '.yui');
+  mkdirSync(join(yuiDir, 'reports'), { recursive: true });
+  mkdirSync(scratch, { recursive: true });
+  const cwd = project?.dir ?? scratch;
+  const extraPatterns = (project?.approvalPatterns ?? []).map((p) => new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+
+  const canUseTool: CanUseTool = async (toolName, input, { signal }) => {
+    if (toolName === 'Bash') {
+      const cmd = String(input.command ?? '');
+      if ([...DANGER, ...extraPatterns].some((re) => re.test(cmd))) {
+        const ok = await requestApproval(
+          run,
+          `${agent.name} quer executar um comando sensível${project ? ` no ${project.name}` : ''}.`,
+          [
+            { label: 'Comando', value: cmd.split('\n')[0].slice(0, 80) },
+            { label: 'Agente', value: agent.name },
+            { label: 'Projeto', value: project?.name ?? '—' },
+          ],
+          signal,
+        );
+        return ok ? { behavior: 'allow', updatedInput: input } : { behavior: 'deny', message: 'O usuário rejeitou este comando. Continue sem executá-lo e explique no resultado.' };
+      }
+      return { behavior: 'allow', updatedInput: input };
+    }
+    return { behavior: 'allow', updatedInput: input };
+  };
+
+  const tools = new Set<string>(JSON.parse(run.tools));
+  let steps: RunStep[] = [];
+  let turns = 0;
+
+  const q = query({
+    prompt: run.instruction,
+    options: {
+      cwd,
+      abortController: ac,
+      additionalDirectories: [yuiDir],
+      systemPrompt: { type: 'preset', preset: 'claude_code', append: systemAppend(agent, project?.name ?? null) },
+      permissionMode: 'default',
+      allowedTools: SAFE_TOOLS,
+      canUseTool,
+      settingSources: ['project'],
+      model: agent.model || config.claudeModel || undefined,
+      maxTurns: 80,
+      env: { ...process.env, ...(config.claudeToken ? { CLAUDE_CODE_OAUTH_TOKEN: config.claudeToken } : {}) } as Record<string, string>,
+    },
+  });
+
+  for await (const msg of q as AsyncIterable<SDKMessage>) {
+    if (msg.type === 'system' && 'session_id' in msg && msg.subtype === 'init') {
+      patch(run.id, { session_id: msg.session_id });
+      logEvent(run.id, 'system', `session ${msg.session_id} · cwd ${cwd}`);
+    } else if (msg.type === 'assistant') {
+      turns++;
+      for (const block of msg.message.content) {
+        if (block.type === 'text' && block.text.trim()) {
+          logEvent(run.id, 'text', block.text.trim());
+        } else if (block.type === 'tool_use') {
+          const input = (block.input ?? {}) as Record<string, unknown>;
+          tools.add(toolLabel(block.name));
+          const op = describeTool(block.name, input);
+          logEvent(run.id, 'tool', op);
+          const fields: Record<string, unknown> = { current_op: op, tools: JSON.stringify([...tools]) };
+          if (block.name === 'TodoWrite' && Array.isArray(input.todos)) {
+            const todos = input.todos as { content: string; status: string; activeForm?: string }[];
+            steps = todos.map((t) => ({
+              label: t.status === 'in_progress' ? (t.activeForm ?? t.content) : t.content,
+              status: t.status === 'completed' ? 'done' : t.status === 'in_progress' ? 'active' : 'pending',
+            }));
+            const done = todos.filter((t) => t.status === 'completed').length;
+            fields.steps = JSON.stringify(steps);
+            fields.progress = Math.min(95, Math.round((done / Math.max(1, todos.length)) * 100));
+          } else if (!steps.length) {
+            fields.progress = Math.min(80, 5 + turns * 4);
+          }
+          const info = patch(run.id, fields);
+          runBus.emit('progress', info);
+        }
+      }
+    } else if (msg.type === 'result') {
+      const usage = msg.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
+      const ok = msg.subtype === 'success';
+      const result = ok ? ((msg as { result?: string }).result ?? '').trim() : `Falhou (${msg.subtype}). ${(msg as { errors?: string[] }).errors?.join('; ') ?? ''}`;
+      logEvent(run.id, ok ? 'result' : 'error', result || '(sem texto)');
+      logEvent(run.id, 'system', `tokens: ${(usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0)} in · ${usage.output_tokens ?? 0} out · $${msg.total_cost_usd.toFixed(4)}`);
+      const info = patch(run.id, {
+        state: ok ? 'done' : 'failed',
+        progress: ok ? 100 : undefined,
+        finished_at: now(),
+        result: result.slice(0, 2000),
+        current_op: ok ? 'Concluído' : 'Falhou',
+        steps: JSON.stringify(ok ? steps.map((s) => ({ ...s, status: 'done' })) : steps),
+        tokens_in: (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
+        tokens_out: usage.output_tokens ?? 0,
+        cost_usd: msg.total_cost_usd,
+      } as Partial<Record<keyof RunRow, unknown>>);
+      runBus.emit('finished', info);
+      return;
+    }
+  }
+  if (ac.signal.aborted) {
+    const info = patch(run.id, { state: 'cancelled', finished_at: now(), current_op: 'Cancelado' });
+    runBus.emit('finished', info);
+  }
+}

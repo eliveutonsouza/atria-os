@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+html{color-scheme:dark;scrollbar-color:rgba(255,255,255,.12) transparent;scrollbar-width:thin}
+html,body{margin:0;height:100%;background:#06070d;color:#e8eaf4;font-family:Manrope,system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden}
+*{box-sizing:border-box}
+a{color:#7fdcf5;text-decoration:none}a:hover{color:#cbbcff}
+input::placeholder{color:#6f7590}
+button{font-family:inherit}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
+</style>
+</helmet>
+<div style="position:fixed;inset:0;overflow:hidden;background:radial-gradient(120% 90% at 50% 28%, #0f1533 0%, #0a0c1d 45%, #06070d 100%);">
+  <canvas ref="{{ bgRef }}" style="position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none"></canvas>
+
+  <div style="position:absolute;top:0;left:0;right:0;height:60px;padding:0 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:30">
+    <div style="display:flex;align-items:center;gap:12px;min-width:0">
+      <button onClick="{{ openPalette }}" style="display:flex;align-items:center;gap:10px;height:36px;padding:0 12px 0 10px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);color:#e8eaf4;cursor:pointer;font-size:13px;font-weight:600;letter-spacing:.14em" style-hover="background:rgba(255,255,255,.07)">
+        <span style="width:10px;height:10px;border-radius:50%;background:radial-gradient(circle at 35% 35%, #fff, #67d8f2 45%, #a68cf7)"></span>
+        <span>YUI</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0;color:#6f7590;font-weight:400">⌘K</span>
+      </button>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#9aa0bb;white-space:nowrap;overflow:hidden">
+        <span>Projeto</span><span style="color:#e8eaf4;font-weight:600">{{ activeProjectName }}</span>
+        <span style="color:#3c4160">·</span><span>Escopo: Auto</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div style="display:flex;align-items:center;gap:14px;padding:0 12px;height:32px;border-radius:10px;font-size:12px;color:#9aa0bb">
+        <span style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#4fe0b0;box-shadow:0 0 8px #4fe0b0"></span>Claude</span>
+        <span style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#4fe0b0;box-shadow:0 0 8px #4fe0b0"></span>OpenAI</span>
+        <span style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#67d8f2;box-shadow:0 0 8px #67d8f2"></span>{{ agentsWorking }} agentes trabalhando</span>
+      </div>
+      <button onClick="{{ toggleInbox }}" style="display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:10px;border:1px solid rgba(245,181,74,.25);background:rgba(245,181,74,.06);color:#f5c97a;font-size:12px;font-weight:600;cursor:pointer">
+        <span>{{ inboxCount }}</span><span style="font-weight:500">pendências</span>
+      </button>
+      <button onClick="{{ toggleHist }}" title="Conversa" style="height:32px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);color:#9aa0bb;font-size:12px;cursor:pointer" style-hover="color:#e8eaf4">Histórico</button>
+    </div>
+  </div>
+
+  <div style="position:absolute;top:{{ panelTop }};bottom:{{ panelBottom }};left:{{ panelLeft }};right:{{ panelRight }};z-index:10;opacity:{{ panelOpacity }};transform:{{ panelTransform }};pointer-events:{{ panelPE }};transition:all .55s cubic-bezier(.2,.8,.2,1);background:linear-gradient(180deg, rgba(20,24,50,.62), rgba(12,14,32,.62));border:1px solid rgba(160,170,255,.11);border-radius:20px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.4)">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:16px 20px 16px 24px;border-bottom:1px solid rgba(255,255,255,.06)">
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#67d8f2;font-weight:600">
+          <span style="width:6px;height:6px;border-radius:50%;background:#67d8f2;box-shadow:0 0 10px #67d8f2"></span>{{ viewEyebrow }}
+        </div>
+        <div style="font-size:20px;font-weight:600;letter-spacing:-.01em">{{ viewTitle }}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <sc-for list="{{ viewActions }}" as="act" hint-placeholder-count="0">
+          <button onClick="{{ act.fn }}" style="height:34px;padding:0 14px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:#dfe3f3;font-size:13px;cursor:pointer" style-hover="background:rgba(255,255,255,.08)">{{ act.label }}</button>
+        </sc-for>
+        <button onClick="{{ toggleFocus }}" style="height:34px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#9aa0bb;font-size:13px;cursor:pointer" style-hover="color:#e8eaf4">{{ focusLabel }}</button>
+        <button onClick="{{ closeCanvas }}" title="Fechar (Esc)" style="height:34px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#9aa0bb;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px" style-hover="color:#e8eaf4">Voltar <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#6f7590">ESC</span></button>
+      </div>
+    </div>
+    <div style="flex:1;overflow-y:auto;overflow-x:hidden;padding:24px;min-width:0">
+
+      <sc-if value="{{ isBrief }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:28px;max-width:1100px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px">
+            <sc-for list="{{ briefKpis }}" as="k" hint-placeholder-count="4">
+              <div style="padding:20px 22px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:6px">
+                <div style="font-size:52px;font-weight:300;line-height:1;letter-spacing:-.03em;color:{{ k.color }}">{{ k.v }}</div>
+                <div style="font-size:13px;color:#9aa0bb">{{ k.l }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#6f7590;font-weight:600;margin-bottom:10px">Linha do tempo</div>
+            <sc-for list="{{ timeline }}" as="ev" hint-placeholder-count="6">
+              <div style="display:grid;grid-template-columns:64px 20px minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#6f7590">{{ ev.t }}</span>
+                <span style="width:8px;height:8px;border-radius:50%;background:{{ ev.c }};box-shadow:0 0 10px {{ ev.c }}"></span>
+                <span style="font-size:15px">{{ ev.l }}</span>
+                <span style="font-size:12px;color:{{ ev.c }}">{{ ev.r }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:22px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px">
+            <sc-for list="{{ dashKpis }}" as="k" hint-placeholder-count="4">
+              <div style="padding:18px 20px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)">
+                <div style="font-size:12px;color:#9aa0bb;margin-bottom:8px">{{ k.l }}</div>
+                <div style="font-size:40px;font-weight:300;line-height:1;letter-spacing:-.02em;color:{{ k.color }}">{{ k.v }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">
+            <div style="padding:18px 20px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;justify-content:space-between;font-size:13px"><span style="font-weight:600">Atividade dos agentes</span><span style="color:#6f7590">últimas 24h</span></div>
+              <div style="height:140px;display:flex;align-items:flex-end;gap:4px">
+                <sc-for list="{{ bars }}" as="b" hint-placeholder-count="24">
+                  <div title="{{ b.tip }}" style="flex:1;height:{{ b.h }};border-radius:3px 3px 1px 1px;background:linear-gradient(180deg,#67d8f2,rgba(166,140,247,.35));opacity:{{ b.o }}"></div>
+                </sc-for>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:10px;color:#6f7590"><span>00h</span><span>06h</span><span>12h</span><span>18h</span><span>agora</span></div>
+            </div>
+            <div style="padding:18px 20px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;justify-content:space-between;font-size:13px"><span style="font-weight:600">Taxa de sucesso</span><span style="color:#6f7590">30 dias</span></div>
+              <svg viewBox="0 0 300 100" preserveAspectRatio="none" style="width:100%;height:140px;display:block">
+                <defs><linearGradient id="yuiArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a68cf7" stop-opacity=".35"></stop><stop offset="1" stop-color="#a68cf7" stop-opacity="0"></stop></linearGradient></defs>
+                <path d="{{ areaPath }}" fill="url(#yuiArea)"></path>
+                <polyline points="{{ linePts }}" fill="none" stroke="#cbbcff" stroke-width="1.5" vector-effect="non-scaling-stroke"></polyline>
+              </svg>
+              <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:10px;color:#6f7590"><span>04 set</span><span>18 set</span><span>hoje</span></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column">
+            <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#6f7590;font-weight:600;margin-bottom:8px">Projetos</div>
+            <sc-for list="{{ projectList }}" as="p" hint-placeholder-count="3">
+              <button onClick="{{ p.fn }}" style="display:grid;grid-template-columns:14px minmax(0,1fr) auto 60px;align-items:center;gap:14px;padding:14px 12px;margin:0 -12px;border:none;border-bottom:1px solid rgba(255,255,255,.05);background:transparent;color:#e8eaf4;text-align:left;cursor:pointer;border-radius:10px" style-hover="background:rgba(255,255,255,.04)">
+                <span style="width:8px;height:8px;border-radius:50%;background:{{ p.c }};box-shadow:0 0 10px {{ p.c }}"></span>
+                <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:600">{{ p.name }}</span><span style="font-size:12px;color:#9aa0bb">{{ p.note }}</span></span>
+                <span style="font-size:12px;color:{{ p.c }}">{{ p.status }}</span>
+                <span style="font-size:20px;font-weight:300;text-align:right">{{ p.health }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isAgents }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:26px">
+          <div style="display:flex;gap:40px;flex-wrap:wrap;align-items:baseline">
+            <div><span style="font-size:48px;font-weight:300;letter-spacing:-.03em">52</span><span style="font-size:13px;color:#9aa0bb;margin-left:10px">configurados</span></div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:14px"><span style="width:8px;height:8px;border-radius:50%;background:#67d8f2;box-shadow:0 0 10px #67d8f2"></span>{{ agentsWorking }} trabalhando</div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#9aa0bb"><span style="width:8px;height:8px;border-radius:50%;border:1px solid #6f7590"></span>{{ agentsSleeping }} dormindo</div>
+          </div>
+          <sc-for list="{{ agentGroups }}" as="g" hint-placeholder-count="3">
+            <div style="display:flex;flex-direction:column">
+              <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#6f7590;font-weight:600;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08)">{{ g.name }}</div>
+              <sc-for list="{{ g.items }}" as="ag" hint-placeholder-count="4">
+                <div style="display:grid;grid-template-columns:30px minmax(80px,160px) minmax(0,1fr) minmax(0,100px) minmax(0,100px);min-width:0;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:14px">
+                  <span style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"><span style="width:8px;height:8px;border-radius:50%;background:{{ ag.dot }};box-shadow:0 0 10px {{ ag.glow }}"></span></span>
+                  <span style="font-weight:600">{{ ag.name }}</span>
+                  <span style="color:{{ ag.taskColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ ag.task }}</span>
+                  <span style="font-size:12px;color:#6f7590">{{ ag.last }}</span>
+                  <span style="font-size:12px;color:#6f7590;font-family:'JetBrains Mono',monospace">{{ ag.next }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isRuns }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:22px">
+          <div style="display:flex;gap:36px;flex-wrap:wrap">
+            <div><div style="font-size:11px;letter-spacing:.18em;color:#6f7590;font-weight:600">RUNNING</div><div style="font-size:36px;font-weight:300;color:#67d8f2">{{ runsRunning }}</div></div>
+            <div><div style="font-size:11px;letter-spacing:.18em;color:#6f7590;font-weight:600">QUEUED</div><div style="font-size:36px;font-weight:300">9</div></div>
+            <div><div style="font-size:11px;letter-spacing:.18em;color:#6f7590;font-weight:600">BACKGROUND</div><div style="font-size:36px;font-weight:300;color:#9aa0bb">14</div></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ runs }}" as="r" hint-placeholder-count="4">
+              <div style="border-radius:16px;background:{{ r.bg }};border:1px solid {{ r.border }};overflow:hidden;transition:all .3s">
+                <button onClick="{{ r.fn }}" style="width:100%;display:grid;grid-template-columns:14px minmax(0,1fr) auto;align-items:center;gap:14px;padding:16px 18px;border:none;background:transparent;color:#e8eaf4;text-align:left;cursor:pointer">
+                  <span style="width:9px;height:9px;border-radius:50%;background:{{ r.dot }};border:1px solid {{ r.color }};box-shadow:0 0 10px {{ r.glow }}"></span>
+                  <span style="display:flex;flex-direction:column;gap:4px;min-width:0">
+                    <span style="font-size:15px;font-weight:600">{{ r.agent }}</span>
+                    <span style="font-size:13px;color:#9aa0bb">{{ r.task }}</span>
+                  </span>
+                  <span style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:{{ r.color }}">{{ r.time }}</span>
+                    <span style="width:90px;height:3px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden"><span style="display:block;height:100%;width:{{ r.prog }};background:{{ r.color }};transition:width .35s"></span></span>
+                  </span>
+                </button>
+                <sc-if value="{{ r.expanded }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:4px 18px 18px 46px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px">
+                    <div style="display:flex;flex-direction:column;gap:8px">
+                      <div style="font-size:11px;letter-spacing:.16em;color:#6f7590;font-weight:600">OPERAÇÃO ATUAL</div>
+                      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#cbbcff">{{ r.op }}</div>
+                      <div style="font-size:11px;letter-spacing:.16em;color:#6f7590;font-weight:600;margin-top:10px">FERRAMENTAS</div>
+                      <div style="display:flex;gap:6px;flex-wrap:wrap">
+                        <sc-for list="{{ r.tools }}" as="tl" hint-placeholder-count="3">
+                          <span style="font-size:12px;padding:4px 10px;border-radius:8px;background:rgba(103,216,242,.08);border:1px solid rgba(103,216,242,.18);color:#a9e9f8">{{ tl }}</span>
+                        </sc-for>
+                      </div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:2px">
+                      <div style="font-size:11px;letter-spacing:.16em;color:#6f7590;font-weight:600;margin-bottom:6px">TIMELINE</div>
+                      <sc-for list="{{ r.steps }}" as="st" hint-placeholder-count="5">
+                        <div style="display:flex;align-items:center;gap:10px;padding:5px 0;font-size:13px;color:{{ st.tc }}">
+                          <span style="width:16px;text-align:center;color:{{ st.c }}">{{ st.i }}</span>{{ st.l }}
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <sc-if value="{{ showTech }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin:0 18px 18px 46px;padding:14px 16px;border-radius:12px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.06);font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.8;color:#9aa0bb">
+                      <sc-for list="{{ techLines }}" as="tln" hint-placeholder-count="5"><div>{{ tln }}</div></sc-for>
+                    </div>
+                  </sc-if>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isProject }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:22px;max-width:1100px">
+          <sc-if value="{{ proj.hasIssue }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:14px;background:rgba(245,181,74,.07);border:1px solid rgba(245,181,74,.25);color:#f5c97a;font-size:14px">
+              <span style="width:8px;height:8px;border-radius:50%;background:#f5b54a;box-shadow:0 0 10px #f5b54a"></span>
+              <span style="flex:1">{{ proj.issue }}</span>
+            </div>
+          </sc-if>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px">
+            <sc-for list="{{ proj.kpis }}" as="k" hint-placeholder-count="4">
+              <div style="padding:18px 20px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)">
+                <div style="font-size:12px;color:#9aa0bb;margin-bottom:8px">{{ k.l }}</div>
+                <div style="font-size:30px;font-weight:300;letter-spacing:-.02em;color:{{ k.color }}">{{ k.v }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column">
+            <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#6f7590;font-weight:600;margin-bottom:8px">Atividade recente</div>
+            <sc-for list="{{ proj.activity }}" as="ac" hint-placeholder-count="4">
+              <div style="display:grid;grid-template-columns:64px 14px minmax(0,1fr);gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:14px">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#6f7590">{{ ac.t }}</span>
+                <span style="width:7px;height:7px;border-radius:50%;background:{{ ac.c }}"></span>
+                <span>{{ ac.l }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isLogs }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div style="font-size:14px;color:#9aa0bb;max-width:720px;text-wrap:pretty">{{ logsSummary }}</div>
+          <div style="padding:16px 18px;border-radius:14px;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.06);font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.85;overflow-x:auto">
+            <sc-for list="{{ logLines }}" as="ln" hint-placeholder-count="10">
+              <div style="display:flex;gap:14px;white-space:nowrap">
+                <span style="color:#4c5270">{{ ln.t }}</span>
+                <span style="width:44px;color:{{ ln.c }}">{{ ln.lvl }}</span>
+                <span style="color:{{ ln.mc }}">{{ ln.m }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isReport }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:26px;padding:8px 0 24px">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:12px;color:#6f7590">Gerado por Report Agent · 03 out 2026, 08:00</div>
+            <div style="font-size:34px;font-weight:300;letter-spacing:-.02em;line-height:1.15">Status executivo — Semana 40</div>
+            <div style="font-size:16px;color:#b4b9cf;line-height:1.6;text-wrap:pretty">Semana estável, com 96% de sucesso nas execuções. Um incidente de deploy no AutoComissão concentrou o risco operacional; a prospecção superou a meta em 30%.</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:rgba(255,255,255,.06);border-radius:14px;overflow:hidden">
+            <sc-for list="{{ reportKpis }}" as="k" hint-placeholder-count="4">
+              <div style="padding:16px 18px;background:#0f1229"><div style="font-size:28px;font-weight:300">{{ k.v }}</div><div style="font-size:12px;color:#9aa0bb">{{ k.l }}</div></div>
+            </sc-for>
+          </div>
+          <sc-for list="{{ reportSections }}" as="sec" hint-placeholder-count="3">
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:{{ sec.c }};font-weight:600">{{ sec.h }}</div>
+              <sc-for list="{{ sec.items }}" as="it" hint-placeholder-count="3">
+                <div style="font-size:15px;line-height:1.6;color:#d6d9e8;padding-left:16px;border-left:1px solid rgba(255,255,255,.1)">{{ it }}</div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isWebsite }}" hint-placeholder-val="{{ false }}">
+        <div style="height:100%;min-height:460px;display:flex;flex-direction:column;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.1);background:#f6f4ef">
+          <div style="height:38px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 14px;background:#14172c;border-bottom:1px solid rgba(255,255,255,.06)">
+            <div style="display:flex;gap:6px"><span style="width:9px;height:9px;border-radius:50%;background:#3a3f5c"></span><span style="width:9px;height:9px;border-radius:50%;background:#3a3f5c"></span><span style="width:9px;height:9px;border-radius:50%;background:#3a3f5c"></span></div>
+            <div style="flex:1;max-width:420px;height:24px;border-radius:7px;background:rgba(255,255,255,.05);display:flex;align-items:center;padding:0 10px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#9aa0bb">clinica-sorriso.preview.yui</div>
+            <div style="font-size:11px;color:#67d8f2">{{ siteHint }}</div>
+          </div>
+          <div style="flex:1;overflow:auto;color:#1d2422;font-family:Manrope,sans-serif">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 40px;font-size:13px">
+              <span style="font-weight:700;letter-spacing:.02em">Clínica Sorriso</span>
+              <span style="display:flex;gap:22px;color:#55605c"><span>Tratamentos</span><span>Equipe</span><span>Contato</span></span>
+            </div>
+            <div onClick="{{ selectHero }}" style="cursor:pointer;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:32px;align-items:center;padding:{{ heroPad }};outline:{{ heroOutline }};outline-offset:-6px;transition:padding .5s">
+              <div style="display:flex;flex-direction:column;gap:16px">
+                <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#2f7a6b;font-weight:600">Odontologia em São Paulo</div>
+                <div style="font-size:40px;line-height:1.08;font-weight:{{ heroWeight }};letter-spacing:-.02em;text-wrap:pretty">{{ heroTitle }}</div>
+                <div style="font-size:15px;color:#55605c;line-height:1.6;max-width:420px">{{ heroSub }}</div>
+                <div style="display:flex;gap:10px"><span style="padding:12px 20px;border-radius:999px;background:#1d2422;color:#f6f4ef;font-size:14px;font-weight:600">Agendar avaliação</span><span style="padding:12px 20px;border-radius:999px;border:1px solid #c9c5ba;font-size:14px">Ver tratamentos</span></div>
+              </div>
+              <div style="height:260px;border-radius:18px;background:repeating-linear-gradient(135deg,#e7e3d9 0 10px,#efebe2 10px 20px);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:#8a8577">foto da clínica</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;padding:8px 40px 40px">
+              <sc-for list="{{ siteServices }}" as="sv" hint-placeholder-count="3">
+                <div style="padding:20px;border-radius:14px;background:#fff;border:1px solid #e7e3d9"><div style="font-weight:700;margin-bottom:6px">{{ sv.t }}</div><div style="font-size:13px;color:#55605c;line-height:1.5">{{ sv.d }}</div></div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+
+  <div style="position:absolute;left:0;right:0;top:{{ centerTop }};bottom:104px;overflow:hidden;display:flex;flex-direction:column;align-items:center;gap:{{ centerGap }};text-align:center;padding:0 24px;z-index:25;transition:opacity .45s, transform .55s cubic-bezier(.2,.8,.2,1);opacity:{{ centerOpacity }};transform:{{ centerTransform }};pointer-events:{{ centerPE }}">
+    <div style="display:flex;align-items:center;gap:10px;font-size:11px;letter-spacing:.32em;color:#9aa0bb;font-weight:600">
+      <span>YUI</span><span style="width:3px;height:3px;border-radius:50%;background:#4c5270"></span><span style="color:{{ stateColor }};letter-spacing:.2em">{{ stateLabel }}</span>
+    </div>
+    <div style="font-size:{{ centerFont }};font-weight:300;line-height:1.3;letter-spacing:-.01em;max-width:680px;text-wrap:pretty">{{ msg }}</div>
+    <sc-if value="{{ showLines }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:4px;font-size:15px;color:#b4b9cf">
+        <sc-for list="{{ briefLines }}" as="bl" hint-placeholder-count="4"><div><span style="color:{{ bl.c }};font-weight:600">{{ bl.n }}</span> {{ bl.t }}</div></sc-for>
+        <div style="margin-top:8px;color:#e8eaf4">Quer ver?</div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ showSugg }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px 18px;margin-top:{{ suggMargin }};max-width:720px;font-size:13px">
+      <sc-for list="{{ suggestions }}" as="sg" hint-placeholder-count="5">
+        <button onClick="{{ sg.fn }}" style="border:none;background:transparent;color:#6f7590;cursor:pointer;padding:4px 2px;font-size:13px" style-hover="color:#cbbcff">“{{ sg.t }}”</button>
+      </sc-for>
+    </div>
+    </sc-if>
+  </div>
+
+  <div style="position:absolute;left:0;width:24%;top:calc(34% + 72px);padding:0 28px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;z-index:25;transition:opacity .45s, transform .55s;opacity:{{ leftOpacity }};transform:{{ leftTransform }};pointer-events:{{ leftPE }}">
+    <div style="display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:.3em;color:#9aa0bb;font-weight:600">
+      <span>YUI</span><span style="width:3px;height:3px;border-radius:50%;background:#4c5270"></span><span style="color:{{ stateColor }};letter-spacing:.18em">{{ stateLabel }}</span>
+    </div>
+    <div style="font-size:15px;line-height:1.55;color:#c9cde0;text-wrap:pretty;max-width:280px">{{ msg }}</div>
+    <sc-if value="{{ hasPending }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ showPending }}" style="margin-top:4px;height:32px;padding:0 14px;border-radius:999px;border:1px solid rgba(103,216,242,.3);background:rgba(103,216,242,.08);color:#a9e9f8;font-size:12px;cursor:pointer">{{ pendingLabel }}</button>
+    </sc-if>
+  </div>
+
+  <canvas ref="{{ cvRef }}" style="position:absolute;inset:0;width:100%;height:100%;z-index:20;pointer-events:none"></canvas>
+
+  <sc-if value="{{ orbBtnShow }}" hint-placeholder-val="{{ false }}">
+    <button onClick="{{ orbClick }}" title="Voltar para Yui" style="position:absolute;left:{{ orbBtnX }};top:{{ orbBtnY }};width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;border:none;background:transparent;cursor:pointer;z-index:45"></button>
+  </sc-if>
+
+  <div style="position:absolute;bottom:22px;left:{{ dockLeft }};right:{{ dockRight }};display:flex;justify-content:center;z-index:40;transition:all .55s cubic-bezier(.2,.8,.2,1);opacity:{{ dockOpacity }};pointer-events:{{ dockPE }}">
+    <div style="width:100%;max-width:760px;display:flex;align-items:center;gap:6px;padding:7px 7px 7px 8px;background:rgba(16,20,42,.78);border:1px solid {{ dockBorder }};border-radius:18px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 18px 50px rgba(0,0,0,.35);transition:border-color .3s">
+      <button title="Anexar" onClick="{{ attach }}" style="width:40px;height:40px;flex-shrink:0;border-radius:12px;border:none;background:transparent;color:#9aa0bb;font-size:22px;font-weight:300;cursor:pointer" style-hover="background:rgba(255,255,255,.06);color:#e8eaf4">+</button>
+      <input ref="{{ inputRef }}" value="{{ input }}" onChange="{{ onInput }}" onKeyDown="{{ onInputKey }}" placeholder="{{ placeholder }}" style="flex:1;min-width:0;height:40px;border:none;outline:none;background:transparent;color:#e8eaf4;font-size:15px;font-family:Manrope,sans-serif">
+      <button title="Falar" onClick="{{ toggleMic }}" style="width:40px;height:40px;flex-shrink:0;border-radius:12px;border:1px solid {{ micBorder }};background:{{ micBg }};color:{{ micColor }};cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path></svg>
+      </button>
+      <button title="Enviar" onClick="{{ send }}" style="width:40px;height:40px;flex-shrink:0;border-radius:12px;border:none;background:linear-gradient(135deg,#67d8f2,#a68cf7);color:#0a0c1d;font-size:17px;font-weight:700;cursor:pointer">↑</button>
+    </div>
+  </div>
+
+  <sc-if value="{{ inboxOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ toggleInbox }}" style="position:absolute;inset:0;z-index:48"></div>
+    <div style="position:absolute;top:60px;right:20px;width:min(380px,calc(100% - 40px));z-index:50;padding:8px;border-radius:16px;background:rgba(16,20,42,.94);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(16px);box-shadow:0 24px 60px rgba(0,0,0,.5)">
+      <div style="padding:10px 12px 8px;font-size:12px;color:#9aa0bb">{{ inboxCount }} coisas precisam de você</div>
+      <sc-for list="{{ inboxItems }}" as="ib" hint-placeholder-count="3">
+        <button onClick="{{ ib.fn }}" style="width:100%;display:flex;flex-direction:column;gap:3px;padding:12px;border:none;border-radius:10px;background:transparent;color:#e8eaf4;text-align:left;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">
+          <span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:{{ ib.c }};font-weight:600">{{ ib.tag }}</span>
+          <span style="font-size:14px">{{ ib.l }}</span>
+        </button>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <div style="position:absolute;top:0;bottom:0;left:0;width:min(360px,90vw);z-index:52;transform:{{ histTransform }};transition:transform .4s cubic-bezier(.2,.8,.2,1);background:rgba(12,14,30,.95);border-right:1px solid rgba(255,255,255,.08);backdrop-filter:blur(18px);display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.06)">
+      <span style="font-size:14px;font-weight:600">Conversa</span>
+      <button onClick="{{ toggleHist }}" style="border:none;background:transparent;color:#9aa0bb;cursor:pointer;font-size:13px">Fechar</button>
+    </div>
+    <div style="flex:1;overflow:auto;padding:16px 20px;display:flex;flex-direction:column;gap:16px">
+      <sc-if value="{{ histEmpty }}" hint-placeholder-val="{{ false }}"><div style="font-size:14px;color:#6f7590">Ainda não conversamos hoje.</div></sc-if>
+      <sc-for list="{{ hist }}" as="h" hint-placeholder-count="0">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:{{ h.c }};font-weight:600">{{ h.who }}</span>
+          <span style="font-size:14px;line-height:1.55;color:#d6d9e8">{{ h.text }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <sc-if value="{{ paletteOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closePalette }}" style="position:absolute;inset:0;z-index:55;background:rgba(4,5,12,.55);backdrop-filter:blur(4px)"></div>
+    <div style="position:absolute;top:16vh;left:50%;transform:translateX(-50%);width:min(560px,calc(100% - 32px));z-index:56;border-radius:18px;background:rgba(16,20,42,.96);border:1px solid rgba(160,170,255,.16);box-shadow:0 30px 90px rgba(0,0,0,.6);overflow:hidden">
+      <input ref="{{ pqRef }}" value="{{ pq }}" onChange="{{ onPq }}" onKeyDown="{{ onPqKey }}" placeholder="Buscar comando ou view…" style="width:100%;height:56px;padding:0 20px;border:none;outline:none;border-bottom:1px solid rgba(255,255,255,.07);background:transparent;color:#e8eaf4;font-size:16px;font-family:Manrope,sans-serif">
+      <div style="max-height:52vh;overflow:auto;padding:8px">
+        <sc-for list="{{ paletteItems }}" as="pi" hint-placeholder-count="8">
+          <button onClick="{{ pi.fn }}" style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:11px 12px;border:none;border-radius:10px;background:{{ pi.bg }};color:#e8eaf4;font-size:14px;text-align:left;cursor:pointer" style-hover="background:rgba(255,255,255,.06)">
+            <span>{{ pi.label }}</span><span style="font-size:12px;color:#6f7590">{{ pi.hint }}</span>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ approvalOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:58;background:rgba(4,5,12,.6);backdrop-filter:blur(6px)"></div>
+    <div style="position:absolute;top:50%;left:{{ approvalLeft }};transform:translate(-50%,-50%);width:min(460px,calc(100% - 32px));z-index:59;padding:28px;border-radius:22px;background:linear-gradient(180deg,rgba(26,22,52,.97),rgba(14,16,34,.97));border:1px solid rgba(245,181,74,.3);box-shadow:0 0 60px rgba(245,181,74,.08), 0 30px 90px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:18px">
+      <div style="font-size:11px;letter-spacing:.24em;color:#f5b54a;font-weight:700">APROVAÇÃO NECESSÁRIA</div>
+      <div style="font-size:22px;font-weight:400;line-height:1.35">DevOps quer publicar o AutoComissão em produção.</div>
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:14px">
+        <sc-for list="{{ approvalRows }}" as="ar" hint-placeholder-count="3">
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)"><span style="color:#9aa0bb">{{ ar.l }}</span><span style="color:{{ ar.c }}">{{ ar.v }}</span></div>
+        </sc-for>
+      </div>
+      <button onClick="{{ reviewChanges }}" style="height:40px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);color:#dfe3f3;font-size:14px;cursor:pointer">Revisar alterações</button>
+      <div style="display:flex;gap:10px">
+        <button onClick="{{ reject }}" style="flex:1;height:44px;border-radius:12px;border:1px solid rgba(240,98,114,.35);background:transparent;color:#f39aa4;font-size:14px;font-weight:600;cursor:pointer">Rejeitar</button>
+        <button onClick="{{ approve }}" style="flex:1;height:44px;border-radius:12px;border:none;background:linear-gradient(135deg,#4fe0b0,#67d8f2);color:#06221c;font-size:14px;font-weight:700;cursor:pointer">Aprovar</button>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;particleDensity&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1,&quot;min&quot;:0.3,&quot;max&quot;:2,&quot;step&quot;:0.1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Avatar&quot;},&quot;reducedMotion&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Avatar&quot;},&quot;startWithBrief&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Experiência&quot;}}">
+class Component extends DCLogic {
+  state = {
+    mode: 'center', view: 'brief', yst: 'idle', msg: '', pending: null, showLines: false,
+    input: '', hist: [], palette: false, pq: '', inbox: false, histOpen: false,
+    approval: false, expanded: 'r1', tech: false, fixing: false, fixProg: 0, fixed: false, deployed: false,
+    project: 'autocomissao', selEl: null, siteV2: false, narrow: false, listening: false, agentsWorking: 4
+  };
+  cvRef = React.createRef(); bgRef = React.createRef(); inputRef = React.createRef(); pqRef = React.createRef();
+  timers = []; micIdx = 0;
+  C = { cyan: '#67d8f2', violet: '#a68cf7', lav: '#cbbcff', ok: '#4fe0b0', warn: '#f5b54a', crit: '#f06272', t2: '#9aa0bb', t3: '#6f7590' };
+
+  later(fn, ms) { const id = setTimeout(fn, ms); this.timers.push(id); return id; }
+
+  componentDidMount() {
+    const h = new Date().getHours();
+    this.greet = h < 12 ? 'Bom dia.' : h < 18 ? 'Boa tarde.' : 'Boa noite.';
+    const brief = this.props.startWithBrief ?? true;
+    this.setState(brief
+      ? { msg: this.greet + ' Enquanto você esteve fora:', showLines: true, pending: 'brief' }
+      : { msg: this.greet + ' O que vamos fazer?' });
+    this.prm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.onResize = () => {
+      const cv = this.cvRef.current, bg = this.bgRef.current; if (!cv || !bg) return;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      this.w = cv.clientWidth; this.h = cv.clientHeight;
+      [cv, bg].forEach(c => { c.width = this.w * dpr; c.height = this.h * dpr; c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0); });
+      const narrow = this.w < 820, short = this.h < 760;
+      if (narrow !== this.state.narrow || short !== this.state.short) this.setState({ narrow, short });
+    };
+    this.onKey = (e) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); this.state.palette ? this.closePalette() : this.openPalette(); return; }
+      if (mod && e.key.toLowerCase() === 'l') { e.preventDefault(); this.inputRef.current && this.inputRef.current.focus(); return; }
+      if (e.key === 'Escape') {
+        const s = this.state;
+        if (s.palette) return this.closePalette();
+        if (s.approval) return this.setState({ approval: false });
+        if (s.inbox || s.histOpen) return this.setState({ inbox: false, histOpen: false });
+        if (s.mode === 'focus') return this.setState({ mode: 'canvas' });
+        if (s.mode === 'canvas') return this.close();
+      }
+    };
+    window.addEventListener('resize', this.onResize);
+    window.addEventListener('keydown', this.onKey);
+    this.onResize();
+    this.initAnim();
+  }
+  componentDidUpdate(pp, ps) {
+    if (ps.yst !== this.state.yst && this.state.yst === 'success' && this.a) this.a.flash = 1;
+    if (pp.particleDensity !== this.props.particleDensity && this.a) this.makeParts();
+  }
+  componentWillUnmount() {
+    cancelAnimationFrame(this.raf); this.timers.forEach(clearTimeout);
+    clearInterval(this.fixTimer); clearInterval(this.micTimer);
+    window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey);
+  }
+
+  // ---------- particle engine ----------
+  makeParts() {
+    const n = Math.round(120 * (this.props.particleDensity ?? 1)), parts = [];
+    for (let i = 0; i < n; i++) parts.push({ ang: Math.random() * 6.283, rr: 1.2 + Math.random() * 1.6, sp: (0.12 + Math.random() * 0.45) * (Math.random() < 0.75 ? 1 : -1), rot: (Math.random() - 0.5) * 1.3, flat: 0.22 + Math.random() * 0.5, s: 0.5 + Math.random() * 1.5, hue: Math.random() < 0.6 ? 0 : 1 });
+    this.a.parts = parts;
+  }
+  initAnim() {
+    const a = this.a = { x: 0, y: 0, r: 60, int: 0.6, spd: 1, t: 0, stars: [], waves: [], sparks: [], flash: 0, lastWave: 0, col: [103, 216, 242], col2: [166, 140, 247], init: false };
+    for (let i = 0; i < 170; i++) a.stars.push({ x: Math.random(), y: Math.random(), z: Math.random(), p: Math.random() * 6.28 });
+    this.makeParts();
+    let last = performance.now();
+    const loop = (now) => { const dt = Math.min(0.05, (now - last) / 1000); last = now; try { this.frame(dt); } catch (e) { if (!this.frameErr) { this.frameErr = 1; console.warn('yui frame', e && e.message); } } this.raf = requestAnimationFrame(loop); };
+    this.raf = requestAnimationFrame(loop);
+  }
+  target() {
+    const w = this.w, h = this.h, s = this.state;
+    if (s.mode === 'center') { const sh = h < 760; return { x: w / 2, y: sh ? h * 0.24 : h * 0.36, r: sh ? Math.min(56, h * 0.075) : Math.min(76, h * 0.085) }; }
+    if (s.mode === 'focus') return { x: w - 50, y: h - 50, r: 16 };
+    if (s.narrow) return { x: w - 46, y: h - 128, r: 18 };
+    return { x: w * 0.12, y: h * 0.34, r: Math.min(50, w * 0.032) };
+  }
+  frame(dt) {
+    const a = this.a, w = this.w, h = this.h; if (!w || !this.cvRef.current) return;
+    const rm = this.props.reducedMotion || this.prm, k = rm ? 0.25 : 1;
+    a.t += dt * k;
+    const T = this.target();
+    if (!a.init) { a.x = T.x; a.y = T.y; a.r = T.r; a.init = true; }
+    const e = 1 - Math.exp(-dt * (rm ? 20 : 6));
+    a.x += (T.x - a.x) * e; a.y += (T.y - a.y) * e; a.r += (T.r - a.r) * e;
+    const st = this.state.yst;
+    const P = { idle: [0.55, 1], listening: [0.85, 1.2], thinking: [1, 2.8], delegating: [1, 2.2], working: [0.8, 1.6], speaking: [0.85, 1.3], showing: [0.8, 1.8], warning: [0.8, 1], success: [1, 1.4] }[st] || [0.55, 1];
+    a.int += (P[0] - a.int) * e; a.spd += (P[1] - a.spd) * e;
+    const tc = st === 'warning' ? [245, 181, 74] : st === 'success' ? [79, 224, 176] : [103, 216, 242];
+    for (let i = 0; i < 3; i++) a.col[i] += (tc[i] - a.col[i]) * e;
+    const rgba = (c, al) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${Math.max(0, al)})`;
+    const R = a.r, t = a.t;
+
+    const bg = this.bgRef.current.getContext('2d');
+    bg.clearRect(0, 0, w, h);
+    const ng = bg.createRadialGradient(a.x, a.y, 0, a.x, a.y, Math.max(w, h) * 0.55);
+    ng.addColorStop(0, rgba(a.col2, 0.10 * a.int)); ng.addColorStop(0.4, rgba([40, 60, 140], 0.05)); ng.addColorStop(1, 'rgba(0,0,0,0)');
+    bg.fillStyle = ng; bg.fillRect(0, 0, w, h);
+    for (const s of a.stars) {
+      const x = ((s.x * w + t * 4 * s.z) % w + w) % w, y = s.y * h;
+      bg.fillStyle = `rgba(200,210,255,${(0.08 + 0.3 * s.z) * (0.6 + 0.4 * Math.sin(t * 0.8 + s.p))})`;
+      const sz = 0.4 + s.z * 1.1; bg.fillRect(x, y, sz, sz);
+    }
+
+    const c = this.cvRef.current.getContext('2d');
+    c.clearRect(0, 0, w, h);
+    c.globalCompositeOperation = 'lighter';
+    let v = 0;
+    if (st === 'listening') v = 0.4 + 0.6 * Math.abs(Math.sin(t * 8.3) * Math.sin(t * 2.1 + 1));
+    if (st === 'speaking') v = Math.abs(Math.sin(t * 6.5)) * 0.8;
+    const Rc = R * (1 + 0.035 * Math.sin(t * 1.3) + v * 0.08);
+
+    const og = c.createRadialGradient(a.x, a.y, R * 0.2, a.x, a.y, R * 2.8);
+    og.addColorStop(0, rgba(a.col, 0.22 * a.int)); og.addColorStop(0.5, rgba(a.col2, 0.07 * a.int)); og.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = og; c.beginPath(); c.arc(a.x, a.y, R * 2.8, 0, 6.283); c.fill();
+
+    c.lineWidth = 1;
+    for (let i = 0; i < 3; i++) {
+      const rr = R * (1.45 + i * 0.3);
+      c.strokeStyle = rgba(i === 1 ? a.col2 : a.col, 0.12 + 0.1 * a.int);
+      c.beginPath(); c.ellipse(a.x, a.y, rr, rr * (0.3 + 0.1 * i), t * 0.18 * a.spd * (i % 2 ? -1 : 1) + i * 1.1, 0, 6.283); c.stroke();
+    }
+    c.setLineDash([1.5, 7]); c.lineDashOffset = -t * 18 * a.spd;
+    c.strokeStyle = rgba(a.col, 0.35 * a.int); c.beginPath(); c.arc(a.x, a.y, R * 1.2, 0, 6.283); c.stroke(); c.setLineDash([]);
+    if (st === 'thinking' || st === 'delegating') {
+      c.lineWidth = 1.5; c.strokeStyle = rgba([255, 255, 255], 0.5);
+      for (let i = 0; i < 3; i++) { c.beginPath(); c.arc(a.x, a.y, R * (0.72 + i * 0.12), t * (3 + i) + i * 2, t * (3 + i) + i * 2 + 1.2); c.stroke(); }
+      c.lineWidth = 1;
+    }
+    for (let i = 0; i < 8; i++) {
+      const an = t * 0.12 + i * 0.785, gx = a.x + Math.cos(an) * R * 1.8, gy = a.y + Math.sin(an) * R * 1.8, g = Math.max(1.2, R * 0.03);
+      c.fillStyle = rgba(a.col2, 0.45 * a.int);
+      c.beginPath(); c.moveTo(gx, gy - g); c.lineTo(gx + g, gy); c.lineTo(gx, gy + g); c.lineTo(gx - g, gy); c.fill();
+    }
+
+    const pt = [];
+    for (const p of a.parts) {
+      p.ang += p.sp * dt * a.spd * k * 1.4;
+      const rr = p.rr * R, ex = Math.cos(p.ang) * rr, ey = Math.sin(p.ang) * rr * p.flat;
+      const cr = Math.cos(p.rot), sr = Math.sin(p.rot);
+      pt.push({ x: a.x + ex * cr - ey * sr, y: a.y + ex * sr + ey * cr, d: Math.sin(p.ang), p });
+    }
+    const drawP = (q) => {
+      const al = (0.2 + 0.6 * (q.d * 0.5 + 0.5)) * a.int, sz = q.p.s * Math.max(0.5, R / 70) * (1 + v * 0.5);
+      c.fillStyle = rgba(q.p.hue ? a.col2 : a.col, al); c.beginPath(); c.arc(q.x, q.y, sz, 0, 6.283); c.fill();
+    };
+    pt.forEach(q => { if (q.d < 0) drawP(q); });
+
+    const cg = c.createRadialGradient(a.x - Rc * 0.22, a.y - Rc * 0.28, Rc * 0.04, a.x, a.y, Rc);
+    cg.addColorStop(0, 'rgba(255,255,255,0.95)'); cg.addColorStop(0.28, rgba(a.col, 0.85)); cg.addColorStop(0.7, rgba(a.col2, 0.5)); cg.addColorStop(1, rgba(a.col2, 0));
+    c.fillStyle = cg; c.beginPath(); c.arc(a.x, a.y, Rc, 0, 6.283); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,0.18)'; c.lineWidth = 1;
+    for (let i = 0; i < 2; i++) { c.beginPath(); c.ellipse(a.x, a.y, Rc * 0.55, Rc * 0.2, t * 0.6 * a.spd + i * 1.57, 0, 6.283); c.stroke(); }
+    pt.forEach(q => { if (q.d >= 0) drawP(q); });
+
+    if (st === 'listening' && t - a.lastWave > 0.45) { a.waves.push({ r: Rc, al: 0.7 }); a.lastWave = t; }
+    a.waves = a.waves.filter(wv => { wv.r += dt * R * 1.5; wv.al -= dt * 0.75; if (wv.al <= 0) return false; c.strokeStyle = rgba(a.col, wv.al); c.lineWidth = 1.2; c.beginPath(); c.arc(a.x, a.y, wv.r, 0, 6.283); c.stroke(); return true; });
+
+    const spawn = st === 'delegating' ? 3 : (st === 'working' && Math.random() < 0.08 ? 1 : 0);
+    for (let i = 0; i < spawn; i++) { const an = Math.random() * 6.283, sp = R * (2 + Math.random() * 3); a.sparks.push({ x: a.x + Math.cos(an) * R, y: a.y + Math.sin(an) * R, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp, l: 1 }); }
+    a.sparks = a.sparks.filter(s => {
+      const px = s.x, py = s.y; s.x += s.vx * dt; s.y += s.vy * dt; s.l -= dt * 0.9; if (s.l <= 0) return false;
+      c.strokeStyle = rgba(a.col, s.l); c.lineWidth = 1.4; c.beginPath(); c.moveTo(px - s.vx * 0.04, py - s.vy * 0.04); c.lineTo(s.x, s.y); c.stroke(); return true;
+    });
+
+    const n = this.state.agentsWorking, ac = [[103, 216, 242], [203, 188, 255], [79, 224, 176], [166, 140, 247], [245, 181, 74]];
+    for (let i = 0; i < n; i++) {
+      const an = t * 0.35 * a.spd + i * (6.283 / n), ax = a.x + Math.cos(an) * R * 2.2, ay = a.y + Math.sin(an) * R * 2.2 * 0.42;
+      c.fillStyle = rgba(ac[i % 5], 0.95); c.beginPath(); c.arc(ax, ay, Math.max(1.6, R * 0.045), 0, 6.283); c.fill();
+      c.fillStyle = rgba(ac[i % 5], 0.15); c.beginPath(); c.arc(ax, ay, Math.max(4, R * 0.12), 0, 6.283); c.fill();
+    }
+    if (a.flash > 0) {
+      c.strokeStyle = rgba([79, 224, 176], a.flash); c.lineWidth = 2;
+      c.beginPath(); c.arc(a.x, a.y, R * (1.15 + (1 - a.flash) * 1.5), 0, 6.283); c.stroke();
+      a.flash -= dt * 1.1;
+    }
+    c.globalCompositeOperation = 'source-over';
+  }
+
+  // ---------- conversation ----------
+  base() { return this.state.fixing ? 'working' : 'idle'; }
+  push(who, text) { this.setState(s => ({ hist: [...s.hist, { who, text }] })); }
+  say(text, o = {}) {
+    this.setState({ yst: 'thinking', showLines: false });
+    this.later(() => {
+      this.setState(s => ({ yst: 'speaking', msg: text, hist: [...s.hist, { who: 'Yui', text }], pending: o.pending !== undefined ? o.pending : s.pending }));
+      this.later(() => {
+        if (o.view) this.show(o.view, o.extra);
+        else this.setState({ yst: o.endState || this.base() });
+        o.then && o.then();
+      }, o.hold || 1300);
+    }, o.think || 650);
+  }
+  show(view, extra = {}) {
+    this.setState(s => ({ view, mode: s.mode === 'focus' ? 'focus' : 'canvas', yst: 'showing', pending: null, approval: false, showLines: false, inbox: false, palette: false, ...extra }));
+    this.later(() => this.setState(s => ({ yst: s.yst === 'showing' ? this.base() : s.yst })), 900);
+  }
+  close() { this.setState({ mode: 'center', yst: this.base(), selEl: null }); }
+  submit(raw) {
+    const text = (raw ?? this.state.input).trim(); if (!text) return;
+    this.setState({ input: '' }); this.push('Você', text); this.route(text);
+  }
+  route(text) {
+    const t = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const s = this.state;
+    const viewWord = /agente|log|erro|dashboard|painel|relat|site|preview|execu|stoqmate|problema|brief|noite/.test(t);
+    if (/\b(volta|voltar|fecha|fechar|sair)\b/.test(t)) { this.close(); this.later(() => { const m = 'Pronto. O que vamos fazer agora?'; this.setState({ msg: m }); this.push('Yui', m); }, 250); return; }
+    if (/tela cheia|foco|maximiz/.test(t) && s.mode !== 'center') return this.setState({ mode: 'focus' });
+    if (s.selEl && s.view === 'website' && /profission|espaco|espacamento|melhor|aument|muda|limp/.test(t)) return this.editSite();
+    if (/corrig|consert|resolv|arrum/.test(t)) return this.fix();
+    if (/aprov|deploy/.test(t)) return this.askApproval();
+    if (/meus projetos|como estao/.test(t)) return this.say(s.fixed ? 'Os três projetos estão saudáveis. O AutoComissão voltou ao normal depois da correção.' : 'Stoqmate e Clínica Sorriso estão saudáveis. O AutoComissão está com o deploy falhando desde 14:20.', { pending: 'dashboard' });
+    if (/o que aconteceu|por que|porque/.test(t)) return this.say(s.fixed ? 'A migration 0042 criava uma coluna NOT NULL sem valor padrão. O Backend Agent adicionou o default e um backfill.' : 'A migration 0042 cria uma coluna NOT NULL sem valor padrão na tabela comissoes. O deploy falhou nas três tentativas.', { pending: 'logs' });
+    if (s.pending && !viewWord && /^(sim|ok|pode|claro|bora|quero)|mostr|ver|abre isso/.test(t)) {
+      if (s.pending === 'approval') return this.askApproval();
+      return this.say('Vou te mostrar.', { view: s.pending, think: 350, hold: 600 });
+    }
+    if (/problema|autocomiss/.test(t)) return this.say(s.fixed ? 'Abrindo o AutoComissão.' : 'Abrindo o AutoComissão. O deploy está falhando durante a migration.', { view: 'project', extra: { project: 'autocomissao' } });
+    if (/stoqmate/.test(t)) return this.say('Abrindo o Stoqmate.', { view: 'project', extra: { project: 'stoqmate' } });
+    if (/dashboard|painel|visao geral/.test(t)) return this.say('Aqui está a visão geral.', { view: 'dashboard' });
+    if (/agente|quem esta trabalhando/.test(t)) return this.say(`${s.agentsWorking} agentes estão trabalhando agora.`, { view: 'agents' });
+    if (/execu|acontecendo|agora|runs/.test(t)) return this.say('Estas são as operações em andamento.', { view: 'runs' });
+    if (/erro|log/.test(t)) return this.say('Estes são os logs do autocomissao-api.', { view: 'logs' });
+    if (/relat|report/.test(t)) return this.say('O relatório semanal está pronto.', { view: 'report' });
+    if (/site|preview|clinica/.test(t)) return this.say('A primeira versão do site está no ar em preview. Clique em qualquer seção para me dar contexto.', { view: 'website' });
+    if (/brief|noite|resumo/.test(t)) return this.say('Aqui está o que aconteceu enquanto você esteve fora.', { view: 'brief' });
+    this.say('Entendi. Vou estruturar isso e acionar os agentes certos — te aviso quando houver algo para ver.');
+  }
+  askApproval() { this.say('O DevOps quer publicar o AutoComissão. Revise antes de aprovar.', { endState: 'warning', then: () => this.setState({ approval: true, inbox: false }) }); }
+  fix() {
+    const s = this.state;
+    if (s.fixed) return this.say('O AutoComissão já está corrigido. O deploy aguarda sua aprovação.', { pending: 'approval' });
+    if (s.fixing) return this.say('O Backend Agent já está trabalhando nisso.', { view: 'runs', extra: { expanded: 'fix' } });
+    this.say('Acordando o Backend Agent para corrigir a migration do AutoComissão.', {
+      endState: 'delegating', then: () => {
+        this.setState(st => ({ fixing: true, fixProg: 0, agentsWorking: st.agentsWorking + 1 }));
+        this.later(() => { this.show('runs', { expanded: 'fix' }); this.startFix(); }, 1800);
+      }
+    });
+  }
+  startFix() {
+    clearInterval(this.fixTimer);
+    this.fixTimer = setInterval(() => {
+      const p = Math.min(100, this.state.fixProg + 2.5);
+      this.setState({ fixProg: p });
+      if (p >= 100) {
+        clearInterval(this.fixTimer);
+        const m = 'Correção concluída. 124 de 124 testes passando. O deploy aguarda sua aprovação.';
+        this.setState(s => ({ fixing: false, fixed: true, agentsWorking: s.agentsWorking - 1, yst: 'success', msg: m, pending: 'approval', hist: [...s.hist, { who: 'Yui', text: m }] }));
+        this.later(() => this.setState(s => ({ yst: s.yst === 'success' ? 'idle' : s.yst })), 1600);
+      }
+    }, 320);
+  }
+  editSite() {
+    this.say('Enviando ao Frontend Agent com contexto: selectedElement = hero-section.', {
+      endState: 'delegating', then: () => this.later(() => {
+        const m = 'Hero atualizado: mais respiro e tipografia mais sóbria. Preview recarregado.';
+        this.setState(s => ({ siteV2: true, yst: 'success', msg: m, hist: [...s.hist, { who: 'Yui', text: m }] }));
+        this.later(() => this.setState({ yst: this.base() }), 1400);
+      }, 2200)
+    });
+  }
+  toggleMic() {
+    if (this.state.listening) { clearInterval(this.micTimer); this.setState({ listening: false, yst: this.base(), input: '' }); return; }
+    const phrases = ['Como estão meus projetos?', 'Me mostra.', 'Abre o que está com problema.', 'O que aconteceu?', 'Pede para o agente corrigir.', 'Volta.'];
+    const p = phrases[this.micIdx % phrases.length]; this.micIdx++;
+    this.setState({ listening: true, yst: 'listening', input: '', showLines: false });
+    const words = p.split(' '); let i = 0;
+    this.later(() => {
+      this.micTimer = setInterval(() => {
+        i++; this.setState({ input: words.slice(0, i).join(' ') });
+        if (i >= words.length) { clearInterval(this.micTimer); this.later(() => { this.setState({ listening: false }); this.submit(p); }, 550); }
+      }, 300);
+    }, 900);
+  }
+  openPalette() { this.setState({ palette: true, pq: '', inbox: false }); this.later(() => this.pqRef.current && this.pqRef.current.focus(), 30); }
+  closePalette() { this.setState({ palette: false }); }
+
+  renderVals() {
+    const s = this.state, C = this.C, isC = s.mode === 'center', isF = s.mode === 'focus';
+    const run = (txt) => () => this.submit(txt);
+    const go = (v, extra) => () => this.show(v, extra);
+    const stateMeta = { idle: ['Disponível', C.t2], listening: ['Ouvindo', C.cyan], thinking: ['Pensando', C.lav], delegating: ['Delegando', C.violet], working: ['Agentes trabalhando', C.cyan], speaking: ['Falando', C.cyan], showing: ['Mostrando', C.lav], warning: ['Atenção', C.warn], success: ['Concluído', C.ok] }[s.yst] || ['Disponível', C.t2];
+
+    const projects = {
+      autocomissao: s.fixed
+        ? { name: 'AutoComissão', health: s.deployed ? '97%' : '89%', prod: s.deployed ? 'Saudável' : 'Aguardando deploy', agents: '0 trabalhando', deploy: s.deployed ? 'agora' : 'falhou 14:20', c: s.deployed ? C.ok : C.warn, hasIssue: !s.deployed, issue: 'Correção pronta na branch fix/migration-0042. Aguardando aprovação de deploy.' }
+        : { name: 'AutoComissão', health: '71%', prod: 'Deploy falhando', agents: s.fixing ? '1 corrigindo' : '1 monitorando', deploy: 'falhou 14:20', c: C.warn, hasIssue: true, issue: 'Deploy falhando durante a migration 0042 — 3 tentativas desde 14:20.' },
+      stoqmate: { name: 'Stoqmate', health: '94%', prod: 'Saudável', agents: '2 trabalhando', deploy: 'há 2h', c: C.ok, hasIssue: false, issue: '' }
+    };
+    const pj = projects[s.project] || projects.autocomissao;
+    const proj = {
+      ...pj,
+      kpis: [{ l: 'Saúde', v: pj.health, color: pj.c }, { l: 'Produção', v: pj.prod, color: pj.c === C.ok ? '#e8eaf4' : pj.c }, { l: 'Agentes', v: pj.agents, color: '#e8eaf4' }, { l: 'Último deploy', v: pj.deploy, color: '#e8eaf4' }],
+      activity: s.project === 'stoqmate'
+        ? [{ t: '13:02', l: 'Deploy v2.14.0 concluído', c: C.ok }, { t: '11:40', l: 'Security Agent revisou PR #219', c: C.cyan }, { t: '09:00', l: 'Repository review — 0 problemas', c: C.ok }, { t: '06:00', l: 'Backup diário concluído', c: C.ok }]
+        : [
+          ...(s.deployed ? [{ t: 'agora', l: 'Deploy em produção aprovado', c: C.ok }] : []),
+          ...(s.fixed ? [{ t: 'agora', l: 'Backend Agent: migration corrigida, 124/124 testes', c: C.ok }] : []),
+          ...(s.fixing ? [{ t: 'agora', l: 'Backend Agent corrigindo migration 0042', c: C.cyan }] : []),
+          { t: '14:31', l: 'Deploy falhou — tentativa 3', c: C.warn }, { t: '14:24', l: 'Deploy falhou — tentativa 2', c: C.warn }, { t: '14:20', l: 'Deploy iniciado por DevOps Agent', c: C.t2 }, { t: '13:55', l: 'PR #88 mesclado — novo cálculo de comissões', c: C.t2 }]
+    };
+
+    const prof = Math.round(s.fixProg);
+    const fixRun = (s.fixing || s.fixed) ? [{
+      id: 'fix', agent: 'Backend Agent', task: s.fixed ? 'Migration corrigida — AutoComissão' : 'Corrigindo migration 0042 — AutoComissão', time: s.fixed ? 'concluído' : `${prof}%`, color: s.fixed ? C.ok : C.cyan, prog: prof + '%', state: s.fixed ? 'done' : 'running',
+      op: s.fixed ? 'Aguardando aprovação de deploy' : prof < 30 ? 'Lendo migrations/0042_comissoes.sql' : prof < 65 ? 'Editando migrations/0042_comissoes.sql' : 'Executando npm test',
+      tools: ['GitHub MCP', 'Bash', 'Filesystem', 'Postgres MCP'],
+      steps: [['Repositório carregado', 8], ['Causa identificada', 25], ['Editando migration', 60], ['Rodando testes', 95], ['Finalizar', 100]].map(([l, th], i, arr) => {
+        const prev = i ? arr[i - 1][1] : 0; const done = prof >= th, act = !done && prof >= prev;
+        return { l, i: done ? '✓' : act ? '●' : '○', c: done ? C.ok : act ? C.cyan : C.t3, tc: done || act ? '#e8eaf4' : C.t3 };
+      })
+    }] : [];
+    const baseRuns = [
+      { id: 'r1', agent: 'Security Agent', task: 'Revisando alterações do PR #482 — Stoqmate', time: '01:12', color: C.cyan, prog: '62%', state: 'running', op: 'Analisando src/auth/session.ts', tools: ['GitHub MCP', 'Read', 'Semgrep'], steps: [{ l: 'Diff carregado', i: '✓', c: C.ok, tc: '#e8eaf4' }, { l: 'Dependências verificadas', i: '✓', c: C.ok, tc: '#e8eaf4' }, { l: 'Revisando autenticação', i: '●', c: C.cyan, tc: '#e8eaf4' }, { l: 'Relatório', i: '○', c: C.t3, tc: C.t3 }] },
+      { id: 'r2', agent: 'Research Agent', task: 'Qualificando leads — clínicas odontológicas', time: '04:31', color: C.lav, prog: '38%', state: 'running', op: 'Pesquisando 26 empresas', tools: ['Web search', 'Browser', 'CRM MCP'], steps: [{ l: 'Fontes coletadas', i: '✓', c: C.ok, tc: '#e8eaf4' }, { l: 'Qualificando', i: '●', c: C.lav, tc: '#e8eaf4' }, { l: 'Scoring', i: '○', c: C.t3, tc: C.t3 }] },
+      { id: 'r3', agent: 'DevOps Agent', task: 'Deployment watch — produção', time: '02:13', color: C.cyan, prog: '80%', state: 'running', op: 'Próxima verificação em 02:13', tools: ['Docker', 'Bash'], steps: [{ l: 'Containers: 21 saudáveis', i: '✓', c: C.ok, tc: '#e8eaf4' }, { l: 'Aguardando próximo ciclo', i: '●', c: C.cyan, tc: '#e8eaf4' }] },
+      { id: 'r4', agent: 'QA Agent', task: s.fixed ? 'Testes de regressão concluídos' : 'Aguardando Backend Agent', time: s.fixed ? '✓' : 'em espera', color: s.fixed ? C.ok : C.t3, prog: s.fixed ? '100%' : '0%', state: s.fixed ? 'done' : 'waiting', op: 'Suite de regressão AutoComissão', tools: ['Playwright', 'Bash'], steps: [{ l: 'Depende de Backend Agent', i: s.fixed ? '✓' : '○', c: s.fixed ? C.ok : C.t3, tc: C.t3 }] }
+    ];
+    const runs = [...fixRun, ...baseRuns].map(r => {
+      const ex = s.expanded === r.id;
+      return { ...r, expanded: ex, dot: r.state === 'waiting' ? 'transparent' : r.color, glow: r.state === 'waiting' ? 'transparent' : r.color, bg: ex ? 'rgba(255,255,255,.045)' : 'rgba(255,255,255,.02)', border: ex ? 'rgba(103,216,242,.22)' : 'rgba(255,255,255,.06)', fn: () => this.setState({ expanded: ex ? null : r.id }) };
+    });
+
+    const barsV = [12, 8, 5, 4, 3, 6, 14, 22, 30, 41, 38, 35, 44, 52, 47, 39, 33, 28, 24, 30, 26, 18, 14, 10];
+    const bars = barsV.map((b, i) => ({ h: Math.round(b / 52 * 100) + '%', o: i === 23 ? 1 : 0.55 + 0.45 * b / 52, tip: `${String(i).padStart(2, '0')}h — ${b} execuções` }));
+    const lineV = [92, 94, 93, 95, 96, 94, 97, 96, 95, 93, 94, 96, 97, 98, 96, 95, 97, 96, 94, 89, 92, 95, 96, 97, 96, 98, 97, 96, 95, 96];
+    const pts = lineV.map((v, i) => `${(i / (lineV.length - 1) * 300).toFixed(1)},${(100 - (v - 85) * 6.5).toFixed(1)}`);
+    const linePts = pts.join(' ');
+    const areaPath = 'M0,100 L' + pts.join(' L') + ' L300,100 Z';
+
+    const A = (name, st, task, last, next) => {
+      const run = st === 'run', wait = st === 'wait';
+      return { name, task, last, next, dot: run ? C.cyan : 'transparent', glow: run ? C.cyan : 'transparent', taskColor: run ? '#e8eaf4' : C.t3 };
+    };
+    const agentGroups = [
+      { name: 'Engineering', items: [A('Backend', s.fixing ? 'run' : 'sleep', s.fixing ? 'Corrigindo migration 0042' : 'Dormindo', s.fixed ? 'agora' : 'há 3h', 'sob demanda'), A('Frontend', 'sleep', 'Dormindo', 'há 1h', 'sob demanda'), A('Security', 'run', 'Revisando PR #482', 'agora', '—'), A('QA', 'wait', s.fixed ? 'Regressão concluída' : 'Aguardando Backend', 'há 20min', 'em espera')] },
+      { name: 'Operações', items: [A('DevOps', 'run', 'Deployment watch', 'agora', '02:13'), A('Infra', 'sleep', 'Dormindo', '12:00', '18:00'), A('Backup', 'sleep', 'Dormindo', '03:30', '03:30')] },
+      { name: 'Growth', items: [A('Research', 'run', 'Qualificando leads', 'agora', '—'), A('Copy', 'sleep', 'Dormindo', 'ontem', 'sob demanda'), A('Report', 'sleep', 'Dormindo', '08:00', 'seg 08:00')] }
+    ];
+
+    const logLines = [
+      ['14:31:02', 'INFO', 'deploy autocomissao-api@a41f9c started'],
+      ['14:31:09', 'INFO', 'running migrations (3 pending)'],
+      ['14:31:10', 'INFO', '0041_add_index_vendas … ok'],
+      ['14:31:11', 'ERROR', '0042_comissoes: column "regra_id" contains null values'],
+      ['14:31:11', 'ERROR', 'ALTER TABLE comissoes ADD COLUMN regra_id INT NOT NULL'],
+      ['14:31:11', 'WARN', 'transaction rolled back'],
+      ['14:31:12', 'ERROR', 'deploy failed (attempt 3/3)'],
+      ['14:31:12', 'INFO', 'previous release v1.8.2 still serving traffic'],
+      ...(s.fixed ? [['agora', 'INFO', 'fix/migration-0042: default + backfill aplicados'], ['agora', 'INFO', 'tests: 124 passed, 0 failed']] : [])
+    ].map(([t, lvl, m]) => ({ t, lvl, m, c: lvl === 'ERROR' ? C.crit : lvl === 'WARN' ? C.warn : C.t3, mc: lvl === 'ERROR' ? '#f6b3ba' : '#c9cde0' }));
+
+    const meta = {
+      brief: ['Overnight', 'Enquanto você esteve fora'], dashboard: ['System overview · Live', 'Visão geral'], agents: ['Agent network', 'Agentes'], runs: ['Live operations', 'Execuções'],
+      project: ['Projeto', pj.name], logs: ['Logs · produção', 'autocomissao-api'], report: ['Report', 'Status executivo'], website: ['Live preview', 'Clínica Sorriso — v' + (s.siteV2 ? '2' : '1')]
+    }[s.view] || ['', ''];
+    const sayA = (txt) => () => this.say(txt);
+    const viewActions = {
+      brief: [{ label: 'Abrir AutoComissão', fn: go('project', { project: 'autocomissao' }) }],
+      dashboard: [{ label: 'Execuções', fn: go('runs') }],
+      runs: [{ label: s.tech ? 'Ocultar detalhes técnicos' : 'Detalhes técnicos', fn: () => this.setState({ tech: !s.tech }) }],
+      project: s.project === 'autocomissao' ? [{ label: 'Ver logs', fn: go('logs') }, ...(s.fixed ? (s.deployed ? [] : [{ label: 'Aprovar deploy', fn: () => this.askApproval() }]) : [{ label: 'Pedir correção', fn: () => this.fix() }])] : [{ label: 'Live preview', fn: go('website') }],
+      logs: s.fixed ? [] : [{ label: 'Pedir correção', fn: () => this.fix() }],
+      report: [{ label: 'Resumir', fn: sayA('Resumo: semana estável, 96% de sucesso, um incidente resolvido e prospecção 30% acima da meta.') }, { label: 'Apresentar', fn: sayA('Quer que eu transforme isso em slides? Posso pedir ao Report Agent.') }, { label: 'Exportar', fn: sayA('PDF exportado para Artifacts › Reports.') }],
+      website: [{ label: 'Comparar', fn: sayA('Comparação v1 × v2 disponível em breve.') }, { label: 'Deploy', fn: sayA('Antes do deploy, vou pedir ao QA Agent uma checagem de acessibilidade.') }]
+    }[s.view] || [];
+
+    const paletteAll = [
+      ['Falar com Yui', 'Ctrl L', () => { this.closePalette(); this.later(() => this.inputRef.current && this.inputRef.current.focus(), 30); }],
+      ['Morning brief', 'view', go('brief')], ['Dashboard', 'view', go('dashboard')], ['Agentes', 'view', go('agents')], ['Execuções', 'view', go('runs')],
+      ['Projeto · AutoComissão', 'view', go('project', { project: 'autocomissao' })], ['Projeto · Stoqmate', 'view', go('project', { project: 'stoqmate' })],
+      ['Logs', 'view', go('logs')], ['Relatório semanal', 'artifact', go('report')], ['Preview · Clínica Sorriso', 'artifact', go('website')],
+      ['Histórico da conversa', '', () => this.setState({ palette: false, histOpen: true })],
+      ['+ Nova missão', 'ação', () => { this.closePalette(); this.say('Qual é a missão? Descreva o objetivo e eu monto a equipe.'); }],
+      ['Voltar para Yui', 'Esc', () => { this.closePalette(); this.close(); }]
+    ];
+    const q = s.pq.toLowerCase();
+    const paletteItems = paletteAll.filter(p => !q || p[0].toLowerCase().includes(q)).map((p, i) => ({ label: p[0], hint: p[1], fn: p[2], bg: i === 0 ? 'rgba(255,255,255,.05)' : 'transparent' }));
+    this.firstPalette = paletteItems[0];
+
+    const inboxItems = [
+      ...(s.deployed ? [] : [{ tag: 'Aprovação', l: 'Deploy de produção — AutoComissão', c: C.warn, fn: () => { this.setState({ inbox: false }); this.askApproval(); } }]),
+      { tag: 'Segurança', l: 'Dependência com severidade alta — Stoqmate', c: C.crit, fn: go('runs', { expanded: 'r1' }) },
+      { tag: 'Artefato', l: 'Relatório “Status executivo” pronto', c: C.ok, fn: go('report') }
+    ];
+    const pendLabels = { brief: 'Ver resumo', dashboard: 'Mostrar visão geral', logs: 'Ver logs', approval: 'Revisar deploy' };
+
+    const T = (this.w && this.a) ? this.target() : { x: 0, y: 0 };
+    return {
+      bgRef: this.bgRef, cvRef: this.cvRef, inputRef: this.inputRef, pqRef: this.pqRef,
+      activeProjectName: (projects[s.project] || pj).name, agentsWorking: s.agentsWorking, agentsSleeping: 52 - s.agentsWorking,
+      inboxCount: inboxItems.length, inboxItems, inboxOpen: s.inbox,
+      toggleInbox: () => this.setState({ inbox: !s.inbox }), toggleHist: () => this.setState({ histOpen: !s.histOpen, inbox: false }),
+      histTransform: s.histOpen ? 'translateX(0)' : 'translateX(-105%)', hist: s.hist.map(h => ({ ...h, c: h.who === 'Yui' ? C.cyan : C.t2 })), histEmpty: !s.hist.length,
+      openPalette: () => this.openPalette(), closePalette: () => this.closePalette(), paletteOpen: s.palette, pq: s.pq, paletteItems,
+      onPq: (e) => this.setState({ pq: e.target.value }), onPqKey: (e) => { if (e.key === 'Enter' && this.firstPalette) this.firstPalette.fn(); },
+      panelTop: isF ? '16px' : '68px', panelBottom: isF ? '16px' : '104px', panelLeft: isF ? '16px' : (s.narrow ? '12px' : '24%'), panelRight: isF ? '16px' : (s.narrow ? '12px' : '28px'),
+      panelOpacity: isC ? 0 : 1, panelTransform: isC ? 'translateX(48px) scale(.98)' : 'none', panelPE: isC ? 'none' : 'auto',
+      centerOpacity: isC ? 1 : 0, centerTransform: isC ? 'none' : 'translateX(-80px) scale(.96)', centerPE: isC ? 'auto' : 'none',
+      leftOpacity: (!isC && !isF && !s.narrow) ? 1 : 0, leftTransform: isC ? 'translateX(30%)' : 'none', leftPE: (!isC && !isF && !s.narrow) ? 'auto' : 'none',
+      dockLeft: (isC || s.narrow) ? '16px' : '24%', dockRight: (isC || s.narrow) ? '16px' : '28px', dockOpacity: isF ? 0 : 1, dockPE: isF ? 'none' : 'auto',
+      dockBorder: s.listening ? 'rgba(103,216,242,.45)' : 'rgba(160,170,255,.14)',
+      orbBtnShow: isF || (s.narrow && !isC), orbBtnX: T.x + 'px', orbBtnY: T.y + 'px', orbClick: () => isF ? this.setState({ mode: 'canvas' }) : this.close(),
+      approvalLeft: (isC || s.narrow) ? '50%' : '62%',
+      showSugg: !(s.short && s.showLines),
+      centerTop: s.short ? 'calc(24% + 80px)' : 'calc(36% + 104px)', centerGap: s.short ? '10px' : '16px', centerFont: s.short ? '24px' : '30px', suggMargin: s.short ? '8px' : '22px',
+      stateLabel: stateMeta[0], stateColor: stateMeta[1], msg: s.msg, showLines: s.showLines,
+      briefLines: [{ n: '14', t: 'rotinas foram executadas.', c: C.cyan }, { n: '8', t: 'novos leads foram qualificados.', c: C.lav }, { n: '3', t: 'deploys foram concluídos.', c: C.ok }, { n: '1', t: 'projeto precisa da sua atenção.', c: C.warn }],
+      suggestions: ['Como estão meus projetos?', 'Mostra os agentes.', 'Mostra o que está acontecendo agora.', 'Me mostra o site.', 'Prepare meu relatório.'].map(t => ({ t, fn: run(t) })),
+      hasPending: !!s.pending && s.pending !== s.view, pendingLabel: pendLabels[s.pending] || 'Mostrar',
+      showPending: () => s.pending === 'approval' ? this.askApproval() : this.show(s.pending),
+      viewEyebrow: meta[0], viewTitle: meta[1], viewActions,
+      focusLabel: isF ? 'Sair da tela cheia' : 'Tela cheia', toggleFocus: () => this.setState({ mode: isF ? 'canvas' : 'focus' }), closeCanvas: () => this.close(),
+      isBrief: s.view === 'brief', isDashboard: s.view === 'dashboard', isAgents: s.view === 'agents', isRuns: s.view === 'runs', isProject: s.view === 'project', isLogs: s.view === 'logs', isReport: s.view === 'report', isWebsite: s.view === 'website',
+      briefKpis: [{ v: '14', l: 'automações concluídas', color: C.cyan }, { v: '8', l: 'leads qualificados', color: C.lav }, { v: '3', l: 'deploys', color: C.ok }, { v: '1', l: 'alerta', color: C.warn }],
+      timeline: [['02:00', 'Infra check', '✓', C.ok], ['03:30', 'Backup Postgres', '✓', C.ok], ['04:00', 'Repository review', '✓', C.ok], ['06:00', 'Security scan', '✓', C.ok], ['07:00', 'Lead research — 8 qualificados', '✓', C.ok], ['14:20', 'Deploy AutoComissão falhou', s.fixed ? 'corrigido' : 'atenção', s.fixed ? C.ok : C.warn]].map(([t, l, r, c]) => ({ t, l, r, c })),
+      dashKpis: [{ l: 'Agentes', v: '52', color: '#e8eaf4' }, { l: 'Ativos', v: String(s.agentsWorking), color: C.cyan }, { l: 'Runs hoje', v: '186', color: '#e8eaf4' }, { l: 'Sucesso', v: '96%', color: C.ok }],
+      bars, linePts, areaPath,
+      projectList: [
+        { name: 'AutoComissão', note: s.fixed ? (s.deployed ? 'Deploy concluído agora' : 'Correção pronta · aguardando deploy') : 'Deploy falhando desde 14:20', status: s.deployed ? 'Saudável' : 'Atenção', c: s.deployed ? C.ok : C.warn, health: projects.autocomissao.health, fn: go('project', { project: 'autocomissao' }) },
+        { name: 'Stoqmate', note: '2 agentes trabalhando · deploy há 2h', status: 'Saudável', c: C.ok, health: '94%', fn: go('project', { project: 'stoqmate' }) },
+        { name: 'Clínica Sorriso', note: 'Site v1 em preview', status: 'Preview', c: C.cyan, health: '98%', fn: go('website') }
+      ],
+      agentGroups, runs, runsRunning: runs.filter(r => r.state === 'running').length, showTech: s.tech,
+      techLines: ['session 7f3a-91c2 · claude-code', '$ git checkout -b fix/migration-0042', 'Read migrations/0042_comissoes.sql', 'Edit +3 −1 migrations/0042_comissoes.sql', '$ npm test -- --filter comissoes', 'tokens: 48.2k in · 6.1k out'],
+      proj, logLines,
+      logsSummary: s.fixed ? 'A falha foi corrigida na branch fix/migration-0042. Produção segue na v1.8.2 até o deploy ser aprovado.' : 'A migration 0042 cria uma coluna NOT NULL sem valor padrão. Produção continua servindo a v1.8.2 — sem impacto para usuários.',
+      reportKpis: [{ v: '412', l: 'execuções' }, { v: '96%', l: 'sucesso' }, { v: '63h', l: 'trabalho de agentes' }, { v: '17', l: 'falhas' }],
+      reportSections: [
+        { h: 'Destaques', c: C.cyan, items: ['Prospecção: 26 empresas pesquisadas, 9 qualificadas com score acima de 80.', 'Stoqmate: três deploys sem incidentes; cobertura de testes subiu para 84%.'] },
+        { h: 'Riscos', c: C.warn, items: ['AutoComissão: migration 0042 bloqueou o deploy por mais de duas horas.', 'Dependência com severidade alta no Stoqmate aguarda revisão.'] },
+        { h: 'Próximas ações', c: C.ok, items: ['Adicionar validação de migrations no pipeline de CI.', 'Gerar demonstrações para os 3 leads de maior oportunidade.'] }
+      ],
+      siteHint: s.selEl ? 'hero-section selecionado' : 'clique para selecionar',
+      selectHero: () => { this.setState({ selEl: 'hero-section' }); this.say('Seção hero selecionada. O que quer mudar nela?', { think: 300 }); },
+      heroOutline: s.selEl ? '2px solid #67d8f2' : '2px solid transparent', heroPad: s.siteV2 ? '72px 56px 64px' : '28px 40px 40px', heroWeight: s.siteV2 ? 400 : 700,
+      heroTitle: s.siteV2 ? 'Cuidado odontológico com precisão e calma.' : 'Seu sorriso em boas mãos!',
+      heroSub: s.siteV2 ? 'Avaliação completa, plano de tratamento transparente e uma equipe que explica cada etapa.' : 'Tratamentos modernos para toda a família, com conforto e tecnologia.',
+      siteServices: [{ t: 'Implantes', d: 'Planejamento digital e cirurgia guiada.' }, { t: 'Ortodontia', d: 'Alinhadores e aparelhos para todas as idades.' }, { t: 'Clareamento', d: 'Resultados naturais em poucas sessões.' }],
+      approvalOpen: s.approval,
+      approvalRows: [{ l: 'Arquivos alterados', v: s.fixed ? '17' : '16', c: '#e8eaf4' }, { l: 'Testes', v: s.fixed ? '124/124 passando' : '118/124 passando', c: s.fixed ? C.ok : C.warn }, { l: 'Segurança', v: 'Aprovado', c: C.ok }],
+      reviewChanges: () => this.show('runs', { expanded: s.fixed ? 'fix' : 'r4' }),
+      approve: () => {
+        const m = s.fixed ? 'Deploy aprovado. AutoComissão está em produção e saudável.' : 'Deploy aprovado, mas os testes ainda falham — pedi ao DevOps para aguardar a correção.';
+        this.setState(st => ({ approval: false, deployed: st.fixed, yst: st.fixed ? 'success' : 'warning', msg: m, pending: null, hist: [...st.hist, { who: 'Yui', text: m }] }));
+        this.later(() => this.setState({ yst: this.base() }), 1600);
+      },
+      reject: () => { const m = 'Deploy rejeitado. As alterações ficam na branch fix/migration-0042.'; this.setState(st => ({ approval: false, yst: this.base(), msg: m, pending: null, hist: [...st.hist, { who: 'Yui', text: m }] })); },
+      input: s.input, placeholder: s.listening ? 'Ouvindo…' : (isC ? 'Pergunte ou fale com Yui…' : 'Continue conversando…'),
+      onInput: (e) => this.setState({ input: e.target.value }), onInputKey: (e) => { if (e.key === 'Enter') this.submit(); },
+      send: () => this.submit(), attach: () => this.say('Pode anexar arquivo, screenshot, projeto, artifact ou link — é só arrastar para cá.'),
+      toggleMic: () => this.toggleMic(),
+      micBorder: s.listening ? 'rgba(103,216,242,.6)' : 'rgba(255,255,255,.08)', micBg: s.listening ? 'rgba(103,216,242,.15)' : 'transparent', micColor: s.listening ? '#67d8f2' : '#9aa0bb'
+    };
+  }
+}
+</script>
+</body>
+</html>
