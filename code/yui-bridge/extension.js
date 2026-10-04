@@ -8,6 +8,8 @@ const REQ = '/workspace/.yui/.editor-open.json'
 const STATE = '/workspace/.yui/.editor-state.json'
 
 function activate(ctx) {
+  // painel de chat de IA (barra lateral secundária) não faz parte do editor do vault
+  vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar').then(undefined, () => {})
   let last = 0
   const open = async (r) => {
     try {

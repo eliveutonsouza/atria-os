@@ -216,10 +216,10 @@ await check('vault: página com VS Code carregado e leitura', async () => {
   await frame.locator('.monaco-workbench').waitFor({ timeout: 45000 });
   await frame.locator('.tab', { hasText: 'Vault & Cérebro.md' }).first().waitFor({ timeout: 30000 });
   await page.screenshot({ path: `${SHOTS}/vault-editor.png` });
-  await page.getByRole('button', { name: 'Leitura' }).click();
+  await page.locator('.vault-seg button', { hasText: 'Leitura' }).click();
   await page.locator('.vault-read a.vlink').first().waitFor({ timeout: 8000 });
   await page.screenshot({ path: `${SHOTS}/vault-read.png` });
-  await page.getByRole('button', { name: 'Editor' }).click();
+  await page.locator('.vault-seg button', { hasText: 'Editor' }).click();
 });
 
 await check('cérebro: universo desenha e busca seleciona estrela', async () => {
