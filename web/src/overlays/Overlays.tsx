@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { InboxItem, RepoInfo, ViewName } from '@shared/protocol'
 import { api } from '../api/client'
+import { applyUpdate, disablePush, enablePush, isIOS, isStandalone, promptInstall, testPush } from '../pwa/pwa'
 import { resolveApproval } from '../lib/actions'
 import { C, toneColor } from '../lib/colors'
 import { dockInput } from '../shell/parts'
@@ -102,6 +103,9 @@ export function CommandPalette() {
       { label: 'Relatório', hint: 'artifact', fn: go('report') },
       { label: 'Preview do site', hint: 'artifact', fn: go('website') },
       { label: 'Infraestrutura', hint: 'view', fn: go('infra') },
+      ...(!isStandalone() ? [{ label: 'Instalar app (celular/desktop)', hint: 'PWA', fn: () => { close(); void install() } }] : []),
+      { label: s().pushEnabled ? 'Notificações: desativar neste dispositivo' : 'Notificações: ativar neste dispositivo', hint: 'push', fn: () => { close(); void (s().pushEnabled ? disablePush() : enablePush()).then((m) => s().say(m)).catch(() => s().say('Não consegui mudar as notificações agora.')) } },
+      { label: 'Notificações: enviar teste', hint: 'push', fn: () => { close(); void testPush().then((m) => s().say(m)).catch(() => s().say('Falhou o teste de notificação.')) } },
       { label: 'Ferramentas · conectores, MCP, skills, plugins', hint: 'view', fn: go('tools') },
       { label: 'Workflows', hint: 'view', fn: go('workflows') },
       { label: '+ Novo workflow', hint: 'ação', fn: go('workflow') },
@@ -189,5 +193,24 @@ export function ApprovalModal() {
         </div>
       </div>
     </>
+  )
+}
+
+async function install() {
+  const s = useYui.getState()
+  const r = await promptInstall()
+  if (r === 'ios') s.say('No iPhone: toque em Compartilhar e depois em “Adicionar à Tela de Início”.')
+  else if (r === 'unavailable') s.say(isIOS() ? 'Abra no Safari para instalar.' : 'O navegador não ofereceu instalação agora — use o ícone de instalar na barra de endereço.')
+  else if (r === 'accepted') s.say('App instalado. Pode abrir a Yui pela tela inicial.')
+}
+
+export function UpdateToast() {
+  const ready = useYui((s) => s.updateReady)
+  if (!ready) return null
+  return (
+    <div role="status" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 'calc(96px + env(safe-area-inset-bottom))', zIndex: 57, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 10px 10px 16px', borderRadius: 14, background: 'rgba(16,20,42,.94)', border: '1px solid rgba(103,216,242,.3)', backdropFilter: 'blur(16px)', boxShadow: '0 18px 50px rgba(0,0,0,.45)', fontSize: 13, color: C.text, whiteSpace: 'nowrap' }}>
+      Nova versão da Yui disponível
+      <button onClick={applyUpdate} style={{ height: 30, padding: '0 12px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#67d8f2,#a68cf7)', color: '#0a0c1d', fontWeight: 700, cursor: 'pointer' }}>Atualizar</button>
+    </div>
   )
 }

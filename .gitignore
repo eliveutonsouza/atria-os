@@ -2,3 +2,4 @@ node_modules/
 dist/
 .env
 *.db
+e2e/shots/

@@ -105,7 +105,7 @@ export function TopBar() {
   const name = projects.find((p) => p.slug === activeProject)?.name ?? activeProject ?? 'Nenhum'
   const set = useYui((s) => s.set)
   return (
-    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 60, padding: narrow ? '0 12px' : '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, zIndex: 30 }}>
+    <div style={{ position: 'absolute', top: 'env(safe-area-inset-top)', left: 'env(safe-area-inset-left)', right: 'env(safe-area-inset-right)', height: 60, padding: narrow ? '0 12px' : '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, zIndex: 30 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
         <button
           onClick={() => set({ palette: true, inboxOpen: false })}
@@ -288,7 +288,7 @@ export function Dock() {
   return (
     <div
       style={{
-        position: 'absolute', bottom: 22, left: isC || narrow ? 16 : '24%', right: isC || narrow ? 16 : 28, display: 'flex', justifyContent: 'center', zIndex: 40,
+        position: 'absolute', bottom: 'calc(22px + env(safe-area-inset-bottom))', left: isC || narrow ? 16 : '24%', right: isC || narrow ? 16 : 28, display: 'flex', justifyContent: 'center', zIndex: 40,
         transition: 'all .55s var(--ease)', opacity: isF ? 0 : 1, pointerEvents: isF ? 'none' : 'auto',
       }}
     >

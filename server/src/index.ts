@@ -27,6 +27,7 @@ import * as customViews from './customViews.ts';
 import * as toolbox from './toolbox.ts';
 import * as agentsAdmin from './agentsAdmin.ts';
 import * as workflows from './workflows.ts';
+import * as push from './push.ts';
 import { sandboxUrl, sbToken } from './sandbox.ts';
 import { catalog, githubEnabled, startGithub, syncCatalog } from './github.ts';
 
@@ -52,6 +53,8 @@ await app.register(helmet, {
       mediaSrc: ["'self'", 'blob:'],
       frameSrc: ["'self'"],
       frameAncestors: ["'none'"],
+      workerSrc: ["'self'"],
+      manifestSrc: ["'self'"],
     },
   },
   crossOriginEmbedderPolicy: false,
@@ -61,7 +64,7 @@ await app.register(websocket);
 registerAuth(app);
 initTerminal();
 registerTerminal(app);
-for (const mod of [missions, customViews, toolbox, agentsAdmin, workflows]) mod.register(app);
+for (const mod of [missions, customViews, toolbox, agentsAdmin, workflows, push]) mod.register(app);
 
 app.get('/api/health', async () => ({ ok: true }));
 

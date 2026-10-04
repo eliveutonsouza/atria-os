@@ -63,7 +63,7 @@ export function CanvasPanel() {
       aria-label={header.title || 'Canvas'}
       aria-hidden={isC}
       style={{
-        position: 'absolute', top: isF ? 16 : 68, bottom: isF ? 16 : 104, left: isF ? 16 : narrow ? 12 : '24%', right: isF ? 16 : narrow ? 12 : 28,
+        position: 'absolute', top: `calc(${isF ? 16 : 68}px + env(safe-area-inset-top))`, bottom: `calc(${isF ? 16 : 104}px + env(safe-area-inset-bottom))`, left: isF ? 16 : narrow ? 12 : '24%', right: isF ? 16 : narrow ? 12 : 28,
         zIndex: 10, opacity: isC ? 0 : 1, transform: isC ? 'translateX(48px) scale(.98)' : 'none', pointerEvents: isC ? 'none' : 'auto',
         transition: 'all .55s cubic-bezier(.2,.8,.2,1)', background: 'linear-gradient(180deg, rgba(20,24,50,.62), rgba(12,14,32,.62))',
         border: '1px solid rgba(160,170,255,.11)', borderRadius: 20, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',

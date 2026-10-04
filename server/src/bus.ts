@@ -9,9 +9,23 @@ export function addClient(res: ServerResponse): () => void {
   return () => clients.delete(res);
 }
 
+type Listener = (ev: ServerEvent) => void;
+const listeners: Listener[] = [];
+// Observadores internos (ex.: push) recebem os mesmos eventos que o navegador.
+export function onEmit(fn: Listener): void {
+  listeners.push(fn);
+}
+
 export function emit(ev: ServerEvent): void {
   const payload = `data: ${JSON.stringify(ev)}\n\n`;
   for (const res of clients) res.write(payload);
+  for (const fn of listeners) {
+    try {
+      fn(ev);
+    } catch (e) {
+      console.error('bus listener', (e as Error).message);
+    }
+  }
 }
 
 let currentState: YuiState = 'idle';

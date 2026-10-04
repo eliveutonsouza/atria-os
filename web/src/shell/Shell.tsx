@@ -4,8 +4,8 @@ import type { Bootstrap, ViewName, ViewParams } from '@shared/protocol'
 import { api } from '../api/client'
 import { connectEvents } from '../api/events'
 import { sendContextDebounced } from '../lib/actions'
-import { ApprovalModal, CommandPalette, HistoryDrawer, Inbox } from '../overlays/Overlays'
-import { pttDown, pttUp } from '../voice/live'
+import { ApprovalModal, CommandPalette, HistoryDrawer, Inbox, UpdateToast } from '../overlays/Overlays'
+import { pttDown, pttUp, toggleLive } from '../voice/live'
 import { useYui, type Mode } from '../store/yui'
 import { CanvasPanel } from './CanvasPanel'
 import { Dock, dockInput, OrbButton, OrbLayer, TopBar, YuiCenter, YuiLeft } from './parts'
@@ -104,6 +104,12 @@ async function bootstrap() {
     pending: b.greeting.showBrief ? { view: 'brief' } : null,
   })
   connectEvents()
+  // atalho do app instalado: "Falar com a Yui" já abre a conversa por voz
+  const qs = new URLSearchParams(location.search)
+  if (qs.get('voice') === '1') {
+    history.replaceState({}, '', location.pathname)
+    setTimeout(() => toggleLive(), 400)
+  }
 }
 
 // ---------- push-to-talk (Espaço) ----------
@@ -233,6 +239,7 @@ export function Shell() {
       <HistoryDrawer />
       <CommandPalette />
       <ApprovalModal />
+      <UpdateToast />
     </main>
   )
 }

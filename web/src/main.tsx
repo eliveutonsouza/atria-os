@@ -4,6 +4,9 @@ import { BrowserRouter, Route, Routes } from 'react-router'
 import { Login } from './shell/Login'
 import { Shell } from './shell/Shell'
 import './styles/tokens.css'
+import { initPwa } from './pwa/pwa'
+
+initPwa()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

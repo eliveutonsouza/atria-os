@@ -47,6 +47,9 @@ export interface YuiStore {
   // off = sem voz; ptt = segurar espaço para falar; continuous = microfone sempre aberto
   voiceMode: 'off' | 'ptt' | 'continuous'
   missions: Record<string, MissionInfo>
+  canInstall: boolean
+  updateReady: boolean
+  pushEnabled: boolean
   workflowRuns: Record<string, WorkflowRunInfo>
   customViews: Record<string, CustomViewInfo>
   liveConnecting: boolean
@@ -101,6 +104,9 @@ export const useYui = create<YuiStore>((set, get) => ({
   liveMuted: false,
   voiceMode: 'off',
   missions: {},
+  canInstall: false,
+  updateReady: false,
+  pushEnabled: false,
   workflowRuns: {},
   customViews: {},
   liveConnecting: false,

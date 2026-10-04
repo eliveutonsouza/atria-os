@@ -94,6 +94,22 @@ await check('terminal shell executa', async () => {
   if (!(await page.locator('.xterm-rows').innerText()).includes('e2e-42')) throw new Error('sem saída');
 });
 
+await check('pwa: manifest instalável + service worker', async () => {
+  await openRoute('/');
+  const cdp = await ctx.newCDPSession(page);
+  const m = await cdp.send('Page.getAppManifest');
+  if (m.errors.length) throw new Error(`manifest: ${JSON.stringify(m.errors)}`);
+  const inst = await cdp.send('Page.getInstallabilityErrors');
+  if (inst.installabilityErrors.length) throw new Error(`instalabilidade: ${JSON.stringify(inst.installabilityErrors)}`);
+  const sw = await page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration())?.active);
+  if (!sw) throw new Error('SW inativo');
+  const apiCached = await page.evaluate(async () => {
+    for (const k of await caches.keys()) for (const r of await (await caches.open(k)).keys()) if (r.url.includes('/api/')) return true;
+    return false;
+  });
+  if (apiCached) throw new Error('/api em cache');
+});
+
 await check('palette ⌘K', async () => {
   await openRoute('/');
   await page.keyboard.press('Control+k');
