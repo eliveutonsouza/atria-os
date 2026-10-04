@@ -156,7 +156,7 @@ export function createNote(rel: string, text?: string): string {
   return p.rel;
 }
 
-function removeNote(rel: string) {
+export function removeNote(rel: string) {
   const p = safePath(rel, { mustExist: true });
   // lixeira do Obsidian em vez de apagar de vez
   const trash = join(vaultRoot(), '.trash', `${Date.now()}-${p.rel.replace(/\//g, '__')}`);

@@ -165,7 +165,7 @@ await check('orb minimizado volta para a Yui', async () => {
   await page.waitForURL((u) => u.pathname === '/', { timeout: 8000 });
 });
 
-for (const pg of ['', 'ops', 'agents', 'runs', 'missions', 'workflows', 'schedule', 'projects', 'browser', 'terminal', 'claude', 'tools', 'inbox', 'infra', 'settings', 'vault', 'brain']) {
+for (const pg of ['', 'ops', 'agents', 'runs', 'missions', 'workflows', 'schedule', 'projects', 'browser', 'terminal', 'claude', 'tools', 'inbox', 'infra', 'settings', 'vault', 'brain', 'company']) {
   await check(`app /${pg || 'overview'}`, async () => {
     await openRoute(`/app${pg ? `/${pg}` : ''}`);
     await page.waitForTimeout(600);
@@ -252,6 +252,76 @@ await check('cérebro: constelação abre', async () => {
 await check('vault: limpa nota de teste', async () => {
   const r = await api(`/api/vault/file?path=${encodeURIComponent(E2E_NOTE)}`, { method: 'DELETE' });
   if (r.status !== 204) throw new Error(`apagar ${r.status}`);
+});
+
+// ---------- Empresa: perfil + base de documentos (OCR, RAG, exclusão total) ----------
+const { readFileSync } = await import('node:fs');
+const FIX = ['precos-e2e.pdf', 'recibo-escaneado.png'].map((n) => ({ n, b64: readFileSync(`fixtures/${n}`).toString('base64') }));
+const companyIds = [];
+await check('empresa: perfil lê e salva sem perder dados', async () => {
+  const p = JSON.parse((await api('/api/company/profile')).body);
+  const r = await api('/api/company/profile', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(p) });
+  if (r.status !== 200) throw new Error(`salvar ${r.status}`);
+  const back = JSON.parse(r.body);
+  if (back.name !== p.name || back.services.length !== p.services.length) throw new Error('perfil mudou');
+});
+
+await check('empresa: upload → Docling/OCR → pronto', async () => {
+  const docs = JSON.parse((await api('/api/company/documents')).body);
+  for (const d of docs.filter((x) => FIX.some((f) => f.n === x.name))) await api(`/api/company/documents/${d.id}`, { method: 'DELETE' });
+  const res = await page.evaluate(async (files) => {
+    const fd = new FormData();
+    for (const f of files) fd.append('files', new Blob([Uint8Array.from(atob(f.b64), (c) => c.charCodeAt(0))]), f.n);
+    fd.append('files', new Blob(['<html>falso</html>']), 'falso.pdf');
+    const r = await fetch('/api/company/documents', { method: 'POST', body: fd });
+    return { status: r.status, body: await r.json() };
+  }, FIX);
+  if (res.status !== 200 || res.body.created.length !== 2) throw new Error(`upload ${res.status} ${JSON.stringify(res.body).slice(0, 200)}`);
+  if (!res.body.rejected.some((x) => x.name === 'falso.pdf')) throw new Error('PDF falso não foi recusado');
+  companyIds.push(...res.body.created.map((d) => d.id));
+  const t0 = Date.now();
+  for (;;) {
+    const all = await Promise.all(companyIds.map(async (id) => JSON.parse((await api(`/api/company/documents/${id}`)).body)));
+    if (all.some((d) => d.state === 'error')) throw new Error(all.map((d) => `${d.name}: ${d.error}`).join(' | '));
+    if (all.every((d) => d.state === 'ready')) {
+      const img = all.find((d) => d.name.endsWith('.png'));
+      if (!img.ocrPages) throw new Error('imagem sem OCR');
+      if (!all.every((d) => d.chunks > 0 && d.summary)) throw new Error('sem trechos/resumo');
+      break;
+    }
+    if (Date.now() - t0 > 240000) throw new Error(`timeout: ${all.map((d) => `${d.name}=${d.state}/${d.stage}`).join(', ')}`);
+    await page.waitForTimeout(3000);
+  }
+});
+
+await check('empresa: busca híbrida acha texto e OCR com página', async () => {
+  for (const [qq, file] of [['qual o código interno ZEBRA-4471?', 'precos-e2e.pdf'], ['referencia OCR-TUCANO-93', 'recibo-escaneado.png']]) {
+    const r = JSON.parse((await api('/api/company/search', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query: qq }) })).body);
+    if (r.hits[0]?.docName !== file || r.hits[0]?.page !== 1) throw new Error(`${qq} → ${r.hits[0]?.docName}`);
+  }
+});
+
+await check('empresa: telas Documentos, detalhe e busca', async () => {
+  await openRoute('/app/company/documentos');
+  await page.getByText('precos-e2e.pdf').first().waitFor({ timeout: 8000 });
+  await page.screenshot({ path: `${SHOTS}/empresa-docs.png` });
+  await openRoute(`/app/company/${encodeURIComponent(`doc:${companyIds[0]}`)}`);
+  await page.locator('canvas, img[src*="/api/company/documents/"]').first().waitFor({ timeout: 10000 });
+  await page.waitForTimeout(1200);
+  await page.screenshot({ path: `${SHOTS}/empresa-doc.png` });
+  await openRoute('/app/company/busca');
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: `${SHOTS}/empresa-busca.png` });
+  await openRoute('/app/company');
+  await page.screenshot({ path: `${SHOTS}/empresa-perfil.png` });
+});
+
+await check('empresa: excluir apaga tudo', async () => {
+  const r = await api('/api/company/documents/bulk-delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ids: companyIds }) });
+  if (JSON.parse(r.body).deleted !== companyIds.length) throw new Error(r.body);
+  for (const id of companyIds) if ((await api(`/api/company/documents/${id}`)).status !== 404) throw new Error('ainda existe');
+  const s = await api('/api/company/search', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query: 'ZEBRA-4471' }) });
+  if (JSON.parse(s.body).hits.some((h) => companyIds.includes(h.docId))) throw new Error('busca ainda acha documento excluído');
 });
 
 await check('mobile centro', async () => {

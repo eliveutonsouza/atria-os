@@ -11,6 +11,10 @@ services:
       YUI_DOCKER_API: http://yui-dockerproxy:2375
       YUI_HOST_PROC: /host/proc
       YUI_BROWSER_CDP: http://yui-browser:9223
+      YUI_PG_URL: postgres://yui:${YUI_PG_PASSWORD:?defina YUI_PG_PASSWORD}@yui-postgres:5432/yui
+      YUI_QDRANT_URL: http://yui-qdrant:6333
+      YUI_QDRANT_KEY: ${YUI_QDRANT_KEY:?defina YUI_QDRANT_KEY}
+      YUI_DOCLING_URL: http://yui-docling:5001
     volumes:
       - yui-data:/data
       - yui-workspace:/workspace
@@ -24,6 +28,8 @@ services:
     depends_on:
       - yui-dockerproxy
       - yui-code
+      - yui-postgres
+      - yui-qdrant
     labels:
       - traefik.enable=true
       - traefik.http.routers.yui-console.rule=Host(`${YUI_DOMAIN}`)
@@ -66,6 +72,51 @@ services:
     labels:
       - traefik.enable=false
 
+  # Base de conhecimento da Empresa: documentos, páginas, trechos e campos extraídos (Postgres),
+  # vetores (Qdrant) e leitura/OCR de arquivos (Docling). Tudo interno, sem porta pública.
+  yui-postgres:
+    image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: yui
+      POSTGRES_DB: yui
+      POSTGRES_PASSWORD: ${YUI_PG_PASSWORD:?defina YUI_PG_PASSWORD}
+    volumes:
+      - yui-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yui -d yui"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    mem_limit: 512m
+    labels:
+      - traefik.enable=false
+
+  yui-qdrant:
+    image: qdrant/qdrant@sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10
+    restart: unless-stopped
+    environment:
+      QDRANT__SERVICE__API_KEY: ${YUI_QDRANT_KEY:?defina YUI_QDRANT_KEY}
+      QDRANT__TELEMETRY_DISABLED: "true"
+    volumes:
+      - yui-qdrant:/qdrant/storage
+    mem_limit: 768m
+    labels:
+      - traefik.enable=false
+
+  yui-docling:
+    image: quay.io/docling-project/docling-serve-cpu@sha256:225c8586e20d5d0fc6811a9e0e044fa602bcc4393f00389009bad42d6787b58f
+    restart: unless-stopped
+    environment:
+      DOCLING_SERVE_ENABLE_UI: "false"
+      DOCLING_SERVE_MAX_SYNC_WAIT: "600"
+      DOCLING_SERVE_ENG_LOC_NUM_WORKERS: "1"
+      OMP_NUM_THREADS: "2"
+    mem_limit: 3g
+    cpus: "2.0"
+    labels:
+      - traefik.enable=false
+
   # TLS automático para VPS sem proxy próprio (profile "edge", ativado pelo install.sh quando não há Traefik).
   # Com Traefik já rodando no host, este serviço fica desligado e valem as labels do yui-console.
   yui-caddy:
@@ -104,6 +155,8 @@ services:
       - traefik.enable=false
 
 volumes:
+  yui-pg:
+  yui-qdrant:
   yui-caddy-data:
   yui-caddy-config:
   yui-data:

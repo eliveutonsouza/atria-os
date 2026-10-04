@@ -377,7 +377,7 @@ async function execute(run: RunRow, ac: AbortController) {
   let steps: RunStep[] = [];
   let turns = 0;
 
-  const perAgent = agentOptions(agent.id);
+  const { mcpServers: extraMcp, ...perAgent } = agentOptions(agent.id);
   const q = query({
     prompt: run.instruction,
     options: {
@@ -395,7 +395,7 @@ async function execute(run: RunRow, ac: AbortController) {
       // user: plugins/settings instalados no HOME do container; claude.ai: conectores MCP do login.
       settingSources: ['user', 'project', 'local'],
       // Navegador headless (sidecar Playwright) + Claude in Chrome (Chrome real do usuário, quando conectado).
-      mcpServers: { playwright: { type: 'http', url: config.browserMcpUrl } },
+      mcpServers: { playwright: { type: 'http', url: config.browserMcpUrl }, ...(extraMcp ?? {}) },
       extraArgs: { chrome: null },
       model: agent.model || config.claudeModel || undefined,
       maxTurns: 80,

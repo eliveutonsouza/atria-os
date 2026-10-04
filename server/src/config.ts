@@ -61,6 +61,13 @@ export const config = {
   browserMcpUrl: env('YUI_BROWSER_MCP', 'http://yui-browser:8931/mcp'),
   browserCdp: env('YUI_BROWSER_CDP', 'http://yui-browser:9223'),
   codeUrl: env('YUI_CODE_URL', 'http://yui-code:3000'),
+  pgUrl: env('YUI_PG_URL', ''),
+  qdrantUrl: env('YUI_QDRANT_URL', 'http://yui-qdrant:6333'),
+  qdrantKey: env('YUI_QDRANT_KEY', ''),
+  doclingUrl: env('YUI_DOCLING_URL', 'http://yui-docling:5001'),
+  get embedModel() {
+    return dyn('models.embed', 'YUI_EMBED_MODEL', 'text-embedding-3-small');
+  },
   dockerApi: env('YUI_DOCKER_API', 'http://yui-dockerproxy:2375'),
   hostProc: env('YUI_HOST_PROC', '/host/proc'),
   timezone: env('TZ', 'America/Sao_Paulo'),

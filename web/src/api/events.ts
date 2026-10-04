@@ -7,6 +7,14 @@ let yuiStreaming = false
 // Vault: páginas (Vault, Cérebro) assinam mudanças de notas para atualizar ao vivo.
 type VaultListener = (paths: string[], at: number) => void
 const vaultListeners = new Set<VaultListener>()
+// Empresa: páginas assinam documentos e perfil para atualizar ao vivo.
+type CompanyEvent = Extract<ServerEvent, { type: 'company.doc.updated' | 'company.doc.deleted' | 'company.profile.updated' }>
+const companyListeners = new Set<(ev: CompanyEvent) => void>()
+export function onCompanyEvent(fn: (ev: CompanyEvent) => void): () => void {
+  companyListeners.add(fn)
+  return () => companyListeners.delete(fn)
+}
+
 export function onVaultChanged(fn: VaultListener): () => void {
   vaultListeners.add(fn)
   return () => vaultListeners.delete(fn)
@@ -103,6 +111,11 @@ export function applyEvent(ev: ServerEvent) {
     case 'live.status':
       s.set({ listening: ev.active, liveMuted: ev.muted, status: { ...s.status, live: ev.active } })
       if (!ev.active && (s.yst === 'listening' || s.yst === 'speaking')) s.set({ yst: useYui.getState().baseState() })
+      break
+    case 'company.doc.updated':
+    case 'company.doc.deleted':
+    case 'company.profile.updated':
+      for (const fn of companyListeners) fn(ev)
       break
     case 'vault.changed':
       for (const fn of vaultListeners) fn(ev.paths, ev.at)

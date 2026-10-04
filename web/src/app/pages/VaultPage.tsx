@@ -22,6 +22,7 @@ const GALAXY: Record<string, string> = {
   '05-Projetos': '#cbbcff',
   '06-Ideias': '#f78cc8',
   Diario: '#dfe3f3',
+  Empresa: '#7aa2ff',
 }
 const galaxyColor = (path: string) => GALAXY[path.split('/')[0]] ?? '#8c92ad'
 const DEFAULT_NOTE = '00-Inbox/Bem-vindo ao vault.md'

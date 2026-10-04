@@ -11,6 +11,7 @@ const GALAXY: Record<string, { c: string; c2: string; name: string }> = {
   '06-ideias': { c: '#f78cc8', c2: '#b4448a', name: 'Ideias' },
   diario: { c: '#dfe3f3', c2: '#6c7399', name: 'Diário' },
   '00-inbox': { c: '#8c92ad', c2: '#4c5270', name: 'Inbox' },
+  empresa: { c: '#7aa2ff', c2: '#3a5bd0', name: 'Empresa' },
 }
 const OTHER = { c: '#8c92ad', c2: '#4c5270' }
 

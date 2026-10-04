@@ -27,6 +27,7 @@ export const PAGE_TITLES: Record<AppPage, [string, string]> = {
   infra: ['Infra & logs', 'Minha VPS'],
   settings: ['Configurações', 'Configurações'],
   vault: ['Conhecimento · vault Obsidian', 'Vault'],
+  company: ['Conhecimento · empresa', 'Empresa'],
   brain: ['Vault · universo de conexões', 'Cérebro'],
 }
 

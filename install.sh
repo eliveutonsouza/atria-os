@@ -140,6 +140,8 @@ env_put ACME_EMAIL "${ACME_EMAIL:-}"
 env_put OPENAI_API_KEY "${OPENAI_API_KEY:-}"
 env_put YUI_USER_NAME "${YUI_USER_NAME:-}"
 env_put SESSION_SECRET "$(openssl rand -hex 32)"
+env_put YUI_PG_PASSWORD "$(openssl rand -hex 24)"
+env_put YUI_QDRANT_KEY "$(openssl rand -hex 24)"
 ok ".env pronto ($(grep -cE '^[A-Z0-9_]+=.' "$ENV_FILE") valores preenchidos; segredos aleatórios gerados)"
 
 # ── 3. proxy HTTPS ──────────────────────────────────────────────────────

@@ -52,6 +52,7 @@ export function agentOptions(agentId: string): Partial<Options> {
       ...acc,
       ...o,
       disallowedTools: [...(acc.disallowedTools ?? []), ...(o.disallowedTools ?? [])],
+      mcpServers: { ...(acc.mcpServers ?? {}), ...(o.mcpServers ?? {}) },
       plugins: [...(acc.plugins ?? []), ...(o.plugins ?? [])],
     };
   }, {});
