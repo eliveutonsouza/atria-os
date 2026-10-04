@@ -81,6 +81,19 @@ await check('workflow editor tem nós e markdown', async () => {
   if (!JSON.parse(md.body).markdown?.includes('## 1.')) throw new Error('markdown sem passos');
 });
 
+await check('workflow: fluxo em Mermaid (arquivo, aba e colar só Mermaid)', async () => {
+  const w = JSON.parse((await api('/api/workflows/post-instagram')).body);
+  if (!/```mermaid\nflowchart TD/.test(w.markdown)) throw new Error('arquivo sem bloco mermaid');
+  await openRoute('/workflows/post-instagram');
+  await page.getByRole('tab', { name: 'Mermaid' }).click();
+  await page.locator('.yui-mermaid svg').first().waitFor({ timeout: 15000 });
+  const nodes = await page.locator('.yui-mermaid svg g.node').count();
+  if (nodes !== w.nodes.length) throw new Error(`${nodes} nós no diagrama, esperado ${w.nodes.length}`);
+  await page.screenshot({ path: `${SHOTS}/workflow-mermaid.png` });
+  const r = JSON.parse((await api('/api/workflows/parse', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ markdown: 'flowchart TD\n  A["1. Buscar<br/>research"] --> B{"2. Achou?"}\n  B -->|sim| C["3. Avisar<br/>assistente"]\n  B -->|não| D(("4. Fim"))\n  C --> D' }) })).body);
+  if (r.nodes.length !== 4 || r.nodes[1].branches?.length !== 2) throw new Error(`parse mermaid: ${JSON.stringify(r.nodes).slice(0, 200)}`);
+});
+
 await check('agente: config com MCP', async () => {
   const r = JSON.parse((await api('/api/agents/backend')).body);
   if (!Array.isArray(r.mcp) || !Array.isArray(r.skills)) throw new Error('AgentConfig incompleto');
