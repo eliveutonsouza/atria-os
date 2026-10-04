@@ -32,7 +32,8 @@ export type ViewName =
   | 'routines'
   | 'claude'
   | 'vault'
-  | 'brain';
+  | 'brain'
+  | 'company';
 
 export const VIEW_NAMES: ViewName[] = [
   'brief',
@@ -56,6 +57,7 @@ export const VIEW_NAMES: ViewName[] = [
   'claude',
   'vault',
   'brain',
+  'company',
 ];
 
 export interface ViewParams {
@@ -254,6 +256,9 @@ export type ServerEvent =
   | { type: 'workflow.run.updated'; run: WorkflowRunInfo }
   | { type: 'custom.created'; view: CustomViewInfo }
   | { type: 'vault.changed'; paths: string[]; at: number }
+  | { type: 'company.doc.updated'; doc: CompanyDoc }
+  | { type: 'company.doc.deleted'; id: string }
+  | { type: 'company.profile.updated'; profile: CompanyProfile }
   | { type: 'ping' };
 
 // ---------- REST ----------
@@ -440,7 +445,7 @@ export interface RoutineInfo {
 export type AppPage =
   | 'overview' | 'ops' | 'agents' | 'runs' | 'missions' | 'workflows' | 'schedule' | 'projects'
   | 'browser' | 'terminal' | 'claude' | 'tools' | 'inbox' | 'infra' | 'settings'
-  | 'vault' | 'brain';
+  | 'vault' | 'brain' | 'company';
 
 export interface StatsOverview {
   kpis: { runsToday: number; runsYesterday: number; success7d: number | null; failed7d: number; agentsActive: number; agentsTotal: number; approvals: number; cost7d: number; tokens7d: number };
@@ -612,4 +617,148 @@ export interface VaultEditorState {
   path: string | null; // relativo ao vault (null = fora do vault)
   abs: string | null;
   at: number;
+}
+
+// ---------- Empresa: perfil + base de conhecimento (OCR → extração → Postgres + Qdrant → RAG) ----------
+// GET  /api/company/profile                 -> CompanyProfile
+// PUT  /api/company/profile (CompanyProfileInput) -> CompanyProfile
+// POST /api/company/logo (multipart "file") -> 204 ; GET /api/company/logo -> imagem ; DELETE /api/company/logo -> 204
+// GET  /api/company/documents?q=&category=  -> CompanyDoc[]
+// POST /api/company/documents (multipart, vários "files"; campo opcional "category") -> {created: CompanyDoc[], duplicates: string[], rejected: {name, reason}[]}
+// GET  /api/company/documents/:id           -> CompanyDoc
+// PATCH /api/company/documents/:id {category?, fields?, summary?, tags?} -> CompanyDoc
+// DELETE /api/company/documents/:id         -> 204 (arquivo + Postgres + Qdrant + nota do vault)
+// POST /api/company/documents/bulk-delete {ids} -> {deleted: number}
+// POST /api/company/documents/:id/reprocess -> CompanyDoc ; POST /api/company/documents/bulk-reprocess {ids}
+// GET  /api/company/documents/:id/file      -> original (inline)
+// GET  /api/company/documents/:id/text      -> {markdown: string}
+// GET  /api/company/documents/:id/pages     -> CompanyDocPage[]
+// GET  /api/company/documents/:id/chunks    -> CompanyChunk[]
+// GET  /api/company/documents/:id/uses      -> CompanyUse[]
+// POST /api/company/search {query, category?, answer?: boolean} -> CompanySearchResult
+// GET  /api/company/stats                   -> CompanyStats
+
+export const COMPANY_CATEGORIES = ['Comercial', 'Contratos', 'Marca', 'Processos', 'Financeiro', 'Clientes', 'Outros'] as const;
+export type CompanyCategory = (typeof COMPANY_CATEGORIES)[number];
+
+export interface CompanyService {
+  name: string;
+  price: string;
+}
+
+export interface CompanyProfileInput {
+  name: string;
+  legalName: string;
+  cnpj: string;
+  segment: string;
+  site: string;
+  city: string;
+  about: string; // o que a empresa faz
+  audience: string; // para quem
+  tone: string;
+  services: CompanyService[];
+}
+
+export interface CompanyProfile extends CompanyProfileInput {
+  hasLogo: boolean;
+  logoVersion: number; // para cache-busting da imagem
+  updatedAt: string | null;
+  agentPreview: string; // texto exato que entra no prompt dos agentes e da Yui
+}
+
+export type CompanyDocState = 'queued' | 'processing' | 'ready' | 'error';
+// 0 recebido · 1 lendo/OCR (Docling) · 2 extraindo dados · 3 embeddings · 4 indexando no Qdrant · 5 pronto
+export type CompanyDocStage = 0 | 1 | 2 | 3 | 4 | 5;
+
+export interface CompanyDoc {
+  id: string;
+  name: string;
+  ext: string; // PDF, DOCX, PPTX, XLSX, PNG, JPG, MD, TXT…
+  mime: string;
+  size: number;
+  category: CompanyCategory;
+  state: CompanyDocState;
+  stage: CompanyDocStage;
+  error: string | null;
+  pages: number;
+  ocrPages: number;
+  chunks: number;
+  docType: string | null; // "Tabela de preços", "Contrato"…
+  summary: string | null;
+  fields: { key: string; value: string }[];
+  entities: { type: string; value: string }[];
+  tags: string[];
+  timings: { stage: CompanyDocStage; label: string; ms: number; detail?: string }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CompanyDocBox {
+  kind: 'text' | 'title' | 'table' | 'picture' | 'list';
+  // fração da página (0–1), origem no canto superior esquerdo
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface CompanyDocPage {
+  page: number;
+  ocr: boolean;
+  width: number;
+  height: number;
+  text: string;
+  boxes: CompanyDocBox[];
+}
+
+export interface CompanyChunk {
+  id: string;
+  ord: number;
+  page: number | null;
+  tokens: number;
+  kind: 'texto' | 'tabela' | 'título';
+  text: string;
+}
+
+export interface CompanySearchHit {
+  n: number; // [n] usado na citação
+  chunkId: string;
+  docId: string;
+  docName: string;
+  category: CompanyCategory;
+  page: number | null;
+  text: string;
+  vector: number | null; // similaridade cosseno (0–1)
+  keyword: number | null; // rank do texto (Postgres), normalizado 0–1
+  score: number; // fusão RRF normalizada 0–1
+}
+
+export interface CompanySearchResult {
+  query: string;
+  answer: string | null;
+  hits: CompanySearchHit[];
+  ms: number;
+  noAnswer: boolean;
+}
+
+export interface CompanyUse {
+  at: string;
+  who: string; // "Yui", nome do agente, "Painel"
+  query: string;
+  score: number | null;
+}
+
+export interface CompanyStats {
+  docs: number;
+  ready: number;
+  processing: number;
+  errors: number;
+  pages: number;
+  ocrPages: number;
+  chunks: number;
+  vectors: number;
+  queries7d: number;
+  unanswered7d: number;
+  unansweredRecent: string[];
+  services: { docling: boolean; postgres: boolean; qdrant: boolean; openai: boolean };
 }

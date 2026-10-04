@@ -11,6 +11,7 @@
     "@fastify/cookie": "^11.1.2",
     "@fastify/helmet": "^13.1.1",
     "@fastify/http-proxy": "^11.6.3",
+    "@fastify/multipart": "^10.1.2",
     "@fastify/rate-limit": "^11.2.0",
     "@fastify/static": "^10.1.5",
     "@fastify/websocket": "^11.3.3",
@@ -20,6 +21,7 @@
     "node-cron": "^4.6.0",
     "node-pty": "^1.1.0",
     "openai": "^7.27.0",
+    "pg": "^8.23.1",
     "web-push": "^3.6.7",
     "ws": "^8.22.0",
     "zod": "^4.6.5"
@@ -28,6 +30,7 @@
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.4",
     "@types/node-cron": "^3.0.11",
+    "@types/pg": "^8.23.1",
     "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.2",
     "tsx": "^4.23.15",
