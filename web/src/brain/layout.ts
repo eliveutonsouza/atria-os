@@ -10,7 +10,7 @@ export interface SimNode extends SimulationNodeDatum {
 }
 export type SimLink = SimulationLinkDatum<SimNode>
 
-const STORE = 'yui.brain.pos'
+const STORE = 'yui.brain.pos.v2'
 
 export function loadPositions(): Record<string, [number, number]> {
   try {
@@ -32,7 +32,7 @@ export function savePositions(nodes: SimNode[]) {
 
 export function galaxyCenters(galaxies: string[], total: number): Map<string, { x: number; y: number }> {
   const m = new Map<string, { x: number; y: number }>()
-  const R = galaxies.length <= 1 ? 0 : Math.max(220, Math.sqrt(total) * 34)
+  const R = galaxies.length <= 1 ? 0 : Math.max(380, Math.sqrt(total) * 52)
   galaxies.forEach((g, i) => {
     const a = (i / galaxies.length) * Math.PI * 2 - Math.PI / 2
     m.set(g, { x: Math.cos(a) * R, y: Math.sin(a) * R * 0.78 })
@@ -58,11 +58,11 @@ export function createSimulation(nodes: SimNode[], links: SimLink[], centers: Ma
   }
   const big = nodes.length > 800
   const sim = forceSimulation<SimNode, SimLink>(nodes)
-    .force('link', forceLink<SimNode, SimLink>(links).id((d) => d.id).distance(big ? 34 : 48).strength(0.25))
+    .force('link', forceLink<SimNode, SimLink>(links).id((d) => d.id).distance(big ? 34 : 56).strength((l) => ((l.source as SimNode).galaxy === (l.target as SimNode).galaxy ? 0.3 : 0.03)))
     .force('charge', forceManyBody<SimNode>().strength(big ? -28 : -70).distanceMax(big ? 260 : 420).theta(0.9))
     .force('collide', forceCollide<SimNode>((d) => d.r + 6).iterations(1))
-    .force('gx', forceX<SimNode>((d) => centers.get(d.galaxy)?.x ?? 0).strength(0.07))
-    .force('gy', forceY<SimNode>((d) => centers.get(d.galaxy)?.y ?? 0).strength(0.07))
+    .force('gx', forceX<SimNode>((d) => centers.get(d.galaxy)?.x ?? 0).strength(0.12))
+    .force('gy', forceY<SimNode>((d) => centers.get(d.galaxy)?.y ?? 0).strength(0.12))
     .alphaDecay(0.03)
     .velocityDecay(0.45)
   // tudo já posicionado (cache) → começa quase parado; só o que é novo se acomoda

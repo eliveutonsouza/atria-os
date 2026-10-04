@@ -17,7 +17,7 @@
 .app-row:hover { background: rgba(255,255,255,.035); }
 .app-scroll { scrollbar-width: thin; }
 /* página rola inteira: blocos não encolhem para caber na altura */
-.app-main > * { flex-shrink: 0; }
+.app-main > *, .brain-scroll > * { flex-shrink: 0; }
 .app-pulse { animation: yui-blink 1.6s ease-in-out infinite; }
 
 /* grids responsivos das páginas: empilham no celular */

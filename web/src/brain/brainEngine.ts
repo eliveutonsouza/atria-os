@@ -717,7 +717,7 @@ export class BrainEngine {
     const { w, h, cam } = this
     const zoomScale = Math.max(0.55, Math.min(1.6, Math.sqrt(cam.k)))
     const nb = this.selected ? this.neighbors(this.selected) : null
-    const labelsQ: { x: number; y: number; text: string; sub?: string; color: string; size: number; bold: boolean; a: number }[] = []
+    const labelsQ: { x: number; y: number; text: string; sub?: string; color: string; size: number; bold: boolean; a: number; p: number }[] = []
     const t = this.prm ? 0 : this.t
     for (const n of this.nodes) {
       if (this.hidden.has(n.id) || n.x === undefined || n.y === undefined) continue
@@ -729,7 +729,7 @@ export class BrainEngine {
       const r = (n.r + (isSel ? 3 : 0)) * zoomScale
       if (isCenter) {
         this.drawOrb(s.x, s.y, Math.max(22, 30 * zoomScale))
-        labelsQ.push({ x: s.x, y: s.y + 44 * zoomScale + 8, text: n.label, sub: n.sub, color: '#ffffff', size: 16, bold: true, a: 1 })
+        labelsQ.push({ x: s.x, y: s.y + 44 * zoomScale + 8, text: n.label, sub: n.sub, color: '#ffffff', size: 16, bold: true, a: 1, p: 9 })
         continue
       }
       g.globalAlpha = a
@@ -825,6 +825,7 @@ export class BrainEngine {
           size: n.hub || isSel ? 12.5 : 10.5,
           bold: n.hub || isSel,
           a: Math.min(1, a + 0.2),
+          p: isSel ? 8 : n.id === this.hover ? 7 : this.pathIds.includes(n.id) ? 6 : n.hub ? 4 : near ? 3 : this.highlight.has(n.id) ? 2 : 1,
         })
       }
     }
@@ -833,13 +834,21 @@ export class BrainEngine {
     g.textAlign = 'center'
     g.shadowColor = '#05060c'
     g.shadowBlur = 8
+    // mais importantes primeiro; rótulo que colide com um já desenhado é pulado
+    labelsQ.sort((x, y) => y.p - x.p)
+    const placed: { x0: number; y0: number; x1: number; y1: number }[] = []
     let count = 0
     for (const l of labelsQ) {
-      if (count++ > 320) break
-      g.globalAlpha = l.a
+      if (count > 320) break
       g.font = `${l.bold ? 700 : 500} ${l.size}px Manrope, system-ui, sans-serif`
-      g.fillStyle = l.color
       const text = l.text.length > 42 ? `${l.text.slice(0, 40)}…` : l.text
+      const tw = g.measureText(text).width
+      const box = { x0: l.x - tw / 2 - 3, y0: l.y - l.size, x1: l.x + tw / 2 + 3, y1: l.y + (l.sub ? 15 : 4) }
+      if (l.p < 6 && placed.some((b) => box.x0 < b.x1 && box.x1 > b.x0 && box.y0 < b.y1 && box.y1 > b.y0)) continue
+      placed.push(box)
+      count++
+      g.globalAlpha = l.a
+      g.fillStyle = l.color
       g.fillText(text, l.x, l.y)
       if (l.sub) {
         g.font = `500 9.5px 'JetBrains Mono', monospace`

@@ -25,6 +25,8 @@ const GALAXY: Record<string, string> = {
 }
 const galaxyColor = (path: string) => GALAXY[path.split('/')[0]] ?? '#8c92ad'
 const DEFAULT_NOTE = '00-Inbox/Bem-vindo ao vault.md'
+// trecho sem a sintaxe de link ([[nota|alias]] → alias)
+const plain = (s: string) => s.replace(/!?\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]+))?\]\]/g, (_m, a: string, al?: string) => al ?? a)
 const noteName = (p: string) => (p.split('/').pop() ?? p).replace(/\.md$/i, '')
 const store = {
   get: (k: string) => {
@@ -273,7 +275,7 @@ function Connections({ path, text, resolve, onOpen, status, onCommit }: { path: 
         {backs.map((b) => (
           <button key={b.path} className="vault-conn" onClick={() => onOpen(b.path)}>
             <span style={{ fontSize: 12.5, fontWeight: 600, color: '#dfe3f3' }}>{b.title}</span>
-            <span style={{ fontSize: 11.5, color: C.t2, lineHeight: 1.45 }}>{b.snippet}</span>
+            <span style={{ fontSize: 11.5, color: C.t2, lineHeight: 1.45 }}>{plain(b.snippet)}</span>
           </button>
         ))}
         {!backs.length && <span style={{ fontSize: 12, color: C.t3 }}>Nenhuma nota cita esta ainda.</span>}

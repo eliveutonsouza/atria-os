@@ -98,7 +98,7 @@ export function NotePanel({
         </button>
       </div>
 
-      <div className="app-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', minHeight: 0, flex: 1 }}>
+      <div className="app-scroll brain-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto', minHeight: 0, flex: 1 }}>
         {ghost ? (
           <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: '#c9cde0' }}>
             Esta estrela ainda não existe: outras notas apontam para <b>[[{node.title}]]</b>, mas o arquivo não foi criado.

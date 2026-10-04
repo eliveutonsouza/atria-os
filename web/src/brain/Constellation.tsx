@@ -99,15 +99,21 @@ export function Constellation({ path, graph }: { path: string; graph: VaultGraph
           angle.set(x.id, a)
         })
       } else {
-        const byParent = new Map<string, VaultRing[]>()
-        for (const x of list) byParent.set(x.via ?? path, [...(byParent.get(x.via ?? path) ?? []), x])
-        const prevCount = Math.max(1, rings.filter((x) => x.ring === r - 1).length)
-        const sector = (Math.PI * 2) / prevCount
-        for (const [p, kids] of byParent) {
-          const base = angle.get(p) ?? 0
-          const step = Math.min(0.32, (sector * 0.9) / Math.max(1, kids.length))
-          kids.forEach((x, i) => angle.set(x.id, base + (i - (kids.length - 1) / 2) * step))
-        }
+        // anel inteiro dividido por igual, na ordem angular dos pais: filhos ficam perto do pai
+        // sem amontoar quando um pai tem muitos vizinhos
+        const TAU = Math.PI * 2
+        const norm = (a: number) => ((a % TAU) + TAU) % TAU
+        const sorted = [...list].sort((x, y) => norm(angle.get(x.via ?? path) ?? 0) - norm(angle.get(y.via ?? path) ?? 0))
+        const N = Math.max(1, sorted.length)
+        let sx = 0
+        let sy = 0
+        sorted.forEach((x, i) => {
+          const d = norm(angle.get(x.via ?? path) ?? 0) - (i / N) * TAU
+          sx += Math.cos(d)
+          sy += Math.sin(d)
+        })
+        const offset = Math.atan2(sy, sx)
+        sorted.forEach((x, i) => angle.set(x.id, offset + (i / N) * TAU + (r % 2 ? 0 : Math.PI / N)))
       }
       for (const x of list) {
         const a = angle.get(x.id)!

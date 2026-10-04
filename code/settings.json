@@ -20,5 +20,101 @@
   "foam.edit.linkReferenceDefinitions": "off",
   "foam.openDailyNote.directory": "Diario",
   "foam.openDailyNote.filenameFormat": "yyyy-mm-dd",
-  "foam.files.ignore": ["**/.obsidian/**", "**/_templates/**", "**/node_modules/**", "**/.trash/**"]
+  "foam.files.ignore": [
+    "**/.obsidian/**",
+    "**/_templates/**",
+    "**/node_modules/**",
+    "**/.trash/**"
+  ],
+  "security.workspace.trust.startupPrompt": "never",
+  "security.workspace.trust.banner": "never",
+  "chat.disableAIFeatures": true,
+  "chat.commandCenter.enabled": false,
+  "workbench.secondarySideBar.defaultVisibility": "hidden",
+  "workbench.layoutControl.enabled": false,
+  "window.commandCenter": true,
+  "workbench.colorCustomizations": {
+    "focusBorder": "#67d8f2",
+    "foreground": "#c9cde0",
+    "editor.background": "#0b0d1c",
+    "editor.lineHighlightBackground": "#67d8f20f",
+    "editor.selectionBackground": "#a68cf74d",
+    "editorCursor.foreground": "#67d8f2",
+    "editorLineNumber.foreground": "#4a5070",
+    "editorLineNumber.activeForeground": "#c9cde0",
+    "editorGroupHeader.tabsBackground": "#080a16",
+    "tab.activeBackground": "#0b0d1c",
+    "tab.inactiveBackground": "#080a16",
+    "tab.activeBorderTop": "#67d8f2",
+    "tab.border": "#ffffff0d",
+    "sideBar.background": "#080a16",
+    "sideBar.border": "#ffffff0f",
+    "sideBarSectionHeader.background": "#080a16",
+    "activityBar.background": "#06070d",
+    "activityBar.foreground": "#67d8f2",
+    "activityBar.inactiveForeground": "#6f7590",
+    "activityBarBadge.background": "#a68cf7",
+    "titleBar.activeBackground": "#06070d",
+    "titleBar.inactiveBackground": "#06070d",
+    "statusBar.background": "#14183a",
+    "statusBar.foreground": "#dfe3f3",
+    "statusBar.noFolderBackground": "#14183a",
+    "panel.background": "#080a16",
+    "list.activeSelectionBackground": "#67d8f224",
+    "list.hoverBackground": "#ffffff0a",
+    "list.inactiveSelectionBackground": "#67d8f214",
+    "input.background": "#06070d",
+    "button.background": "#67d8f2",
+    "button.foreground": "#0a0c1d",
+    "badge.background": "#a68cf7",
+    "textLink.foreground": "#7fdcf5"
+  },
+  "editor.tokenColorCustomizations": {
+    "textMateRules": [
+      {
+        "scope": [
+          "markup.heading",
+          "entity.name.section"
+        ],
+        "settings": {
+          "foreground": "#ffffff",
+          "fontStyle": "bold"
+        }
+      },
+      {
+        "scope": [
+          "punctuation.definition.heading"
+        ],
+        "settings": {
+          "foreground": "#a68cf7"
+        }
+      },
+      {
+        "scope": [
+          "markup.inline.raw",
+          "markup.fenced_code"
+        ],
+        "settings": {
+          "foreground": "#4fe0b0"
+        }
+      },
+      {
+        "scope": [
+          "markup.underline.link",
+          "string.other.link"
+        ],
+        "settings": {
+          "foreground": "#cbbcff"
+        }
+      },
+      {
+        "scope": [
+          "punctuation.definition.list"
+        ],
+        "settings": {
+          "foreground": "#67d8f2"
+        }
+      }
+    ]
+  }
 }
