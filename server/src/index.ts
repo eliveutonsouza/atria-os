@@ -37,6 +37,7 @@ import * as onboarding from './onboarding.ts';
 import * as vault from './vault.ts';
 import * as vaultAuto from './vaultAuto.ts';
 import * as company from './company/index.ts';
+import * as help from './help.ts';
 import { sandboxUrl, sbToken } from './sandbox.ts';
 import { catalog, githubEnabled, startGithub, syncCatalog } from './github.ts';
 
@@ -73,7 +74,7 @@ await app.register(websocket);
 registerAuth(app);
 initTerminal();
 registerTerminal(app);
-for (const mod of [missions, customViews, toolbox, agentsAdmin, workflows, push, stats, browserLive, settings, onboarding, vault, company]) mod.register(app);
+for (const mod of [missions, customViews, toolbox, agentsAdmin, workflows, push, stats, browserLive, settings, onboarding, vault, company, help]) mod.register(app);
 vaultAuto.register();
 
 app.get('/api/health', async () => ({ ok: true }));

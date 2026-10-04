@@ -33,7 +33,8 @@ export type ViewName =
   | 'claude'
   | 'vault'
   | 'brain'
-  | 'company';
+  | 'company'
+  | 'help';
 
 export const VIEW_NAMES: ViewName[] = [
   'brief',
@@ -58,6 +59,7 @@ export const VIEW_NAMES: ViewName[] = [
   'vault',
   'brain',
   'company',
+  'help',
 ];
 
 export interface ViewParams {
@@ -445,7 +447,7 @@ export interface RoutineInfo {
 export type AppPage =
   | 'overview' | 'ops' | 'agents' | 'runs' | 'missions' | 'workflows' | 'schedule' | 'projects'
   | 'browser' | 'terminal' | 'claude' | 'tools' | 'inbox' | 'infra' | 'settings'
-  | 'vault' | 'brain' | 'company';
+  | 'vault' | 'brain' | 'company' | 'help';
 
 export interface StatsOverview {
   kpis: { runsToday: number; runsYesterday: number; success7d: number | null; failed7d: number; agentsActive: number; agentsTotal: number; approvals: number; cost7d: number; tokens7d: number };
@@ -761,4 +763,83 @@ export interface CompanyStats {
   unanswered7d: number;
   unansweredRecent: string[];
   services: { docling: boolean; postgres: boolean; qdrant: boolean; openai: boolean };
+}
+
+// ---------- Ajuda: guias operacionais, receitas, FAQ, "Pergunte" e Resultados ----------
+// GET  /api/help                            -> HelpIndex
+// GET  /api/help/doc/:kind/:id              -> HelpDoc (kind: guia | receita)
+// POST /api/help/ask {pergunta}             -> HelpAnswer
+// POST /api/help/feedback {kind, id, util}  -> 204
+// GET  /api/help/unanswered                 -> {pergunta, at}[]
+// GET  /api/help/results?period=week|month|90d -> HelpResults
+// PUT  /api/help/results/minutes {[tipo]: minutos} -> HelpResults (período mês)
+
+export interface HelpGuideMeta {
+  id: string;
+  titulo: string;
+  grupo: string; // Começar | Acompanhar | Organizar | Conhecimento | Ferramentas | Sistema
+  pagina: AppPage | null; // tela que o botão "Abrir" leva
+  ordem: number;
+  resumo: string;
+}
+
+export interface HelpRecipeMeta {
+  id: string;
+  titulo: string;
+  categoria: string;
+  ferramentas: string;
+  tempo: string;
+}
+
+export interface HelpIndex {
+  guias: HelpGuideMeta[];
+  receitas: HelpRecipeMeta[];
+  faq: { categoria: string; pergunta: string; resposta: string }[];
+  dia: { hora: string; titulo: string; texto: string; frase: string | null }[];
+  version: string;
+}
+
+export interface HelpDoc {
+  kind: 'guia' | 'receita';
+  id: string;
+  titulo: string;
+  meta: Record<string, string | string[]>; // frontmatter (resumo, usar_quando, frases, dicas, erros, relacionados, antes, resultado, frase…)
+  markdown: string; // corpo, sem o frontmatter nem o "# título"
+  pagina: AppPage | null;
+}
+
+export interface HelpSource {
+  kind: 'guia' | 'receita' | 'faq';
+  id: string;
+  titulo: string;
+  pagina: AppPage | null;
+}
+
+export interface HelpAnswer {
+  pergunta: string;
+  resposta: string | null;
+  semResposta: boolean;
+  fontes: HelpSource[];
+  abrir: AppPage | null;
+}
+
+export type HelpTaskType = 'codigo' | 'pesquisa' | 'textos' | 'assistente' | 'workflow' | 'rotina' | 'consulta' | 'documento';
+
+export interface HelpResults {
+  period: 'week' | 'month' | '90d';
+  from: string;
+  to: string;
+  hours: number; // estimadas
+  kpis: {
+    runsDone: number;
+    successRate: number | null; // 0–1 (concluídas / (concluídas + falhas))
+    workflowsDone: number;
+    approvals: number;
+    approvalAvgMin: number | null;
+    docsReady: number;
+    queries: number;
+    costUsd: number;
+  };
+  rows: { tipo: HelpTaskType; label: string; count: number; minutes: number; hours: number }[];
+  weeks: { label: string; from: string; hours: number; byTipo: Partial<Record<HelpTaskType, number>> }[];
 }

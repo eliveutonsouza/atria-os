@@ -32,6 +32,7 @@ COPY server/package.json ./server/
 COPY server/src ./server/src
 COPY shared ./shared
 COPY workspace-seed ./workspace-seed
+COPY docs ./docs
 COPY --from=web /app/web/dist ./web/dist
 # CLI do Claude Code (mesmo binário do SDK) para `docker exec -it … claude` → /login, /plugin, /mcp
 RUN ln -s /app/server/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude /usr/local/bin/claude \
