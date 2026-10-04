@@ -38,8 +38,29 @@
   .app-hide-narrow { display: none !important; }
 }
 @media (max-width: 480px) {
-  .app-grid-3 { grid-template-columns: minmax(0, 1fr); }
+  .app-grid-3, .app-grid-5 { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) {
   .app-pulse { animation: none; }
+}
+
+/* Operações: pipeline em linha no desktop, grade de 2 colunas no celular (sem rolagem lateral). */
+.app-pipeline { display: flex; align-items: stretch; gap: 8px; }
+.app-pipeline-step { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.app-kanban-col { min-height: 160px; }
+@media (max-width: 1180px) {
+  .app-pipeline { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 820px) {
+  .app-pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .app-kanban-col { min-height: 0; }
+}
+
+/* Filtros no celular: busca em largura total + selects em 2 colunas. */
+.app-filters-narrow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.app-filters-narrow > input { grid-column: 1 / -1; }
+.app-filters-narrow > select { width: 100%; min-width: 0; height: 42px; }
+.app-filters-narrow > select {
+  -webkit-appearance: none; appearance: none; color: #e8eaf4; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; padding: 0 34px 0 12px;
+  background: rgba(255,255,255,.03) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa0bb' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;
 }

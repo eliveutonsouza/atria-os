@@ -116,11 +116,12 @@ export function BrowserPage() {
   const stopRun = async (runId: string) => {
     await api.post(`/api/runs/${runId}/cancel`).catch(() => {})
   }
+  const narrow = useYui((s) => s.narrow)
   const openRun = (runId: string) => useYui.getState().set({ shellMode: 'app', appPage: 'runs', appParams: { id: runId } })
 
   const empty = connected && tabs.length === 0
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, height: '100%', minHeight: 560 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, height: narrow ? 'auto' : '100%', minHeight: narrow ? 0 : 560 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 999, fontSize: 12, background: busy ? 'rgba(103,216,242,.08)' : 'rgba(255,255,255,.03)', border: `1px solid ${busy ? 'rgba(103,216,242,.25)' : 'rgba(255,255,255,.08)'}`, color: busy ? '#a9e9f8' : C.t2 }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: !connected ? C.crit : busy ? C.cyan : C.t3, boxShadow: busy ? glow(C.cyan, 8) : undefined }} />
@@ -145,7 +146,7 @@ export function BrowserPage() {
       </div>
 
       <div style={{ display: 'flex', gap: 14, flex: 1, minHeight: 0, flexWrap: 'wrap' }}>
-        <section style={{ flex: '999 1 560px', minWidth: 0, minHeight: 420, display: 'flex', flexDirection: 'column', borderRadius: 16, overflow: 'hidden', border: `1px solid ${controlling ? 'rgba(103,216,242,.45)' : 'rgba(255,255,255,.1)'}`, background: '#14172c' }}>
+        <section style={{ flex: '999 1 560px', minWidth: 0, minHeight: narrow ? 0 : 420, display: 'flex', flexDirection: 'column', borderRadius: 16, overflow: 'hidden', border: `1px solid ${controlling ? 'rgba(103,216,242,.45)' : 'rgba(255,255,255,.1)'}`, background: '#14172c' }}>
           <div role="tablist" aria-label="Abas" style={{ display: 'flex', gap: 2, padding: '8px 10px 0', background: '#0f1226', overflowX: 'auto' }}>
             {tabs.map((t) => (
               <button
@@ -168,7 +169,7 @@ export function BrowserPage() {
               if (controlling && url.trim()) send({ type: 'navigate', url })
               setEditingUrl(false)
             }}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#14172c', borderBottom: '1px solid rgba(255,255,255,.06)' }}
+            style={{ display: 'flex', alignItems: 'center', gap: narrow ? 6 : 10, flexWrap: narrow ? 'wrap' : 'nowrap', padding: '8px 12px', background: '#14172c', borderBottom: '1px solid rgba(255,255,255,.06)' }}
           >
             <button type="button" aria-label="Voltar" disabled={!controlling} onClick={() => send({ type: 'nav', action: 'back' })} style={{ ...iconBtn, opacity: controlling ? 1 : 0.4 }}>‹</button>
             <button type="button" aria-label="Avançar" disabled={!controlling} onClick={() => send({ type: 'nav', action: 'forward' })} style={{ ...iconBtn, opacity: controlling ? 1 : 0.4 }}>›</button>
@@ -181,7 +182,7 @@ export function BrowserPage() {
               onBlur={() => setEditingUrl(false)}
               onChange={(e) => setUrl(e.target.value)}
               className="mono"
-              style={{ flex: 1, minWidth: 0, height: 28, borderRadius: 8, border: 'none', outline: 'none', background: 'rgba(255,255,255,.05)', padding: '0 12px', fontSize: 12, color: '#c9cde0' }}
+              style={{ flex: 1, minWidth: 0, height: narrow ? 36 : 28, borderRadius: 8, border: 'none', outline: 'none', background: 'rgba(255,255,255,.05)', padding: '0 12px', fontSize: 12, color: '#c9cde0', order: narrow ? 10 : undefined, flexBasis: narrow ? '100%' : undefined }}
             />
             <button type="submit" disabled={!controlling} title={controlling ? 'Abrir endereço' : 'Ligue "Assumir controle" para navegar'} style={{ ...btn, opacity: controlling ? 1 : 0.45 }}>Abrir URL</button>
           </form>
@@ -189,7 +190,7 @@ export function BrowserPage() {
             tabIndex={controlling ? 0 : -1}
             onKeyDown={key('keyDown')}
             onKeyUp={key('keyUp')}
-            style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0b0d1c', outline: 'none', cursor: controlling ? 'default' : 'not-allowed' }}
+            style={{ flex: narrow ? 'none' : 1, minHeight: 0, aspectRatio: narrow ? (frame ? `${frame.width} / ${frame.height}` : '16 / 10') : undefined, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0b0d1c', outline: 'none', cursor: controlling ? 'default' : 'not-allowed' }}
           >
             {frame && !empty ? (
               <img

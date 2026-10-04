@@ -49,6 +49,10 @@ export function SchedulePage() {
 
   const days = Array.from({ length: 7 }, (_, i) => new Date(week.getTime() + i * DAY))
   const todayKey = new Date().toDateString()
+  const narrow = useYui((s) => s.narrow)
+  const [dayPick, setDayPick] = useState<string | null>(null)
+  const selectedDay = dayPick && days.some((d) => d.toDateString() === dayPick) ? dayPick : days.find((d) => d.toDateString() === todayKey)?.toDateString() ?? days[0].toDateString()
+  const dayItems = (occ.data ?? []).filter((o) => new Date(o.at).toDateString() === selectedDay).sort((a, b) => a.at.localeCompare(b.at))
   // linhas = horários com algo agendado (como no layout); muitas ocorrências por hora viram "+N"
   const { hours, cell } = useMemo(() => {
     const map = new Map<string, ScheduleOccurrence[]>()
@@ -72,6 +76,38 @@ export function SchedulePage() {
   return (
     <>
       <div className="app-split" style={{ alignItems: 'flex-start' }}>
+        {narrow ? (
+          // Celular: agenda do dia (chips dos 7 dias + lista) em vez da grade semanal larga.
+          <section aria-label="Agenda do dia" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 4 }}>
+              {days.map((d) => {
+                const key = d.toDateString()
+                const on = key === selectedDay
+                const count = (occ.data ?? []).filter((o) => new Date(o.at).toDateString() === key).length
+                return (
+                  <button key={key} onClick={() => setDayPick(key)} aria-pressed={on} style={{ minHeight: 56, borderRadius: 12, border: `1px solid ${on ? 'rgba(103,216,242,.4)' : 'rgba(255,255,255,.08)'}`, background: on ? 'rgba(103,216,242,.12)' : 'rgba(255,255,255,.02)', color: key === todayKey ? C.cyan : C.text, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: 0, cursor: 'pointer' }}>
+                    <span style={{ fontSize: 10.5, color: C.t2 }}>{d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}</span>
+                    <span style={{ fontSize: 16, fontWeight: 600 }}>{d.getDate()}</span>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: count ? C.violet : 'transparent' }} />
+                  </button>
+                )
+              })}
+            </div>
+            <div className="app-card" style={{ padding: '6px 14px' }}>
+              {dayItems.length === 0 && <div style={{ padding: '18px 0', color: C.t2, fontSize: 14 }}>Nada agendado neste dia.</div>}
+              {dayItems.map((o) => {
+                const tone = !o.enabled ? EV.off : o.workflow ? EV.wf : EV.agent
+                return (
+                  <div key={`${o.routineId}-${o.at}`} style={{ display: 'grid', gridTemplateColumns: '52px 10px minmax(0, 1fr)', alignItems: 'center', gap: 10, padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,.05)', fontSize: 14 }}>
+                    <span className="app-mono" style={{ color: C.t3, fontSize: 12.5 }}>{new Date(o.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: tone.c }} />
+                    <span style={{ color: o.enabled ? C.text : C.t3 }}>{o.name}{o.workflow ? <span style={{ color: C.t3, fontSize: 12 }}> · workflow</span> : null}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        ) : (
         <section
           aria-label="Calendário semanal"
           style={{ flex: 1, minWidth: 0, width: '100%', borderRadius: 16, background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.06)', overflowX: 'auto' }}
@@ -96,6 +132,7 @@ export function SchedulePage() {
             ))}
           </div>
         </section>
+        )}
         <aside style={{ width: 340, maxWidth: '100%', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div className="eyebrow">Workflows</div>
           {(wfs.data ?? []).length === 0 && <span className="app-muted">Nenhum workflow ainda.</span>}

@@ -265,7 +265,7 @@ export function Shell() {
   )
 
   return (
-    <main style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: 'radial-gradient(120% 90% at 50% 28%, #0f1533 0%, #0a0c1d 45%, #06070d 100%)' }}>
+    <main style={{ position: 'fixed', inset: 0, overflow: 'clip', overscrollBehavior: 'none', background: 'radial-gradient(120% 90% at 50% 28%, #0f1533 0%, #0a0c1d 45%, #06070d 100%)' }}>
       <OrbLayer />
       <TopBar />
       <AppShell />

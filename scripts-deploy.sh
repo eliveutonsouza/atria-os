@@ -25,5 +25,5 @@ done
 echo "container: $st"
 if [ "$E2E" = 1 ] && [ -f e2e/run.mjs ]; then
   docker run --rm --network host -v "$PWD/e2e:/e2e" -w /e2e -e YUI_E2E_PASSWORD="${YUI_E2E_PASSWORD:?defina YUI_E2E_PASSWORD}" \
-    mcr.microsoft.com/playwright:v1.63.0-noble bash -c "npm i -s playwright@1.63.0 >/dev/null 2>&1; node run.mjs"
+    mcr.microsoft.com/playwright:v1.63.0-noble bash -c "npm i -s playwright@1.63.0 >/dev/null 2>&1; node run.mjs && node mobile.mjs"
 fi

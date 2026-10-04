@@ -22,6 +22,7 @@ const origin = (r: RunInfo) => (r.missionId ? 'missão' : r.workflowRunId ? 'wor
 const sortKey = (r: RunInfo) => (r.state === 'running' || r.state === 'queued' || r.state === 'waiting_approval' ? '9' : '1') + (r.finishedAt ?? r.startedAt ?? '')
 
 export function RunsPage() {
+  const narrow = useYui((s) => s.narrow)
   const sel = useYui((s) => s.appParams.id)
   const live = useYui((s) => s.runs)
   const { data } = useApi<{ runs: RunInfo[] }>('/api/runs', [], 20000)
@@ -58,8 +59,8 @@ export function RunsPage() {
   const selectStyle = { ...input, height: 34, padding: '0 10px', width: 'auto', minWidth: 120 } as const
   return (
     <>
-      <section style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input aria-label="Buscar execuções" placeholder="Buscar tarefa ou resultado…" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...input, height: 34, flex: '1 1 220px' }} />
+      <section className={narrow ? 'app-filters-narrow' : undefined} style={narrow ? undefined : { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input aria-label="Buscar execuções" placeholder="Buscar tarefa ou resultado…" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...input, height: narrow ? 42 : 34, flex: '1 1 220px' }} />
         <select aria-label="Agente" value={agent} onChange={(e) => setAgent(e.target.value)} style={selectStyle}>
           <option value="">Todos os agentes</option>
           {agents.map((a) => <option key={a}>{a}</option>)}
@@ -94,22 +95,40 @@ export function RunsPage() {
             const [l, c] = STATE[r.state] ?? [r.state, C.t2]
             const on = r.id === sel
             return (
-              <button
-                key={r.id}
-                onClick={() => openApp('runs', r.id)}
-                className={on ? undefined : 'app-row'}
-                style={{
-                  display: 'grid', gridTemplateColumns: '14px 110px minmax(0,1fr) 110px 100px 70px', alignItems: 'center', gap: 12, width: '100%', padding: '10px', border: 'none', borderRadius: 10,
-                  background: on ? 'rgba(103,216,242,.07)' : 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer', fontSize: 13,
-                }}
-              >
-                <Dot c={c} size={7} pulse={r.state === 'running'} />
-                <span style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.agent}</span>
-                <span style={{ color: '#c9cde0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.task}</span>
-                <span className="app-mono" style={{ fontSize: 11.5, color: C.t2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.project ?? '—'}</span>
-                <span style={{ fontSize: 12, color: c }}>{r.state === 'running' ? `${l} ${r.progress}%` : l}</span>
-                <span className="app-mono" style={{ fontSize: 11, color: C.t3, textAlign: 'right' }}>{r.state === 'running' ? elapsed(r.startedAt) : relTime(r.finishedAt ?? r.startedAt)}</span>
-              </button>
+              narrow ? (
+                // Celular: cartão em 3 linhas (agente + estado · tarefa · projeto e tempo), sem colunas fixas.
+                <button
+                  key={r.id}
+                  onClick={() => openApp('runs', r.id)}
+                  className={on ? undefined : 'app-row'}
+                  style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%', padding: '12px 10px', border: 'none', borderBottom: '1px solid rgba(255,255,255,.05)', borderRadius: 10, background: on ? 'rgba(103,216,242,.07)' : 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer' }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600 }}>
+                    <Dot c={c} size={7} pulse={r.state === 'running'} />
+                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.agent}</span>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: c, whiteSpace: 'nowrap' }}>{r.state === 'running' ? `${l} ${r.progress}%` : l}</span>
+                  </span>
+                  <span style={{ fontSize: 13, color: '#c9cde0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.task}</span>
+                  <span className="app-mono" style={{ fontSize: 11.5, color: C.t3 }}>{r.project ?? 'sem projeto'} · {r.state === 'running' ? elapsed(r.startedAt) : relTime(r.finishedAt ?? r.startedAt)}</span>
+                </button>
+              ) : (
+                <button
+                  key={r.id}
+                  onClick={() => openApp('runs', r.id)}
+                  className={on ? undefined : 'app-row'}
+                  style={{
+                    display: 'grid', gridTemplateColumns: '14px 110px minmax(0,1fr) 110px 100px 70px', alignItems: 'center', gap: 12, width: '100%', padding: '10px', border: 'none', borderRadius: 10,
+                    background: on ? 'rgba(103,216,242,.07)' : 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer', fontSize: 13,
+                  }}
+                >
+                  <Dot c={c} size={7} pulse={r.state === 'running'} />
+                  <span style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.agent}</span>
+                  <span style={{ color: '#c9cde0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.task}</span>
+                  <span className="app-mono" style={{ fontSize: 11.5, color: C.t2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.project ?? '—'}</span>
+                  <span style={{ fontSize: 12, color: c }}>{r.state === 'running' ? `${l} ${r.progress}%` : l}</span>
+                  <span className="app-mono" style={{ fontSize: 11, color: C.t3, textAlign: 'right' }}>{r.state === 'running' ? elapsed(r.startedAt) : relTime(r.finishedAt ?? r.startedAt)}</span>
+                </button>
+              )
             )
           })}
         </section>

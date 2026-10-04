@@ -21,7 +21,8 @@ export function MiniOrb() {
   const [text, setText] = useState('')
   const [focused, setFocused] = useState(false)
   const [hover, setHover] = useState(false)
-  const lastMsg = useRef(msg)
+  const lastMsg = useRef<string | undefined>(undefined)
+  const mountedAt = useRef(Date.now())
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   useEffect(() => {
@@ -33,11 +34,13 @@ export function MiniOrb() {
   // fala nova da Yui com ela minimizada → bolha por ~8 s
   useEffect(() => {
     if (msg === lastMsg.current) return
+    // saudação do carregamento (primeiros segundos) não vira bolha
+    const first = lastMsg.current === undefined || Date.now() - mountedAt.current < 3000
     lastMsg.current = msg
-    if (!app || !msg) return
+    if (first || !app || !msg) return
     setBubble(msg)
     clearTimeout(timer.current)
-    timer.current = setTimeout(() => setBubble(null), 8000)
+    timer.current = setTimeout(() => setBubble(null), narrow ? 4000 : 8000)
   }, [msg, app])
   useEffect(() => {
     if (!app) setBubble(null)
@@ -62,9 +65,12 @@ export function MiniOrb() {
         <div
           role="status"
           aria-live="polite"
+          onClick={narrow ? () => exitApp() : undefined}
           style={{
-            position: 'absolute', right, bottom, zIndex: 46, maxWidth: narrow ? 'calc(100vw - 110px)' : 300, padding: '10px 14px',
-            borderRadius: '14px 14px 4px 14px', background: 'rgba(16,20,42,.92)', border: '1px solid rgba(160,170,255,.16)', backdropFilter: 'blur(14px)',
+            // celular: bolha acima do orb (não cobre conteúdo nem o campo), toque abre a conversa
+            position: 'absolute', right: narrow ? 14 : right, bottom: narrow ? bottom + 70 : bottom, zIndex: 46, maxWidth: narrow ? '70vw' : 300, padding: '10px 14px',
+            cursor: narrow ? 'pointer' : undefined,
+            borderRadius: narrow ? '14px 14px 4px 14px' : '14px 14px 4px 14px', background: 'rgba(16,20,42,.92)', border: '1px solid rgba(160,170,255,.16)', backdropFilter: 'blur(14px)',
             boxShadow: '0 18px 50px rgba(0,0,0,.4)', fontSize: 12.5, lineHeight: 1.45, color: '#c9cde0', animation: 'yui-pop .28s var(--ease)',
           }}
         >

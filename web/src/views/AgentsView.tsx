@@ -18,6 +18,7 @@ async function newAgent() {
 }
 
 export function AgentsView() {
+  const narrow = useYui((s) => s.narrow)
   const agentsWorking = useYui((s) => s.agentsWorking)
   const { data, loading, error } = useApi<AgentInfo[]>('/api/agents', [agentsWorking], 15000)
   useHeader('Agent network', 'Agentes', [
@@ -59,14 +60,24 @@ export function AgentsView() {
                   if (e.key === 'Enter') useYui.getState().show('agent', { agentId: ag.id })
                 }}
                 className="hov-row"
-                style={{ cursor: 'pointer', borderRadius: 8, display: 'grid', gridTemplateColumns: '30px minmax(80px,160px) minmax(0,1fr) minmax(0,100px) minmax(0,100px)', minWidth: 0, alignItems: 'center', gap: 14, padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,.04)', fontSize: 14 }}>
+                style={{ cursor: 'pointer', borderRadius: 8, display: 'grid', gridTemplateColumns: narrow ? '30px minmax(0,1fr) auto' : '30px minmax(80px,160px) minmax(0,1fr) minmax(0,100px) minmax(0,100px)', minWidth: 0, alignItems: 'center', gap: 14, padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,.04)', fontSize: 14 }}>
                 <span style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: dot, boxShadow: `0 0 10px ${dot}` }} />
                 </span>
-                <span style={{ fontWeight: 600 }}>{ag.name}</span>
-                <span style={{ color: run ? C.text : C.t3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ag.task ?? (wait ? 'Em espera' : 'Dormindo')}</span>
-                <span style={{ fontSize: 12, color: C.t3 }}>{ago(ag.lastActivity)}</span>
-                <span className="mono" style={{ fontSize: 12, color: C.t3 }}>{ag.nextWake ?? '—'}</span>
+                {narrow ? (
+                  // celular: nome + tarefa empilhados, só a última atividade à direita
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                    <span style={{ fontWeight: 600 }}>{ag.name}</span>
+                    <span style={{ fontSize: 12.5, color: run ? C.text : C.t3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ag.task ?? (wait ? 'Em espera' : 'Dormindo')}</span>
+                  </span>
+                ) : (
+                  <>
+                    <span style={{ fontWeight: 600 }}>{ag.name}</span>
+                    <span style={{ color: run ? C.text : C.t3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ag.task ?? (wait ? 'Em espera' : 'Dormindo')}</span>
+                  </>
+                )}
+                <span style={{ fontSize: 12, color: C.t3, whiteSpace: 'nowrap' }}>{ago(ag.lastActivity)}</span>
+                {!narrow && <span className="mono" style={{ fontSize: 12, color: C.t3 }}>{ag.nextWake ?? '—'}</span>}
               </div>
             )
           })}

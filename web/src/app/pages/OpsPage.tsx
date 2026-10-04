@@ -64,9 +64,9 @@ export function OpsPage() {
 
   return (
     <>
-      <section className="app-card" style={{ display: 'flex', alignItems: 'stretch', gap: 8, overflowX: 'auto' }} aria-label="Pipeline de execução">
+      <section className="app-card app-pipeline" aria-label="Pipeline de execução">
         {pipe.map((n, i) => (
-          <div key={n.k} style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 128 }}>
+          <div key={n.k} className="app-pipeline-step">
             <div
               style={{
                 flex: 1, minWidth: 0, padding: '10px 12px', borderRadius: 12, display: 'flex', flexDirection: 'column', gap: 3,
@@ -78,7 +78,7 @@ export function OpsPage() {
               <span style={{ fontSize: 11.5, color: n.c }}>{n.n}</span>
             </div>
             {i < pipe.length - 1 && (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.t4} strokeWidth="1.8" strokeLinecap="round" aria-hidden style={{ flexShrink: 0 }}>
+              <svg className="app-hide-narrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.t4} strokeWidth="1.8" strokeLinecap="round" aria-hidden style={{ flexShrink: 0 }}>
                 <path d="M5 12h14M13 6l6 6-6 6" />
               </svg>
             )}
@@ -90,7 +90,7 @@ export function OpsPage() {
         {COLS.map((col) => {
           const cards = d?.columns[col.key] ?? []
           return (
-            <div key={col.key} style={{ padding: 12, borderRadius: 16, background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.05)', display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, minHeight: 160 }}>
+            <div key={col.key} style={{ padding: 12, borderRadius: 16, background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.05)', display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }} className="app-kanban-col">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 4px 6px' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 600 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: col.color }} />

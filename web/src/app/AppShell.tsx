@@ -91,9 +91,9 @@ export function AppShell() {
         >
           <main
             key={`${page}:${idKey}`}
-            className="app-scroll app-main"
+            className="app-scroll app-main app-page"
             style={{
-              position: 'absolute', inset: 0, overflowY: 'auto', overflowX: 'hidden',
+              position: 'absolute', inset: 0, overflowY: 'auto', overflowX: 'clip', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
               padding: narrow ? 'calc(14px + env(safe-area-inset-top)) 14px calc(96px + env(safe-area-inset-bottom))' : '22px 28px 100px',
               display: 'flex', flexDirection: 'column', gap: 16,
             }}
