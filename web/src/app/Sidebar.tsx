@@ -25,6 +25,7 @@ const ICON: Record<AppPage, string> = {
   inbox: 'M4 13l2-8h12l2 8M4 13v6h16v-6M4 13h5l1 2h4l1-2h5',
   infra: 'M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01',
   company: 'M4 21V7l8-4 8 4v14M9 21v-6h6v6M8 10h.01M12 10h.01M16 10h.01',
+  help: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01',
   vault: 'M5 4h5v16H5zM10 4h4v16h-4zM15.5 5.2l3.8 1-3.4 13.6-3.8-1z',
   brain: 'M5 7.5a1.5 1.5 0 1 0 0-.01M18.5 5a1.5 1.5 0 1 0 0-.01M12 12.5a2 2 0 1 0 0-.01M6.5 19a1.5 1.5 0 1 0 0-.01M19 18a1.5 1.5 0 1 0 0-.01M6.3 8.4l4 3M17.4 6.2l-4 4.6M10.6 13.8l-3 3.8M13.6 13.6l4 3.2',
   settings:
@@ -142,7 +143,7 @@ export function Sidebar() {
         { id: 'tools', label: 'Conectores & MCP' },
       ],
     },
-    { name: 'Sistema', items: [{ id: 'infra', label: 'Infra & logs' }, { id: 'settings', label: 'Configurações' }] },
+    { name: 'Sistema', items: [{ id: 'infra', label: 'Infra & logs' }, { id: 'settings', label: 'Configurações' }, { id: 'help', label: 'Ajuda' }] },
   ]
 
   const togglePin = () => {

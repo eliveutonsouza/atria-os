@@ -28,6 +28,7 @@ export const PAGE_TITLES: Record<AppPage, [string, string]> = {
   settings: ['Configurações', 'Configurações'],
   vault: ['Conhecimento · vault Obsidian', 'Vault'],
   company: ['Conhecimento · empresa', 'Empresa'],
+  help: ['Sistema · ajuda', 'Ajuda'],
   brain: ['Vault · universo de conexões', 'Cérebro'],
 }
 
