@@ -9,6 +9,7 @@ import { emit } from './bus.ts';
 import { findAgent, agentsWorking, type AgentDef } from './agents.ts';
 import { ensureProject, findProject } from './projects.ts';
 import { agentOptions, runPromptExtras } from './extensions.ts';
+import { getSetting } from './settings.ts';
 
 // Eventos para a camada de conversa (live.ts / brain.ts) narrar o trabalho.
 export const runBus = new EventEmitter<{
@@ -356,7 +357,7 @@ async function execute(run: RunRow, ac: AbortController) {
       return { behavior: 'allow', updatedInput: input };
     }
     // Conectores/MCP com efeito externo irreversível (enviar e-mail, publicar, pagar…) pedem aprovação.
-    if (toolName.startsWith('mcp__') && SENSITIVE_MCP.test(toolName.split('__').pop() ?? '')) {
+    if (toolName.startsWith('mcp__') && getSetting('approvals.mcpSensitive') !== false && SENSITIVE_MCP.test(toolName.split('__').pop() ?? '')) {
       const ok = await requestApproval(
         run,
         `${agent.name} quer usar ${toolLabel(toolName)} (${toolName.split('__').pop()}).`,

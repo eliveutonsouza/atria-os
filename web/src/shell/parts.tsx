@@ -77,8 +77,9 @@ export function OrbLayer() {
 export function OrbButton({ w, h }: { w: number; h: number }) {
   const mode = useYui((s) => s.mode)
   const narrow = useYui((s) => s.narrow)
+  const app = useYui((s) => s.shellMode === 'app')
   const isC = mode === 'center', isF = mode === 'focus'
-  if (!(isF || (narrow && !isC))) return null
+  if (app || !(isF || (narrow && !isC))) return null
   const T = orbTarget(mode, narrow, w, h)
   return (
     <button
@@ -102,10 +103,18 @@ export function TopBar() {
   const inbox = useYui((s) => s.inbox)
   const status = useYui((s) => s.status)
   const narrow = useYui((s) => s.narrow)
+  const app = useYui((s) => s.shellMode === 'app')
   const name = projects.find((p) => p.slug === activeProject)?.name ?? activeProject ?? 'Nenhum'
   const set = useYui((s) => s.set)
   return (
-    <div style={{ position: 'absolute', top: 'env(safe-area-inset-top)', left: 'env(safe-area-inset-left)', right: 'env(safe-area-inset-right)', height: 60, padding: narrow ? '0 12px' : '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, zIndex: 30 }}>
+    <div
+      aria-hidden={app}
+      style={{
+        position: 'absolute', top: 'env(safe-area-inset-top)', left: 'env(safe-area-inset-left)', right: 'env(safe-area-inset-right)', height: 60, padding: narrow ? '0 12px' : '0 20px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, zIndex: 30,
+        transition: 'opacity .3s, transform .45s var(--ease), visibility .3s', opacity: app ? 0 : 1, transform: app ? 'translateY(-10px)' : 'none', pointerEvents: app ? 'none' : 'auto', visibility: app ? 'hidden' : 'visible',
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
         <button
           onClick={() => set({ palette: true, inboxOpen: false })}
@@ -178,7 +187,8 @@ export function YuiCenter() {
   const showLines = useYui((s) => s.showLines)
   const brief = useYui((s) => s.brief)
   const liveTranscript = useYui((s) => s.liveTranscript)
-  const isC = mode === 'center'
+  const app = useYui((s) => s.shellMode === 'app')
+  const isC = mode === 'center' && !app
   const [label, color] = STATE_META[yst] ?? STATE_META.idle
   const showSugg = !(short && showLines)
   return (
@@ -187,7 +197,7 @@ export function YuiCenter() {
       style={{
         position: 'absolute', left: 0, right: 0, top: short ? 'calc(24% + 80px)' : 'calc(36% + 104px)', bottom: 104, overflow: 'hidden',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: short ? 10 : 16, textAlign: 'center', padding: '0 24px', zIndex: 25,
-        transition: 'opacity .45s, transform .55s var(--ease)', opacity: isC ? 1 : 0, transform: isC ? 'none' : 'translateX(-80px) scale(.96)', pointerEvents: isC ? 'auto' : 'none',
+        transition: 'opacity .3s, transform .55s var(--ease), visibility .3s', opacity: isC ? 1 : 0, transform: isC ? 'none' : app ? 'translateY(14px) scale(.97)' : 'translateX(-80px) scale(.96)', pointerEvents: isC ? 'auto' : 'none', visibility: app ? 'hidden' : 'visible',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, letterSpacing: '.32em', color: C.t2, fontWeight: 600 }}>
@@ -227,8 +237,9 @@ export function YuiLeft() {
   const msg = useYui((s) => s.msg)
   const pending = useYui((s) => s.pending)
   const view = useYui((s) => s.view)
+  const app = useYui((s) => s.shellMode === 'app')
   const isC = mode === 'center', isF = mode === 'focus'
-  const vis = !isC && !isF && !narrow
+  const vis = !isC && !isF && !narrow && !app
   const [label, color] = STATE_META[yst] ?? STATE_META.idle
   const hasPending = !!pending && pending.view !== view
   return (
@@ -257,7 +268,17 @@ export function YuiLeft() {
 }
 
 // ---------- dock ----------
-export const dockInput: { el: HTMLInputElement | null } = { el: null }
+// Campo de texto ativo da Yui: o Dock (tela cheia) ou o mini campo junto ao orb minimizado (modo app).
+export const dockInput = {
+  yuiEl: null as HTMLInputElement | null,
+  miniEl: null as HTMLInputElement | null,
+  get el(): HTMLInputElement | null {
+    return useYui.getState().shellMode === 'app' ? this.miniEl : this.yuiEl
+  },
+  set el(v: HTMLInputElement | null) {
+    this.yuiEl = v
+  },
+}
 
 export function Dock() {
   const mode = useYui((s) => s.mode)
@@ -267,8 +288,10 @@ export function Dock() {
   const muted = useYui((s) => s.liveMuted)
   const voiceMode = useYui((s) => s.voiceMode)
   const pending = useYui((s) => s.pending)
+  const app = useYui((s) => s.shellMode === 'app')
   const [input, setInput] = useState('')
   const isC = mode === 'center', isF = mode === 'focus'
+  const hide = isF || app
   const send = () => {
     const t = input.trim()
     if (!t) return
@@ -289,7 +312,8 @@ export function Dock() {
     <div
       style={{
         position: 'absolute', bottom: 'calc(22px + env(safe-area-inset-bottom))', left: isC || narrow ? 16 : '24%', right: isC || narrow ? 16 : 28, display: 'flex', justifyContent: 'center', zIndex: 40,
-        transition: 'all .55s var(--ease)', opacity: isF ? 0 : 1, pointerEvents: isF ? 'none' : 'auto',
+        transition: 'opacity .3s, transform .5s var(--ease), left .55s var(--ease), right .55s var(--ease), visibility .3s', opacity: hide ? 0 : 1, pointerEvents: hide ? 'none' : 'auto',
+        transform: app ? 'translateY(16px)' : 'none', visibility: app ? 'hidden' : 'visible',
       }}
     >
       <div
@@ -310,7 +334,7 @@ export function Dock() {
         </button>
         <input
           ref={(el) => {
-            dockInput.el = el
+            dockInput.yuiEl = el
           }}
           aria-label="Mensagem para Yui"
           value={input}

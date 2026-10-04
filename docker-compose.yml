@@ -10,6 +10,7 @@ services:
       TZ: America/Sao_Paulo
       YUI_DOCKER_API: http://yui-dockerproxy:2375
       YUI_HOST_PROC: /host/proc
+      YUI_BROWSER_CDP: http://yui-browser:9223
     volumes:
       - yui-data:/data
       - yui-workspace:/workspace
@@ -25,8 +26,8 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.routers.yui-console.rule=Host(`${YUI_DOMAIN}`)
-      - traefik.http.routers.yui-console.entrypoints=websecure
-      - traefik.http.routers.yui-console.tls.certresolver=letsencrypt
+      - traefik.http.routers.yui-console.entrypoints=${YUI_TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.yui-console.tls.certresolver=${YUI_TRAEFIK_CERTRESOLVER:-letsencrypt}
       - traefik.http.routers.yui-console.service=yui-console
       - traefik.http.services.yui-console.loadbalancer.server.port=8080
 
@@ -35,23 +36,38 @@ services:
   yui-browser:
     image: mcr.microsoft.com/playwright/mcp@sha256:77dccc5ce9e94cb8ae7ebea87ddbb6cd54b05760c4d63c54e16accf2726b8734 # v0.0.82
     restart: unless-stopped
-    entrypoint: ["node", "/app/cli.js"]
+    # Chromium com CDP (9223 via proxy, assistido ao vivo pelo console) + Playwright MCP (8931) ligado a ele.
+    entrypoint: ["/bin/sh", "/browser/entrypoint.sh"]
     user: "0" # volume do perfil nasce root; chromium já roda com --no-sandbox num container isolado
-    command:
-      - --headless
-      - --browser=chromium
-      - --no-sandbox
-      - --host=0.0.0.0
-      - --port=8931
-      - --allowed-hosts=yui-browser,yui-browser:8931
-      - --user-data-dir=/profile
-      - --output-dir=/workspace/.yui/browser
-      - --viewport-size=1440x900
     volumes:
       - yui-browser-profile:/profile
       - yui-workspace:/workspace
+      - ./browser:/browser:ro
     shm_size: 1g
     mem_limit: 1g
+    labels:
+      - traefik.enable=false
+
+  # TLS automático para VPS sem proxy próprio (profile "edge", ativado pelo install.sh quando não há Traefik).
+  # Com Traefik já rodando no host, este serviço fica desligado e valem as labels do yui-console.
+  yui-caddy:
+    image: caddy:2.11-alpine
+    profiles: ["edge"]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      YUI_DOMAIN: ${YUI_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - yui-caddy-data:/data
+      - yui-caddy-config:/config
+    depends_on:
+      - yui-console
+    mem_limit: 128m
     labels:
       - traefik.enable=false
 
@@ -70,6 +86,8 @@ services:
       - traefik.enable=false
 
 volumes:
+  yui-caddy-data:
+  yui-caddy-config:
   yui-data:
   yui-workspace:
   yui-browser-profile:

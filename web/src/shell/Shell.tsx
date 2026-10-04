@@ -7,6 +7,7 @@ import { sendContextDebounced } from '../lib/actions'
 import { ApprovalModal, CommandPalette, HistoryDrawer, Inbox, UpdateToast } from '../overlays/Overlays'
 import { pttDown, pttUp, toggleLive } from '../voice/live'
 import { AppShell } from '../app/AppShell'
+import { toggleApp } from '../app/nav'
 import type { AppPage } from '@shared/protocol'
 import { useYui, type Mode } from '../store/yui'
 import { CanvasPanel } from './CanvasPanel'
@@ -191,6 +192,12 @@ function onKey(e: KeyboardEvent) {
   onPttDown(e)
   const s = useYui.getState()
   const mod = e.metaKey || e.ctrlKey
+  // Ctrl/⌘+J: alterna entre conversar com a Yui (tela cheia) e o dashboard
+  if (mod && e.key.toLowerCase() === 'j') {
+    e.preventDefault()
+    toggleApp()
+    return
+  }
   if (mod && e.key.toLowerCase() === 'k') {
     e.preventDefault()
     s.set({ palette: !s.palette, inboxOpen: false })

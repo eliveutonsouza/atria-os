@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { InboxItem, RepoInfo, ViewName } from '@shared/protocol'
 import { api } from '../api/client'
+import { enterApp } from '../app/nav'
 import { applyUpdate, disablePush, enablePush, isIOS, isStandalone, promptInstall, testPush } from '../pwa/pwa'
 import { resolveApproval } from '../lib/actions'
 import { C, toneColor } from '../lib/colors'
@@ -89,6 +90,7 @@ export function CommandPalette() {
     const close = () => s().set({ palette: false })
     const go = (v: ViewName, params = {}) => () => s().show(v, params)
     const all: PalItem[] = [
+      { label: 'Abrir dashboard', hint: 'Ctrl J', fn: () => { close(); enterApp(s().appPage) } },
       { label: 'Falar com Yui', hint: 'Ctrl L', fn: () => { close(); setTimeout(() => dockInput.el?.focus(), 30) } },
       { label: 'Morning brief', hint: 'view', fn: go('brief') },
       { label: 'Dashboard', hint: 'view', fn: go('dashboard') },

@@ -18,6 +18,10 @@ import { brainExtensions, type ToolCtx } from './extensions.ts';
 
 // 429 (limite de tokens/min da conta) acontece sob carga: o SDK respeita retry-after com backoff.
 export const openai = new OpenAI({ apiKey: config.openaiKey || 'missing', maxRetries: 4 });
+// Chave trocada nas Configurações → o mesmo cliente (importado por voz, missões, workflows) passa a usá-la.
+export function refreshOpenAI() {
+  openai.apiKey = config.openaiKey || 'missing';
+}
 
 let uiContext: ChatContext = { view: null, mode: 'center' };
 export function setUiContext(ctx: ChatContext) {
@@ -35,7 +39,9 @@ export function recentMessages(limit = 24): { who: 'user' | 'yui'; text: string;
   return (db.prepare('SELECT who, text, at FROM messages ORDER BY at DESC LIMIT ?').all(limit) as { who: 'user' | 'yui'; text: string; at: string }[]).reverse();
 }
 
-const INSTRUCTIONS = `Você é o raciocínio por trás da Yui, a assistente do Yui Console — a central pessoal de IA do ${config.userName}.
+// Nome do dono vem das Configurações (pode mudar com o servidor no ar).
+const ownerName = () => (config.userName ? `de ${config.userName}` : 'do usuário');
+const instructionsText = () => `Você é o raciocínio por trás da Yui, a assistente do Yui Console — a central pessoal de IA ${ownerName()}.
 A Yui conversa (por voz ou texto) e você decide o que fazer usando ferramentas. A força de execução são agentes Claude Code (delegate_task).
 
 Como responder:
@@ -264,7 +270,7 @@ function dryResult(name: string): unknown {
 }
 
 const allTools = () => [...TOOLS, ...brainExtensions().flatMap((e) => e.tools)];
-const allInstructions = () => [INSTRUCTIONS, ...brainExtensions().map((e) => e.instructions).filter(Boolean)].join('\n');
+const allInstructions = () => [instructionsText(), ...brainExtensions().map((e) => e.instructions).filter(Boolean)].join('\n');
 
 // Retorna a frase final da Yui. Efeitos de UI já foram emitidos durante o loop.
 export async function think({ request, dryRun = false, calls }: ThinkInput): Promise<string> {

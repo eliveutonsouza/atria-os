@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ServerEvent } from '../../shared/protocol.ts';
 import { db, kvGet, kvSet, now } from './db.ts';
 import { onEmit } from './bus.ts';
+import { getSetting } from './settings.ts';
 
 // Notificações push (PWA): aprovações, falhas e conclusões chegam no celular/desktop mesmo com o app fechado.
 // Só envia quando nenhuma tela do console está visível (presença enviada pelo app a cada 30 s).
@@ -33,8 +34,13 @@ interface PushMsg {
   priority?: 'high' | 'normal';
 }
 
-export async function sendPush(msg: PushMsg, opts: { force?: boolean } = {}): Promise<number> {
+// Tipo da notificação (approval | failed | done) filtrado pela configuração "notify.types".
+const allowed = (kind: 'approval' | 'failed' | 'done') =>
+  String(getSetting('notify.types') ?? 'approval,failed,done').split(',').map((s) => s.trim()).includes(kind);
+
+export async function sendPush(msg: PushMsg, opts: { force?: boolean; kind?: 'approval' | 'failed' | 'done' } = {}): Promise<number> {
   if (!opts.force && Date.now() - lastVisible < VISIBLE_MS) return 0;
+  if (!opts.force && opts.kind && !allowed(opts.kind)) return 0;
   const subs = db.prepare('SELECT endpoint, keys FROM push_subscriptions').all() as { endpoint: string; keys: string }[];
   let sent = 0;
   await Promise.all(
@@ -73,15 +79,15 @@ function onEvent(ev: ServerEvent) {
   switch (ev.type) {
     case 'approval.requested':
       if (once(`approval:${ev.approval.id}`))
-        void sendPush({ title: 'Aprovação necessária', body: ev.approval.title, url: '/', tag: `approval-${ev.approval.id}`, priority: 'high' });
+        void sendPush({ title: 'Aprovação necessária', body: ev.approval.title, url: '/app/inbox', tag: `approval-${ev.approval.id}`, priority: 'high' }, { kind: 'approval' });
       break;
     case 'run.updated': {
       const r = ev.run;
       if (r.missionId || r.workflowRunId) break; // missão/workflow avisam no fim do conjunto
       if (r.state === 'failed' && once(`run-failed:${r.id}`))
-        void sendPush({ title: `${r.agent} não conseguiu concluir`, body: short(r.result ?? r.task), url: `/runs/${r.id}`, tag: `run-${r.id}`, priority: 'high' });
+        void sendPush({ title: `${r.agent} não conseguiu concluir`, body: short(r.result ?? r.task), url: `/app/runs/${r.id}`, tag: `run-${r.id}`, priority: 'high' }, { kind: 'failed' });
       if (r.state === 'done' && once(`run-done:${r.id}`))
-        void sendPush({ title: `${r.agent} concluiu`, body: short(r.result ?? r.task), url: `/runs/${r.id}`, tag: `run-${r.id}` });
+        void sendPush({ title: `${r.agent} concluiu`, body: short(r.result ?? r.task), url: `/app/runs/${r.id}`, tag: `run-${r.id}` }, { kind: 'done' });
       break;
     }
     case 'mission.updated': {
@@ -89,7 +95,7 @@ function onEvent(ev: ServerEvent) {
       if (['done', 'failed', 'blocked'].includes(m.status) && once(`mission:${m.id}:${m.status}`)) {
         const title = m.status === 'done' ? `Missão concluída · ${m.title}` : `Missão precisa de atenção · ${m.title}`;
         const last = [...m.steps].reverse().find((s) => s.result);
-        void sendPush({ title, body: short(last?.result ?? m.goal), url: `/missions/${m.id}`, tag: `mission-${m.id}`, priority: m.status === 'done' ? 'normal' : 'high' });
+        void sendPush({ title, body: short(last?.result ?? m.goal), url: `/app/missions/${m.id}`, tag: `mission-${m.id}`, priority: m.status === 'done' ? 'normal' : 'high' }, { kind: m.status === 'done' ? 'done' : 'failed' });
       }
       break;
     }
@@ -100,10 +106,10 @@ function onEvent(ev: ServerEvent) {
         void sendPush({
           title: w.status === 'done' ? `Workflow concluído · ${w.workflow}` : `Workflow falhou · ${w.workflow}`,
           body: short(results.at(-1) ?? ''),
-          url: `/workflows/${w.workflow}`,
+          url: `/app/workflows/${w.workflow}`,
           tag: `wf-${w.id}`,
           priority: w.status === 'done' ? 'normal' : 'high',
-        });
+        }, { kind: w.status === 'done' ? 'done' : 'failed' });
       }
       break;
     }

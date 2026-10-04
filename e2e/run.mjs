@@ -138,6 +138,49 @@ await check('chat: gráfico sob medida', async () => {
   await page.screenshot({ path: `${SHOTS}/custom-chart.png` });
 });
 
+// ---------- v3: dashboard ----------
+await check('sidebar abre na borda e entra no dashboard', async () => {
+  await openRoute('/');
+  await page.mouse.move(3, 450);
+  await page.waitForTimeout(700);
+  const nav = page.locator('nav[aria-label]').filter({ hasText: 'Visão geral' }).first();
+  if (!(await nav.isVisible())) throw new Error('sidebar não apareceu');
+  await nav.getByText('Agentes', { exact: true }).first().click();
+  await page.waitForURL((u) => u.pathname === '/app/agents', { timeout: 8000 });
+  await page.waitForTimeout(900);
+  await page.screenshot({ path: `${SHOTS}/v3-app-agents.png` });
+});
+
+await check('orb minimizado volta para a Yui', async () => {
+  await openRoute('/app');
+  await page.getByRole('button', { name: /Falar com a Yui/ }).first().click();
+  await page.waitForURL((u) => u.pathname === '/', { timeout: 8000 });
+});
+
+for (const pg of ['', 'ops', 'agents', 'runs', 'missions', 'workflows', 'schedule', 'projects', 'browser', 'terminal', 'claude', 'tools', 'inbox', 'infra', 'settings']) {
+  await check(`app /${pg || 'overview'}`, async () => {
+    await openRoute(`/app${pg ? `/${pg}` : ''}`);
+    await page.waitForTimeout(600);
+    const body = await page.locator('body').innerText();
+    if (/em construção/i.test(body)) throw new Error('stub');
+    await page.screenshot({ path: `${SHOTS}/v3-${pg || 'overview'}.png` });
+  });
+}
+
+await check('navegador ao vivo recebe frames', async () => {
+  await openRoute('/app/browser');
+  await page.waitForTimeout(4000);
+  const ok = await page.evaluate(() => [...document.querySelectorAll('img')].some((i) => i.naturalWidth > 200 && /^(blob:|data:image)/.test(i.src)));
+  if (!ok) throw new Error('sem frame');
+});
+
+await check('configurações + setup status', async () => {
+  const st = JSON.parse((await api('/api/setup/status')).body);
+  if (st.needsPassword) throw new Error('pede senha em produção');
+  const s = JSON.parse((await api('/api/settings')).body);
+  if (!s.values || !s.secrets) throw new Error('settings sem payload');
+});
+
 await check('mobile centro', async () => {
   const m = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: await ctx.storageState() });
   const mp = await m.newPage();

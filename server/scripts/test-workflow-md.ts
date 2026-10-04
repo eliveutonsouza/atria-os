@@ -39,7 +39,7 @@ test('post-instagram: estrutura', () => {
   const def = parseWorkflowMarkdown(readFileSync(join(seedDir, 'post-instagram.md'), 'utf8'));
   assert.equal(def.slug, 'post-instagram');
   assert.equal(def.trigger.type, 'manual');
-  assert.equal(def.project, 'eliveuton-instagram');
+  assert.equal(def.project, null); // seed genérico: sem projeto fixo
   const d = def.nodes.find((n) => n.id === '4')!;
   assert.equal(d.type, 'decision');
   assert.deepEqual(d.branches, [{ label: 'sim', to: '5' }, { label: 'não', to: '2' }]);

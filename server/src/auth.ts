@@ -1,8 +1,9 @@
 import { randomBytes } from 'node:crypto';
-import { verify } from '@node-rs/argon2';
+import { hash, verify } from '@node-rs/argon2';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { config } from './config.ts';
 import { db, kvSet, now } from './db.ts';
+import { setRaw } from './settings.ts';
 
 const COOKIE = 'yui_sid';
 const TTL_DAYS = 30;
@@ -25,6 +26,22 @@ export async function requireAuth(req: FastifyRequest, reply: FastifyReply): Pro
   kvSet('last_active', now());
 }
 
+// Cria sessão e grava o cookie (login e primeiro acesso).
+export function startSession(reply: FastifyReply) {
+  const token = randomBytes(32).toString('base64url');
+  const expires = new Date(Date.now() + TTL_DAYS * 86400_000);
+  db.prepare('INSERT INTO sessions(token, created_at, expires_at) VALUES(?, ?, ?)').run(token, now(), expires.toISOString());
+  db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now());
+  reply.setCookie(COOKIE, token, { path: '/', httpOnly: true, sameSite: 'strict', secure: config.secureCookies, expires });
+}
+
+export const hasPassword = () => !!config.passwordHash;
+
+export async function setPassword(plain: string) {
+  if (plain.length < 8) throw new Error('A senha precisa de pelo menos 8 caracteres.');
+  setRaw('auth.passwordHash', await hash(plain));
+}
+
 export function registerAuth(app: FastifyInstance): void {
   app.post(
     '/api/auth/login',
@@ -34,17 +51,27 @@ export function registerAuth(app: FastifyInstance): void {
       if (typeof password !== 'string' || !config.passwordHash) return reply.code(401).send({ error: 'invalid' });
       const ok = await verify(config.passwordHash, password).catch(() => false);
       if (!ok) return reply.code(401).send({ error: 'invalid' });
-      const token = randomBytes(32).toString('base64url');
-      const expires = new Date(Date.now() + TTL_DAYS * 86400_000);
-      db.prepare('INSERT INTO sessions(token, created_at, expires_at) VALUES(?, ?, ?)').run(token, now(), expires.toISOString());
-      db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now());
-      reply.setCookie(COOKIE, token, {
-        path: '/',
-        httpOnly: true,
-        sameSite: 'strict',
-        secure: config.secureCookies,
-        expires,
-      });
+      startSession(reply);
+      return reply.code(204).send();
+    },
+  );
+
+  // Trocar senha (logado). Encerra as outras sessões.
+  app.post(
+    '/api/auth/password',
+    { config: { rateLimit: { max: 6, timeWindow: '10 minutes' } } },
+    async (req, reply) => {
+      if (!isAuthed(req)) return reply.code(401).send({ error: 'unauthorized' });
+      const b = (req.body ?? {}) as { current?: unknown; next?: unknown };
+      if (typeof b.current !== 'string' || typeof b.next !== 'string') return reply.code(400).send({ error: 'Informe a senha atual e a nova.' });
+      const ok = config.passwordHash ? await verify(config.passwordHash, b.current).catch(() => false) : false;
+      if (!ok) return reply.code(403).send({ error: 'Senha atual incorreta.' });
+      try {
+        await setPassword(b.next);
+      } catch (e) {
+        return reply.code(400).send({ error: (e as Error).message });
+      }
+      db.prepare('DELETE FROM sessions WHERE token != ?').run(req.cookies[COOKIE] ?? '');
       return reply.code(204).send();
     },
   );

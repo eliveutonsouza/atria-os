@@ -29,11 +29,18 @@ interface GuideCat {
 const KIND_LABEL: Record<GuideCard['kind'], string> = { slash: 'comando', flag: 'CLI', shortcut: 'atalho', concept: 'conceito' }
 const KIND_COLOR: Record<GuideCard['kind'], string> = { slash: C.cyan, flag: C.lav, shortcut: C.warn, concept: C.t2 }
 
+// No dashboard (/app) abre a página Terminal; no modo Yui abre o terminal no Canvas.
+function openTerm(kind: 'claude' | 'shell', cmd?: string) {
+  const s = useYui.getState()
+  if (s.shellMode === 'app') s.set({ viewParams: { ...s.viewParams, kind, cmd }, appPage: 'terminal', appParams: {} })
+  else s.show('terminal', { kind, cmd })
+}
+
 function openInTerminal(c: GuideCard) {
   if (!c.command) return
   // Comandos do shell (claude --bg, claude -c…) vão para a aba Shell; slash commands para a aba Claude.
   const shell = c.kind === 'flag' || c.command.startsWith('claude')
-  useYui.getState().show('terminal', { kind: shell ? 'shell' : 'claude', cmd: c.command })
+  openTerm(shell ? 'shell' : 'claude', c.command)
 }
 
 export function ClaudeGuideView() {
@@ -44,8 +51,8 @@ export function ClaudeGuideView() {
   const [cat, setCat] = useState<string | null>(null)
 
   useHeader('Claude Code · mapa', 'O Claude Code no dia a dia', [
-    { label: 'Abrir terminal', fn: () => useYui.getState().show('terminal', { kind: 'claude' }) },
-    { label: 'Ferramentas', fn: () => useYui.getState().show('tools') },
+    { label: 'Abrir terminal', fn: () => openTerm('claude') },
+    { label: 'Ferramentas', fn: () => (useYui.getState().shellMode === 'app' ? useYui.getState().set({ appPage: 'tools', appParams: {} }) : useYui.getState().show('tools')) },
   ])
 
   const installed = useMemo(() => new Set([...(init?.slashCommands ?? []), ...(init?.skills ?? [])]), [init])
@@ -125,7 +132,7 @@ export function ClaudeGuideView() {
           <span className="eyebrow" style={{ color: C.lav }}>Skills instaladas neste Claude · {skillsFound.length}</span>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {skillsFound.map((s) => (
-              <Chip key={s} onClick={() => useYui.getState().show('terminal', { kind: 'claude', cmd: `/${s} ` })} title="Abrir no terminal">
+              <Chip key={s} onClick={() => openTerm('claude', `/${s} `)} title="Abrir no terminal">
                 /{s}
               </Chip>
             ))}

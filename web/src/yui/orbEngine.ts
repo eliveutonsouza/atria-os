@@ -10,7 +10,9 @@ interface Star { x: number; y: number; z: number; p: number }
 interface Wave { r: number; al: number }
 interface Spark { x: number; y: number; vx: number; vy: number; l: number }
 
-export function orbTarget(mode: Mode, narrow: boolean, w: number, h: number) {
+export function orbTarget(mode: Mode, narrow: boolean, w: number, h: number, app = false) {
+  // modo app (dashboard): Yui minimizada no canto inferior direito
+  if (app) return narrow ? { x: w - 48, y: h - 52, r: 18 } : { x: w - 58, y: h - 58, r: 22 }
   if (mode === 'center') {
     const sh = h < 760
     return { x: w / 2, y: sh ? h * 0.24 : h * 0.36, r: sh ? Math.min(56, h * 0.075) : Math.min(76, h * 0.085) }
@@ -43,7 +45,7 @@ export class OrbEngine {
   private density: number
   private unsub: () => void
   private a = {
-    x: 0, y: 0, r: 60, int: 0.6, spd: 1, t: 0,
+    x: 0, y: 0, r: 60, int: 0.6, spd: 1, t: 0, vx: 0, vy: 0,
     stars: [] as Star[], waves: [] as Wave[], sparks: [] as Spark[], parts: [] as Part[],
     flash: 0, lastWave: 0, col: [103, 216, 242] as RGB, col2: [166, 140, 247] as RGB, init: false,
   }
@@ -117,10 +119,15 @@ export class OrbEngine {
     const S = useYui.getState()
     const rm = this.prm, k = rm ? 0.25 : 1
     a.t += dt * k
-    const T = orbTarget(S.mode, S.narrow, w, h)
+    const T = orbTarget(S.mode, S.narrow, w, h, S.shellMode === 'app')
     if (!a.init) { a.x = T.x; a.y = T.y; a.r = T.r; a.init = true }
     const e = 1 - Math.exp(-dt * (rm ? 20 : 6))
-    a.x += (T.x - a.x) * e; a.y += (T.y - a.y) * e; a.r += (T.r - a.r) * e
+    // voo até o canto (e de volta) um pouco mais lento e com leve mola: orb "flutua" para o lugar
+    const dist = Math.hypot(T.x - a.x, T.y - a.y)
+    const ef = dist > 40 && !rm ? 1 - Math.exp(-dt * 4.2) : e
+    a.vx = (a.vx ?? 0) * 0.82 + (T.x - a.x) * ef * 0.18
+    a.vy = (a.vy ?? 0) * 0.82 + (T.y - a.y) * ef * 0.18
+    a.x += (T.x - a.x) * ef + (rm ? 0 : a.vx * 0.35); a.y += (T.y - a.y) * ef + (rm ? 0 : a.vy * 0.35); a.r += (T.r - a.r) * ef
     const st = S.yst
     const P = PARAMS[st] || [0.55, 1]
     a.int += (P[0] - a.int) * e; a.spd += (P[1] - a.spd) * e

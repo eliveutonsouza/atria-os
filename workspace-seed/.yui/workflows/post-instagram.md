@@ -2,7 +2,6 @@
 nome: Post Instagram
 descricao: Pesquisa tendências, escreve a legenda, gera a imagem e publica no Instagram depois da sua aprovação.
 gatilho: manual
-projeto: eliveuton-instagram
 time: [research, copy, designer, assistente]
 ---
 
