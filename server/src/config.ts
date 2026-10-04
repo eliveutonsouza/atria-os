@@ -60,6 +60,7 @@ export const config = {
   },
   browserMcpUrl: env('YUI_BROWSER_MCP', 'http://yui-browser:8931/mcp'),
   browserCdp: env('YUI_BROWSER_CDP', 'http://yui-browser:9223'),
+  codeUrl: env('YUI_CODE_URL', 'http://yui-code:3000'),
   dockerApi: env('YUI_DOCKER_API', 'http://yui-dockerproxy:2375'),
   hostProc: env('YUI_HOST_PROC', '/host/proc'),
   timezone: env('TZ', 'America/Sao_Paulo'),

@@ -1,0 +1,58 @@
+{
+  "showTags": false,
+  "showAttachments": false,
+  "showOrphans": true,
+  "colorGroups": [
+    {
+      "query": "path:01-Projeto",
+      "color": {
+        "a": 1,
+        "rgb": 6805746
+      }
+    },
+    {
+      "query": "path:02-Decisoes",
+      "color": {
+        "a": 1,
+        "rgb": 16102730
+      }
+    },
+    {
+      "query": "path:03-Agentes",
+      "color": {
+        "a": 1,
+        "rgb": 10915063
+      }
+    },
+    {
+      "query": "path:04-Execucoes",
+      "color": {
+        "a": 1,
+        "rgb": 5234864
+      }
+    },
+    {
+      "query": "path:05-Projetos",
+      "color": {
+        "a": 1,
+        "rgb": 13352191
+      }
+    },
+    {
+      "query": "path:06-Ideias",
+      "color": {
+        "a": 1,
+        "rgb": 16223432
+      }
+    },
+    {
+      "query": "path:Diario",
+      "color": {
+        "a": 1,
+        "rgb": 14672883
+      }
+    }
+  ],
+  "lineSizeMultiplier": 1,
+  "nodeSizeMultiplier": 1.1
+}

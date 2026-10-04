@@ -30,7 +30,9 @@ export type ViewName =
   | 'workflow'
   | 'workflows'
   | 'routines'
-  | 'claude';
+  | 'claude'
+  | 'vault'
+  | 'brain';
 
 export const VIEW_NAMES: ViewName[] = [
   'brief',
@@ -52,6 +54,8 @@ export const VIEW_NAMES: ViewName[] = [
   'workflows',
   'routines',
   'claude',
+  'vault',
+  'brain',
 ];
 
 export interface ViewParams {
@@ -66,6 +70,7 @@ export interface ViewParams {
   workflowRunId?: string;
   tab?: string; // aba interna (tools: connectors|mcp|skills|plugins|apps)
   cmd?: string; // terminal: texto digitado ao conectar (sem Enter)
+  note?: string; // vault/brain: caminho da nota no vault
 }
 
 export type Tone = 'ok' | 'warn' | 'crit' | 'cyan' | 'lav' | 'muted';
@@ -248,6 +253,7 @@ export type ServerEvent =
   | { type: 'mission.updated'; mission: MissionInfo }
   | { type: 'workflow.run.updated'; run: WorkflowRunInfo }
   | { type: 'custom.created'; view: CustomViewInfo }
+  | { type: 'vault.changed'; paths: string[]; at: number }
   | { type: 'ping' };
 
 // ---------- REST ----------
@@ -433,7 +439,8 @@ export interface RoutineInfo {
 // ---------- v3: dashboard ----------
 export type AppPage =
   | 'overview' | 'ops' | 'agents' | 'runs' | 'missions' | 'workflows' | 'schedule' | 'projects'
-  | 'browser' | 'terminal' | 'claude' | 'tools' | 'inbox' | 'infra' | 'settings';
+  | 'browser' | 'terminal' | 'claude' | 'tools' | 'inbox' | 'infra' | 'settings'
+  | 'vault' | 'brain';
 
 export interface StatsOverview {
   kpis: { runsToday: number; runsYesterday: number; success7d: number | null; failed7d: number; agentsActive: number; agentsTotal: number; approvals: number; cost7d: number; tokens7d: number };
@@ -503,3 +510,98 @@ export type BrowserClientMsg =
   | { type: 'mouse'; event: 'mousePressed' | 'mouseReleased' | 'mouseMoved' | 'mouseWheel'; x: number; y: number; button?: 'left' | 'right' | 'none'; clickCount?: number; deltaX?: number; deltaY?: number }
   | { type: 'key'; event: 'keyDown' | 'keyUp' | 'char'; key: string; code?: string; text?: string }
   | { type: 'viewport'; width: number; height: number };
+
+// ---------- Vault (Obsidian) + Cérebro ----------
+// GET  /api/vault/tree                      -> VaultTreeEntry[]
+// GET  /api/vault/file?path=                -> VaultFile
+// PUT  /api/vault/file {path, text, baseMtime?} -> {mtime} (409 se mudou)
+// POST /api/vault/file {path, text?}        -> {path} (cria; 409 se existe)
+// DELETE /api/vault/file?path=              -> 204
+// POST /api/vault/move {from, to}           -> {path}
+// GET  /api/vault/graph                     -> VaultGraphPayload
+// GET  /api/vault/backlinks?path=           -> VaultBacklink[]
+// GET  /api/vault/rings?path=&depth=        -> VaultRing[]
+// GET  /api/vault/path?from=&to=            -> {path: string[] | null}
+// GET  /api/vault/suggest?path=             -> VaultSuggestion[]
+// POST /api/vault/link {from, to}           -> 204 (acrescenta [[to]] em "## Relacionadas")
+// GET  /api/vault/status                    -> VaultStatus
+// GET  /api/vault/search?q=                 -> VaultSearchHit[]
+
+export interface VaultTreeEntry {
+  path: string; // relativo ao vault, "/" como separador
+  name: string;
+  dir: boolean;
+  depth: number;
+  size?: number;
+  mtime?: number;
+  count?: number; // notas dentro (pastas)
+}
+
+export interface VaultFile {
+  path: string;
+  text: string;
+  mtime: number;
+  title: string;
+  tags: string[];
+  props: Record<string, string>;
+}
+
+export interface VaultNode {
+  id: string; // path (ou "ghost:<nome>" para link para nota inexistente)
+  title: string;
+  folder: string;
+  tags: string[];
+  mtime: number;
+  words: number;
+  ghost?: boolean;
+}
+
+export interface VaultLink {
+  s: string;
+  t: string;
+  kind: 'link' | 'embed' | 'tag';
+}
+
+export interface VaultGraphPayload {
+  nodes: VaultNode[];
+  links: VaultLink[];
+  folders: { name: string; count: number }[];
+  at: number;
+}
+
+export interface VaultBacklink {
+  path: string;
+  title: string;
+  line: number;
+  snippet: string;
+}
+
+export interface VaultRing {
+  id: string;
+  ring: number;
+  via: string | null;
+  dir: 'out' | 'in' | 'both' | null;
+}
+
+export interface VaultSuggestion {
+  id: string;
+  title: string;
+  score: number;
+  reason: string;
+}
+
+export interface VaultSearchHit {
+  path: string;
+  title: string;
+  line: number;
+  snippet: string;
+}
+
+export interface VaultStatus {
+  notes: number;
+  links: number;
+  pending: number; // arquivos alterados ainda sem commit
+  lastCommitAt: string | null;
+  lastCommitMsg: string | null;
+  editor: boolean; // sidecar VS Code respondendo
+}
