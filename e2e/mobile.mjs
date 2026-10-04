@@ -4,7 +4,7 @@ import { chromium, webkit, devices } from 'playwright';
 
 const B = process.env.YUI_URL ?? 'https://yui.eliveutonsouza.cloud';
 const SHOTS = process.env.YUI_SHOTS ?? '/e2e/shots/mobile';
-const ROUTES = ['/', '/agents', '/runs', '/tools', '/claude', '/routines', '/app', '/app/ops', '/app/agents', '/app/agents/backend', '/app/runs', '/app/missions', '/app/workflows', '/app/workflows/post-instagram', '/app/schedule', '/app/projects', '/app/browser', '/app/terminal', '/app/claude', '/app/tools', '/app/inbox', '/app/infra', '/app/settings', '/app/vault', '/app/brain', '/app/company', '/app/company/documentos', '/app/company/busca'];
+const ROUTES = ['/', '/agents', '/runs', '/tools', '/claude', '/routines', '/app', '/app/ops', '/app/agents', '/app/agents/backend', '/app/runs', '/app/missions', '/app/workflows', '/app/workflows/post-instagram', '/app/schedule', '/app/projects', '/app/browser', '/app/terminal', '/app/claude', '/app/tools', '/app/inbox', '/app/infra', '/app/settings', '/app/vault', '/app/brain', '/app/company', '/app/company/documentos', '/app/company/busca', '/app/help', '/app/help/guia%3Aworkflows', '/app/help/resultados', '/app/help/faq'];
 const OWN_SCROLL = '.xterm, .react-flow, [data-own-scroll]';
 const fails = [];
 let state = null; // sessão reaproveitada entre navegadores (o login tem limite anti-força-bruta)

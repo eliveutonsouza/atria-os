@@ -1,0 +1,44 @@
+---
+titulo: Missões
+grupo: Organizar
+pagina: missions
+ordem: 1
+resumo: Para pedidos grandes, a Yui monta um plano com várias etapas e agentes, roda na ordem certa e para nas etapas arriscadas.
+usar_quando: Quando o pedido envolve mais de uma especialidade ou várias entregas (site completo, auditoria, campanha, pesquisa mais conteúdo).
+nao_usar_quando: Para algo que se repete sempre do mesmo jeito, use Workflows; para uma tarefa simples de um agente, só peça à Yui.
+frases:
+  - "Yui, cria uma landing page para uma clínica de fisioterapia no projeto clinica-site."
+  - "Faz uma auditoria completa de segurança e desempenho do Stoqmate."
+  - "Como está a missão?"
+  - "Pausa a missão."
+  - "Tenta de novo a etapa que falhou."
+dicas:
+  - Diga tudo no primeiro pedido (público, tom, referências, projeto). Cada etapa recebe uma instrução fechada e não ouve a conversa.
+  - Etapas sem dependência rodam em paralelo; as que dependem recebem o resultado das anteriores.
+  - Etapas que publicam, fazem deploy, enviam mensagem, gastam dinheiro ou apagam algo pedem seu OK antes de começar.
+erros:
+  - Usar missão para uma tarefa pequena. Ela vira 2 a 8 etapas e gasta mais do que uma delegação direta.
+  - Esquecer o projeto. Sem projeto, as etapas trabalham numa pasta de rascunho do workspace.
+relacionados: [workflows, aprovacoes, execucoes, projetos]
+---
+# Missões
+
+## O que é
+Uma missão é um plano de execução: o objetivo vira de 2 a 8 etapas, cada uma com um agente, ligadas por dependências. O plano aparece na tela e começa sozinho. Você acompanha cada etapa e o grafo mostra o que já terminou.
+
+## Passo a passo
+1. **Peça algo grande.** Fale com a Yui ou clique em **+ Nova missão** (aqui ou na Visão geral) e descreva o objetivo.
+2. **Confira o plano.** A missão abre com as Etapas, o agente de cada uma e o estado (na fila, trabalhando, aguardando seu OK, concluída, falhou, pulada).
+3. **Aprove as etapas arriscadas.** Elas ficam "aguardando seu OK" até você decidir em Aprovações.
+4. **Controle o andamento.** Botões **Pausar**, **Retomar**, **Cancelar** e, se algo falhar, **Tentar de novo**.
+5. **Veja as entregas.** Clique numa etapa para abrir a execução e o resultado.
+
+## O que você vê na tela
+- Lista de missões à esquerda: título, estado (rodando, pausada, precisa de você, concluída, falhou, cancelada), agentes e "x/y etapas".
+- Plano à direita com grafo das etapas e a lista detalhada.
+- "Precisa de você": há etapa falhada ou aprovação pendente.
+
+## Exemplos do dia a dia
+- Novo cliente quer site → missão com Designer, Copy, Frontend e QA; o deploy final pede OK.
+- Auditoria antes de entregar um sistema → missão com Security, QA e Report.
+- Uma etapa falhou por falta de acesso → resolva o acesso e diga "tenta de novo a missão".

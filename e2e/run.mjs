@@ -178,7 +178,7 @@ await check('orb minimizado volta para a Yui', async () => {
   await page.waitForURL((u) => u.pathname === '/', { timeout: 8000 });
 });
 
-for (const pg of ['', 'ops', 'agents', 'runs', 'missions', 'workflows', 'schedule', 'projects', 'browser', 'terminal', 'claude', 'tools', 'inbox', 'infra', 'settings', 'vault', 'brain', 'company']) {
+for (const pg of ['', 'ops', 'agents', 'runs', 'missions', 'workflows', 'schedule', 'projects', 'browser', 'terminal', 'claude', 'tools', 'inbox', 'infra', 'settings', 'vault', 'brain', 'company', 'help']) {
   await check(`app /${pg || 'overview'}`, async () => {
     await openRoute(`/app${pg ? `/${pg}` : ''}`);
     await page.waitForTimeout(600);
@@ -335,6 +335,28 @@ await check('empresa: excluir apaga tudo', async () => {
   for (const id of companyIds) if ((await api(`/api/company/documents/${id}`)).status !== 404) throw new Error('ainda existe');
   const s = await api('/api/company/search', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query: 'ZEBRA-4471' }) });
   if (JSON.parse(s.body).hits.some((h) => companyIds.includes(h.docId))) throw new Error('busca ainda acha documento excluído');
+});
+
+// ---------- Ajuda ----------
+await check('ajuda: índice, guia, pergunte e resultados', async () => {
+  const idx = JSON.parse((await api('/api/help')).body);
+  if (idx.guias.length < 18 || idx.receitas.length < 10 || idx.faq.length < 15) throw new Error(`índice ${idx.guias.length}/${idx.receitas.length}/${idx.faq.length}`);
+  const a = JSON.parse((await api('/api/help/ask', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pergunta: 'como agendo um workflow toda segunda?' }) })).body);
+  if (a.semResposta || !a.fontes.some((f) => ['workflows', 'agendamentos', 'agendar-relatorio'].includes(f.id))) throw new Error(`pergunte: ${JSON.stringify(a.fontes)}`);
+  const r = JSON.parse((await api('/api/help/results?period=month')).body);
+  const sum = r.rows.reduce((s, x) => s + x.count * x.minutes, 0) / 60;
+  if (Math.abs(sum - r.hours) > 0.2) throw new Error(`horas ${r.hours} vs ${sum}`);
+  for (const [path, label] of [['/app/help', 'inicio'], ['/app/help/guia%3Aworkflows', 'guia'], ['/app/help/receitas', 'receitas'], ['/app/help/resultados', 'resultados'], ['/app/help/faq', 'faq']]) {
+    await openRoute(path);
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: `${SHOTS}/ajuda-${label}.png` });
+  }
+  await openRoute('/app/help/guia%3Aworkflows');
+  await page.getByText('Passo a passo').first().waitFor({ timeout: 6000 });
+  await openRoute('/app/vault');
+  await page.getByRole('button', { name: 'Ajuda desta tela' }).click();
+  await page.waitForURL((u) => u.pathname.startsWith('/app/help/guia'), { timeout: 6000 });
+  if (!decodeURIComponent(page.url()).includes('guia:vault')) throw new Error(`? abriu ${page.url()}`);
 });
 
 await check('mobile centro', async () => {
