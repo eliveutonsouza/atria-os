@@ -15,6 +15,8 @@ import { SettingsPage } from './SettingsPage'
 import { TerminalPage } from './TerminalPage'
 import { ToolsPage } from './ToolsPage'
 import { WorkflowsPage } from './WorkflowsPage'
+import { VaultPage } from './VaultPage'
+import { BrainPage } from './BrainPage'
 
 // Registro das páginas do dashboard (/app/<página>). Cada página lê `appParams.id` quando tem detalhe.
 export const PAGES: Record<AppPage, ComponentType> = {
@@ -33,4 +35,6 @@ export const PAGES: Record<AppPage, ComponentType> = {
   inbox: InboxPage,
   infra: InfraPage,
   settings: SettingsPage,
+  vault: VaultPage,
+  brain: BrainPage,
 }

@@ -4,6 +4,14 @@ import { MOCK } from './client'
 
 let yuiStreaming = false
 
+// Vault: páginas (Vault, Cérebro) assinam mudanças de notas para atualizar ao vivo.
+type VaultListener = (paths: string[], at: number) => void
+const vaultListeners = new Set<VaultListener>()
+export function onVaultChanged(fn: VaultListener): () => void {
+  vaultListeners.add(fn)
+  return () => vaultListeners.delete(fn)
+}
+
 export function applyUiAction(a: UiAction) {
   const s = useYui.getState()
   switch (a.type) {
@@ -95,6 +103,9 @@ export function applyEvent(ev: ServerEvent) {
     case 'live.status':
       s.set({ listening: ev.active, liveMuted: ev.muted, status: { ...s.status, live: ev.active } })
       if (!ev.active && (s.yst === 'listening' || s.yst === 'speaking')) s.set({ yst: useYui.getState().baseState() })
+      break
+    case 'vault.changed':
+      for (const fn of vaultListeners) fn(ev.paths, ev.at)
       break
     case 'ping':
       break

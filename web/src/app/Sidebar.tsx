@@ -24,6 +24,8 @@ const ICON: Record<AppPage, string> = {
   tools: 'M14 7l3-3 3 3-3 3M4 20l9-9M10 4a4 4 0 0 0 5 5',
   inbox: 'M4 13l2-8h12l2 8M4 13v6h16v-6M4 13h5l1 2h4l1-2h5',
   infra: 'M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01',
+  vault: 'M5 4h5v16H5zM10 4h4v16h-4zM15.5 5.2l3.8 1-3.4 13.6-3.8-1z',
+  brain: 'M5 7.5a1.5 1.5 0 1 0 0-.01M18.5 5a1.5 1.5 0 1 0 0-.01M12 12.5a2 2 0 1 0 0-.01M6.5 19a1.5 1.5 0 1 0 0-.01M19 18a1.5 1.5 0 1 0 0-.01M6.3 8.4l4 3M17.4 6.2l-4 4.6M10.6 13.8l-3 3.8M13.6 13.6l4 3.2',
   settings:
     'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z',
 }
@@ -120,6 +122,13 @@ export function Sidebar() {
         { id: 'workflows', label: 'Workflows', count: p?.workflows || undefined },
         { id: 'schedule', label: 'Agendamentos' },
         { id: 'projects', label: 'Projetos' },
+      ],
+    },
+    {
+      name: 'Conhecimento',
+      items: [
+        { id: 'vault', label: 'Vault' },
+        { id: 'brain', label: 'Cérebro' },
       ],
     },
     {

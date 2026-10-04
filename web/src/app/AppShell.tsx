@@ -26,6 +26,8 @@ export const PAGE_TITLES: Record<AppPage, [string, string]> = {
   inbox: ['Aprovações', 'O que precisa de você'],
   infra: ['Infra & logs', 'Minha VPS'],
   settings: ['Configurações', 'Configurações'],
+  vault: ['Conhecimento · vault Obsidian', 'Vault'],
+  brain: ['Vault · universo de conexões', 'Cérebro'],
 }
 
 // Cabeçalho padrão ao trocar de página; a página (ou a view reaproveitada) sobrescreve via useHeader.
