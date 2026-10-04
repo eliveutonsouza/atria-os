@@ -4,14 +4,16 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
+import httpProxy from '@fastify/http-proxy';
 import { timingSafeEqual } from 'node:crypto';
+import { connect } from 'node:net';
 import { cpSync, existsSync, readFileSync, statSync, statfsSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import type { Bootstrap, ChatContext } from '../../shared/protocol.ts';
 import { config } from './config.ts';
 import { db, kvGet, kvSet, now } from './db.ts';
 import { addClient, emit, setYuiState, yuiState } from './bus.ts';
-import { isAuthed, registerAuth, requireAuth } from './auth.ts';
+import { isAuthed, isAuthedCookieHeader, registerAuth, requireAuth } from './auth.ts';
 import { agentInfos, agentsWorking } from './agents.ts';
 import { activeProject, ensureProject, findProject, listProjectConfigs, projectDetail, projectLogs, projectSummaries, setActiveProject } from './projects.ts';
 import { cancelRun, claudeLoggedIn, enqueueRun, getRun, inboxItems, listRuns, pendingApprovals, recoverRuns, resolveApproval, runEvents } from './runs.ts';
@@ -331,18 +333,97 @@ app.get('/sandbox/:token/:slug/*', async (req, reply) => {
   return readFileSync(file);
 });
 
+// ---------- editor VS Code (sidecar yui-code) ----------
+// Só o console alcança o yui-code (rede interna, sem token próprio): a sessão do Yui é checada aqui,
+// inclusive no upgrade de WebSocket. O helmet do app não vale para /code (o VS Code roda em iframe
+// do próprio console e precisa de eval/workers que o CSP do app proíbe).
+const codeAuth = async (req: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply) => {
+  if (isAuthed(req)) return;
+  const nav = req.method === 'GET' && (req.headers.accept ?? '').includes('text/html');
+  if (nav) return reply.redirect('/login');
+  return reply.code(401).send({ error: 'unauthorized' });
+};
+const stripSid = (cookie: string | undefined) => (cookie ?? '').split(/;\s*/).filter((c) => c && !c.startsWith('yui_sid=')).join('; ');
+await app.register(httpProxy, {
+  upstream: config.codeUrl,
+  prefix: '/code',
+  rewritePrefix: '/code',
+  preHandler: codeAuth,
+  replyOptions: {
+    rewriteRequestHeaders: (_req, headers) => {
+      const cookie = stripSid(headers.cookie as string | undefined);
+      const { cookie: _c, ...rest } = headers;
+      return cookie ? { ...rest, cookie } : rest;
+    },
+    onError: (reply) => {
+      reply.code(502).type('text/html').send('<body style="background:#06070d;color:#9aa0bb;font-family:sans-serif;padding:40px">O editor (yui-code) não está respondendo. Tente de novo em alguns segundos.</body>');
+    },
+  },
+});
+app.addHook('onSend', async (req, reply, payload) => {
+  if (req.url === '/code' || req.url.startsWith('/code/')) {
+    reply.removeHeader('content-security-policy');
+    reply.removeHeader('x-frame-options');
+    reply.header('Content-Security-Policy', "frame-ancestors 'self'");
+  }
+  return payload;
+});
+
 // ---------- SPA ----------
 if (existsSync(config.webDist)) {
   await app.register(fastifyStatic, { root: config.webDist, wildcard: false, index: false });
   const indexHtml = () => readFileSync(join(config.webDist, 'index.html'), 'utf8');
   app.get('/assets/*', (req, reply) => reply.sendFile(req.url.slice(1).split('?')[0]));
   app.setNotFoundHandler((req, reply) => {
-    if (req.url.startsWith('/api/') || req.url.startsWith('/sandbox/')) return reply.code(404).send({ error: 'not found' });
+    if (req.url.startsWith('/api/') || req.url.startsWith('/sandbox/') || req.url.startsWith('/code/')) return reply.code(404).send({ error: 'not found' });
     const path = req.url.split('?')[0];
     const f = join(config.webDist, path);
     if (path !== '/' && f.startsWith(config.webDist) && existsSync(f) && statSync(f).isFile()) return reply.sendFile(path.slice(1));
     if (!isAuthed(req) && path !== '/login') return reply.redirect('/login');
     reply.type('text/html').send(indexHtml());
+  });
+}
+
+// WebSocket do VS Code: o @fastify/websocket trata todo upgrade; /code passa por aqui antes,
+// com a sessão checada, num túnel TCP cru até o yui-code.
+await app.ready();
+{
+  const upgrades = app.server.listeners('upgrade') as ((...a: unknown[]) => void)[];
+  app.server.removeAllListeners('upgrade');
+  const up = new URL(config.codeUrl);
+  app.server.on('upgrade', (req: import('node:http').IncomingMessage, socket: import('node:net').Socket, head: Buffer) => {
+    if (!(req.url === '/code' || req.url?.startsWith('/code/'))) {
+      for (const l of upgrades) l.call(app.server, req, socket, head);
+      return;
+    }
+    if (!isAuthedCookieHeader(req.headers.cookie)) {
+      socket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+      return;
+    }
+    const target = connect(Number(up.port || 80), up.hostname, () => {
+      const lines = [`${req.method} ${req.url} HTTP/1.1`];
+      for (let i = 0; i < req.rawHeaders.length; i += 2) {
+        const k = req.rawHeaders[i];
+        let v = req.rawHeaders[i + 1];
+        if (k.toLowerCase() === 'host') v = up.host;
+        if (k.toLowerCase() === 'cookie') {
+          v = v.split(/;\s*/).filter((c) => c && !c.startsWith('yui_sid=')).join('; ');
+          if (!v) continue;
+        }
+        lines.push(`${k}: ${v}`);
+      }
+      target.write(`${lines.join('\r\n')}\r\n\r\n`);
+      if (head?.length) target.write(head);
+      socket.pipe(target).pipe(socket);
+    });
+    const kill = () => {
+      socket.destroy();
+      target.destroy();
+    };
+    target.on('error', kill);
+    socket.on('error', kill);
+    socket.on('close', () => target.destroy());
+    target.on('close', () => socket.destroy());
   });
 }
 

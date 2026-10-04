@@ -23,6 +23,7 @@ services:
       - no-new-privileges:true
     depends_on:
       - yui-dockerproxy
+      - yui-code
     labels:
       - traefik.enable=true
       - traefik.http.routers.yui-console.rule=Host(`${YUI_DOMAIN}`)
@@ -45,6 +46,23 @@ services:
       - ./browser:/browser:ro
     shm_size: 1g
     mem_limit: 1g
+    labels:
+      - traefik.enable=false
+
+  # VS Code open source para o Vault e os projetos. Sem porta pública nem Traefik: o yui-console
+  # checa a sessão e repassa /code (HTTP + WebSocket). Mesmo uid (1000) do console no volume.
+  yui-code:
+    build: ./code
+    image: yui-code:local
+    restart: unless-stopped
+    volumes:
+      - yui-workspace:/workspace
+    environment:
+      TZ: America/Sao_Paulo
+    mem_limit: 1536m
+    cpus: "1.5"
+    security_opt:
+      - no-new-privileges:true
     labels:
       - traefik.enable=false
 

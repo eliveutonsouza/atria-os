@@ -36,6 +36,14 @@ async function chat(text) {
 }
 
 await check('login', async () => {
+  // YUI_E2E_SESSION: token de sessão temporário (criado no banco pelo operador) em vez da senha
+  if (process.env.YUI_E2E_SESSION) {
+    await ctx.addCookies([{ name: 'yui_sid', value: process.env.YUI_E2E_SESSION, url: B, httpOnly: true, secure: B.startsWith('https'), sameSite: 'Strict' }]);
+    await page.goto(B + '/');
+    await page.waitForTimeout(1500);
+    if (page.url().includes('login')) throw new Error('sessão inválida');
+    return;
+  }
   await page.goto(B + '/login');
   await page.fill('input[type=password]', process.env.YUI_E2E_PASSWORD);
   await page.keyboard.press('Enter');
@@ -157,7 +165,7 @@ await check('orb minimizado volta para a Yui', async () => {
   await page.waitForURL((u) => u.pathname === '/', { timeout: 8000 });
 });
 
-for (const pg of ['', 'ops', 'agents', 'runs', 'missions', 'workflows', 'schedule', 'projects', 'browser', 'terminal', 'claude', 'tools', 'inbox', 'infra', 'settings']) {
+for (const pg of ['', 'ops', 'agents', 'runs', 'missions', 'workflows', 'schedule', 'projects', 'browser', 'terminal', 'claude', 'tools', 'inbox', 'infra', 'settings', 'vault', 'brain']) {
   await check(`app /${pg || 'overview'}`, async () => {
     await openRoute(`/app${pg ? `/${pg}` : ''}`);
     await page.waitForTimeout(600);
@@ -179,6 +187,71 @@ await check('configurações + setup status', async () => {
   if (st.needsPassword) throw new Error('pede senha em produção');
   const s = JSON.parse((await api('/api/settings')).body);
   if (!s.values || !s.secrets) throw new Error('settings sem payload');
+});
+
+// ---------- Vault + VS Code + Cérebro ----------
+const E2E_NOTE = `00-Inbox/E2E ${Date.now()}.md`;
+await check('vault: API cria nota e indexa link/backlink', async () => {
+  const r = await api('/api/vault/file', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: E2E_NOTE, text: '# E2E\n[[Yui Console]] #e2e' }) });
+  if (r.status !== 200) throw new Error(`criar ${r.status} ${r.body}`);
+  await page.waitForTimeout(800);
+  const g = JSON.parse((await api('/api/vault/graph')).body);
+  if (!g.links.some((l) => l.s === E2E_NOTE && l.t === '01-Projeto/Yui Console.md')) throw new Error('link não indexado');
+  const b = JSON.parse((await api(`/api/vault/backlinks?path=${encodeURIComponent('01-Projeto/Yui Console.md')}`)).body);
+  if (!b.some((x) => x.path === E2E_NOTE)) throw new Error('backlink ausente');
+  const bad = await api('/api/vault/file?path=../../etc/passwd');
+  if (bad.status !== 400) throw new Error(`path traversal ${bad.status}`);
+});
+
+await check('vault: /code exige login e serve o VS Code', async () => {
+  const anon = await fetch(`${B}/code/`, { redirect: 'manual' });
+  if (anon.status !== 302 && anon.status !== 401) throw new Error(`sem login ${anon.status}`);
+  const r = await api('/code/');
+  if (r.status !== 200 || !r.body.includes('workbench')) throw new Error(`logado ${r.status}`);
+});
+
+await check('vault: página com VS Code carregado e leitura', async () => {
+  await openRoute(`/app/vault/${encodeURIComponent('01-Projeto/Vault & Cérebro.md')}`);
+  const frame = page.frameLocator('iframe[title="VS Code"]');
+  await frame.locator('.monaco-workbench').waitFor({ timeout: 45000 });
+  await frame.locator('.tab', { hasText: 'Vault & Cérebro.md' }).first().waitFor({ timeout: 30000 });
+  await page.screenshot({ path: `${SHOTS}/vault-editor.png` });
+  await page.getByRole('button', { name: 'Leitura' }).click();
+  await page.locator('.vault-read a.vlink').first().waitFor({ timeout: 8000 });
+  await page.screenshot({ path: `${SHOTS}/vault-read.png` });
+  await page.getByRole('button', { name: 'Editor' }).click();
+});
+
+await check('cérebro: universo desenha e busca seleciona estrela', async () => {
+  await openRoute('/app/brain');
+  await page.waitForTimeout(1500);
+  const lit = await page.evaluate(() => {
+    const c = document.querySelector('canvas[aria-label="Universo de notas do vault"]');
+    if (!c) return -1;
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4 * 97) if (d[i] + d[i + 1] + d[i + 2] > 120) n++;
+    return n;
+  });
+  if (lit <= 20) throw new Error(`canvas vazio (${lit})`);
+  const input = page.locator('input[placeholder^="Buscar estrela"]');
+  await input.fill('Vault & Cérebro');
+  await input.press('Enter');
+  await page.locator('[aria-label="Nota selecionada"]').getByText('Vault & Cérebro').first().waitFor({ timeout: 8000 });
+  await page.screenshot({ path: `${SHOTS}/brain.png` });
+});
+
+await check('cérebro: constelação abre', async () => {
+  await openRoute(`/app/brain/${encodeURIComponent('01-Projeto/Vault & Cérebro.md')}`);
+  await page.locator('canvas[aria-label^="Constelação da nota"]').waitFor({ timeout: 8000 });
+  await page.locator('[aria-label="Prévia da nota"]').waitFor({ timeout: 8000 });
+  await page.waitForTimeout(1200);
+  await page.screenshot({ path: `${SHOTS}/constellation.png` });
+});
+
+await check('vault: limpa nota de teste', async () => {
+  const r = await api(`/api/vault/file?path=${encodeURIComponent(E2E_NOTE)}`, { method: 'DELETE' });
+  if (r.status !== 204) throw new Error(`apagar ${r.status}`);
 });
 
 await check('mobile centro', async () => {

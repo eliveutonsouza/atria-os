@@ -14,6 +14,12 @@ function validSession(token: string | undefined): boolean {
   return !!row && row.expires_at > now();
 }
 
+// Para upgrades crus (WebSocket fora do roteamento do Fastify).
+export function isAuthedCookieHeader(header: string | undefined): boolean {
+  const m = (header ?? '').match(/(?:^|;\s*)yui_sid=([^;]+)/);
+  return validSession(m ? decodeURIComponent(m[1]) : undefined);
+}
+
 export function isAuthed(req: FastifyRequest): boolean {
   return validSession(req.cookies[COOKIE]);
 }

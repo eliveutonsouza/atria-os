@@ -474,6 +474,25 @@ export function register(app: FastifyInstance) {
     })(req, reply),
   );
   app.get('/api/vault/search', (req) => search((req.query as Q).q ?? ''));
+  // Ponte com o VS Code (extensão yui-bridge no yui-code): pedir para abrir e saber o que está aberto.
+  const bridge = (f: string) => join(config.workspaceDir, '.yui', f);
+  app.post('/api/vault/open', (req, reply) =>
+    wrap(() => {
+      const b = (req.body ?? {}) as { path?: string; line?: number };
+      const p = safePath(b.path, { mustExist: true });
+      writeFileSync(bridge('.editor-open.json'), JSON.stringify({ path: p.abs.replace(realpathSync(vaultRoot()), join(config.workspaceDir, '.yui', 'vault')), line: Number(b.line) || 0, at: Date.now() }));
+      return reply.code(204).send(undefined);
+    })(req, reply),
+  );
+  app.get('/api/vault/editor-state', () => {
+    try {
+      const st = JSON.parse(readFileSync(bridge('.editor-state.json'), 'utf8')) as { path: string; at: number };
+      const prefix = join(config.workspaceDir, '.yui', 'vault') + '/';
+      return { path: st.path.startsWith(prefix) ? st.path.slice(prefix.length) : null, abs: st.path, at: st.at };
+    } catch {
+      return { path: null, abs: null, at: 0 };
+    }
+  });
   app.post('/api/vault/commit', async () => {
     await commitNow();
     return status();

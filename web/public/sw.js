@@ -33,7 +33,7 @@ self.addEventListener('message', (e) => {
 });
 
 const bypass = (url) =>
-  url.origin !== location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/sandbox') || url.pathname === '/sw.js';
+  url.origin !== location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/sandbox') || url.pathname === '/code' || url.pathname.startsWith('/code/') || url.pathname === '/sw.js';
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;

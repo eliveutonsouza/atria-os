@@ -1,0 +1,11 @@
+{
+  "name": "yui-bridge",
+  "displayName": "Yui Bridge",
+  "description": "Liga o VS Code ao Yui Console: abre a nota escolhida no console e informa qual arquivo está aberto.",
+  "version": "0.1.0",
+  "publisher": "yui",
+  "engines": { "vscode": "^1.80.0" },
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "extensionKind": ["workspace"]
+}

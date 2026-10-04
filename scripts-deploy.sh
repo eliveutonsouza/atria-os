@@ -24,6 +24,7 @@ for i in $(seq 1 30); do
 done
 echo "container: $st"
 if [ "$E2E" = 1 ] && [ -f e2e/run.mjs ]; then
-  docker run --rm --network host -v "$PWD/e2e:/e2e" -w /e2e -e YUI_E2E_PASSWORD="${YUI_E2E_PASSWORD:?defina YUI_E2E_PASSWORD}" \
+  [ -n "${YUI_E2E_PASSWORD:-}${YUI_E2E_SESSION:-}" ] || { echo "defina YUI_E2E_PASSWORD (ou YUI_E2E_SESSION)"; exit 1; }
+  docker run --rm --network host -v "$PWD/e2e:/e2e" -w /e2e -e YUI_E2E_PASSWORD="${YUI_E2E_PASSWORD:-}" -e YUI_E2E_SESSION="${YUI_E2E_SESSION:-}" \
     mcr.microsoft.com/playwright:v1.63.0-noble bash -c "npm i -s playwright@1.63.0 >/dev/null 2>&1; node run.mjs && node mobile.mjs"
 fi

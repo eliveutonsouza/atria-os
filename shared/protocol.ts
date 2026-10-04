@@ -605,3 +605,11 @@ export interface VaultStatus {
   lastCommitMsg: string | null;
   editor: boolean; // sidecar VS Code respondendo
 }
+
+// POST /api/vault/open {path, line?}        -> 204 (VS Code abre a nota)
+// GET  /api/vault/editor-state              -> VaultEditorState (arquivo ativo no VS Code)
+export interface VaultEditorState {
+  path: string | null; // relativo ao vault (null = fora do vault)
+  abs: string | null;
+  at: number;
+}

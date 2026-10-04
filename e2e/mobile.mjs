@@ -4,7 +4,7 @@ import { chromium, webkit, devices } from 'playwright';
 
 const B = process.env.YUI_URL ?? 'https://yui.eliveutonsouza.cloud';
 const SHOTS = process.env.YUI_SHOTS ?? '/e2e/shots/mobile';
-const ROUTES = ['/', '/agents', '/runs', '/tools', '/claude', '/routines', '/app', '/app/ops', '/app/agents', '/app/agents/backend', '/app/runs', '/app/missions', '/app/workflows', '/app/workflows/post-instagram', '/app/schedule', '/app/projects', '/app/browser', '/app/terminal', '/app/claude', '/app/tools', '/app/inbox', '/app/infra', '/app/settings'];
+const ROUTES = ['/', '/agents', '/runs', '/tools', '/claude', '/routines', '/app', '/app/ops', '/app/agents', '/app/agents/backend', '/app/runs', '/app/missions', '/app/workflows', '/app/workflows/post-instagram', '/app/schedule', '/app/projects', '/app/browser', '/app/terminal', '/app/claude', '/app/tools', '/app/inbox', '/app/infra', '/app/settings', '/app/vault', '/app/brain'];
 const OWN_SCROLL = '.xterm, .react-flow, [data-own-scroll]';
 const fails = [];
 let state = null; // sessão reaproveitada entre navegadores (o login tem limite anti-força-bruta)
@@ -13,6 +13,10 @@ for (const [engine, device] of [[webkit, 'iPhone 14'], [chromium, 'iPhone 14'], 
   const browser = await engine.launch();
   const ctx = await browser.newContext({ ...devices[device], ...(state ? { storageState: state } : {}) });
   const page = await ctx.newPage();
+  if (!state && process.env.YUI_E2E_SESSION) {
+    await ctx.addCookies([{ name: 'yui_sid', value: process.env.YUI_E2E_SESSION, url: B, httpOnly: true, secure: B.startsWith('https'), sameSite: 'Strict' }]);
+    state = await ctx.storageState();
+  }
   if (!state) {
     await page.goto(B + '/login');
     await page.fill('input[type=password]', process.env.YUI_E2E_PASSWORD);
