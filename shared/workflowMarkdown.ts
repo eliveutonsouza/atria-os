@@ -238,6 +238,7 @@ const edgeText = (s: string) => s.replace(/["|]/g, '').replace(/[\r\n]+/g, ' ').
 export interface MermaidOpts {
   current?: string | null; // passo em execução (destacado)
   status?: Record<string, 'done' | 'skipped' | 'failed'>;
+  compact?: boolean; // sem cores (classDef) — para prompts de agentes
 }
 
 // Fluxograma do workflow em Mermaid: formas por tipo, agente na caixa das tarefas, rótulos nos ramos.
@@ -256,6 +257,15 @@ export function toMermaid(def: Pick<WorkflowDef, 'nodes'>, opts: MermaidOpts = {
     } else {
       for (const t of n.next ?? []) if (ids.has(t)) lines.push(`  ${id(n.id)} --> ${id(t)}`);
     }
+  }
+  if (opts.compact) {
+    const st = opts.status ?? {};
+    for (const [k, cls] of [['done', 'feito'], ['skipped', 'pulado'], ['failed', 'falhou']] as const) {
+      const g = def.nodes.filter((n) => st[n.id] === k).map((n) => id(n.id));
+      if (g.length) lines.push(`  class ${g.join(',')} ${cls}`);
+    }
+    if (opts.current && ids.has(opts.current)) lines.push(`  class ${id(opts.current)} atual`);
+    return lines.join('\n');
   }
   lines.push(
     '  classDef t_start fill:#1b2045,stroke:#8c92ad,color:#e8eaf4',

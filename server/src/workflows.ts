@@ -80,7 +80,7 @@ function runDiagram(ex: Exec, current: string): string {
     else if (st.status === 'skipped') status[id] = 'skipped';
     else if (st.status === 'failed' || st.status === 'cancelled') status[id] = 'failed';
   }
-  return toMermaid(ex.def, { current, status });
+  return toMermaid(ex.def, { current, status, compact: true });
 }
 
 export function loadWorkflow(slug: string): WorkflowDef | null {
@@ -683,7 +683,7 @@ export function register(app: FastifyInstance): void {
             });
             emit({ type: 'ui.action', action: { type: 'show_view', view: 'workflow', params: { workflowId: w.slug } } });
             setYuiState('showing');
-            return { ok: true, slug: w.slug, nome: w.name, fluxo: toMermaid(w), passos: w.nodes.map((n) => `${n.id}. ${n.title}${n.agent ? ` (${n.agent})` : ''}`), gatilho: w.trigger, erros: validateWorkflow(w) };
+            return { ok: true, slug: w.slug, nome: w.name, fluxo: toMermaid(w, { compact: true }), passos: w.nodes.map((n) => `${n.id}. ${n.title}${n.agent ? ` (${n.agent})` : ''}`), gatilho: w.trigger, erros: validateWorkflow(w) };
           })();
         case 'run_workflow':
           return (async () => {
@@ -705,7 +705,7 @@ export function register(app: FastifyInstance): void {
           const w = findWf(args.slug);
           if (!w) return Promise.resolve({ ok: false, error: 'workflow não encontrado', disponiveis: listWorkflows().map((x) => x.slug) });
           return Promise.resolve({
-            ok: true, slug: w.slug, nome: w.name, gatilho: w.trigger, fluxo: toMermaid(w),
+            ok: true, slug: w.slug, nome: w.name, gatilho: w.trigger, fluxo: toMermaid(w, { compact: true }),
             passos: w.nodes.map((n) => ({ id: n.id, tipo: n.type, titulo: n.title, agente: n.agent ?? null, instrucao: n.instruction ?? null, condicao: n.condition ?? null })),
             erros: validateWorkflow(w),
           });
