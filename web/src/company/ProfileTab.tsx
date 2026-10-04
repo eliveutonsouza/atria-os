@@ -119,13 +119,13 @@ export function ProfileTab() {
                 {logo(profile?.hasLogo ? 92 : 56, 14, 22)}
                 <span style={{ fontSize: 11 }}>{logoBusy ? 'Enviando…' : profile?.hasLogo ? 'Trocar logo' : 'Enviar logo'}</span>
               </button>
-              <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden onChange={(e) => onLogo(e.target.files?.[0])} />
+              <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => onLogo(e.target.files?.[0])} />
               {profile?.hasLogo ? (
                 <button className="app-btn small danger" onClick={removeLogo}>
                   Remover logo
                 </button>
               ) : (
-                <span style={{ fontSize: 10.5, color: C.t3, textAlign: 'center' }}>PNG, SVG, JPG ou WEBP · até 2 MB</span>
+                <span style={{ fontSize: 10.5, color: C.t3, textAlign: 'center' }}>PNG, JPG ou WEBP · até 2 MB</span>
               )}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'repeat(2, minmax(0, 1fr))', gap: '12px 14px' }}>
