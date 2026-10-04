@@ -56,3 +56,6 @@
 .vtask.open { color: #f5b54a; }
 .vtask.done { color: #4fe0b0; }
 .vault-read li:has(.vtask) { list-style: none; margin-left: -18px; }
+.vault-read .vmermaid, .yui-mermaid { display: flex; justify-content: center; }
+.vault-read .vmermaid { margin: 8px 0 14px; padding: 10px; border-radius: 12px; background: #070814; border: 1px solid rgba(255,255,255,.06); overflow-x: auto; }
+.vault-read .vmermaid svg, .yui-mermaid svg { max-width: 100%; height: auto; }

@@ -14,7 +14,8 @@ import {
 import '@xyflow/react/dist/style.css'
 import '../workflow/workflow.css'
 import type { AgentInfo, WorkflowDef, WorkflowNode, WorkflowNodeType, WorkflowRunInfo } from '@shared/protocol'
-import { parseWorkflowMarkdown, serializeWorkflow, slugify, validateWorkflow } from '@shared/workflowMarkdown'
+import { parseWorkflowMarkdown, serializeWorkflow, slugify, toMermaid, validateWorkflow } from '@shared/workflowMarkdown'
+import { MermaidDiagram } from '../lib/MermaidDiagram'
 import { api } from '../api/client'
 import { useApi } from '../api/useApi'
 import { C } from '../lib/colors'
@@ -61,7 +62,7 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
   const [savedMd, setSavedMd] = useState(initial?.markdown ?? '')
   const [mdText, setMdText] = useState(() => serializeWorkflow(initial ? stripDef(initial) : BLANK))
   const [mdError, setMdError] = useState<string | null>(null)
-  const [tab, setTab] = useState<'props' | 'md' | 'runs'>('props')
+  const [tab, setTab] = useState<'props' | 'md' | 'mmd' | 'runs'>('props')
   const [selected, setSelected] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [runId, setRunId] = useState<string | null>(runParam)
@@ -307,6 +308,7 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
           <div role="tablist" style={{ display: 'flex', gap: 16, padding: '10px 16px 0', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
             <button role="tab" className="wf-tab" aria-selected={tab === 'props'} onClick={() => setTab('props')}>Propriedades</button>
             <button role="tab" className="wf-tab" aria-selected={tab === 'md'} onClick={() => setTab('md')}>Markdown</button>
+            <button role="tab" className="wf-tab" aria-selected={tab === 'mmd'} onClick={() => setTab('mmd')}>Mermaid</button>
             <button role="tab" className="wf-tab" aria-selected={tab === 'runs'} onClick={() => setTab('runs')}>Execuções</button>
           </div>
           <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 16 }}>
@@ -333,10 +335,41 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
                 {mdError && <div style={{ fontSize: 12, color: C.crit }}>{mdError}</div>}
               </div>
             )}
+            {tab === 'mmd' && <MermaidTab draft={draft} run={run} />}
             {tab === 'runs' && <RunsPanel runs={runs.data ?? []} current={run} onPick={(id) => setRunId(id)} steps={draft.nodes} />}
           </div>
         </aside>
       </div>
+    </div>
+  )
+}
+
+// Fluxo em Mermaid (o mesmo bloco do arquivo); com execução aberta, marca feitos e o passo atual.
+function MermaidTab({ draft, run }: { draft: Draft; run: WorkflowRunInfo | null }) {
+  const [copied, setCopied] = useState(false)
+  const status: Record<string, 'done' | 'skipped' | 'failed'> = {}
+  for (const [id, st] of Object.entries(run?.nodes ?? {})) {
+    if (st.status === 'done') status[id] = 'done'
+    else if (st.status === 'skipped') status[id] = 'skipped'
+    else if (st.status === 'failed' || st.status === 'cancelled') status[id] = 'failed'
+  }
+  const code = toMermaid(draft, run ? { current: run.current, status } : {})
+  const copy = () => {
+    void navigator.clipboard?.writeText(toMermaid(draft)).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ flex: 1, fontSize: 12, color: C.t3 }}>{run ? 'Execução aberta: passo atual destacado, concluídos em verde.' : 'É assim que a Yui e os agentes enxergam o fluxo.'}</span>
+        <button className="wf-btn ghost" onClick={copy}>{copied ? 'Copiado' : 'Copiar Mermaid'}</button>
+      </div>
+      <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,.06)', background: '#0a0c1a', padding: 10 }}>
+        <MermaidDiagram code={code} minHeight={240} />
+      </div>
+      <pre className="wf-mono" style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: C.t2, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{toMermaid(draft)}</pre>
     </div>
   )
 }

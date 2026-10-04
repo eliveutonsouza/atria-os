@@ -13,7 +13,7 @@ import { registerBrain } from './extensions.ts';
 import { openai } from './brain.ts';
 import { narrate } from './live.ts';
 import { createRoutine, deleteRoutine, registerRoutineRoutes, routinesForWorkflow, setWorkflowRunner } from './routines.ts';
-import { parseWorkflowMarkdown, serializeWorkflow, slugify, validateWorkflow } from './workflowMarkdown.ts';
+import { parseWorkflowMarkdown, serializeWorkflow, slugify, toMermaid, validateWorkflow } from './workflowMarkdown.ts';
 
 // Workflows de decisão: definidos em markdown canônico (/workspace/.yui/workflows/<slug>.md),
 // editados como fluxograma no console e executados passo a passo por agentes (manual ou rotina cron).
@@ -51,6 +51,36 @@ function seedWorkflows() {
     seeded.add(f);
   }
   db.prepare(`INSERT INTO kv(key, value) VALUES('workflows_seeded', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(JSON.stringify([...seeded]));
+}
+
+// Arquivos de antes do Mermaid ganham o diagrama uma vez (com backup <slug>.md.bak).
+function migrateToMermaid() {
+  if (!existsSync(wfDir())) return;
+  for (const f of readdirSync(wfDir()).filter((x) => x.endsWith('.md'))) {
+    const file = join(wfDir(), f);
+    const md = readFileSync(file, 'utf8');
+    if (/```mermaid/i.test(md)) continue;
+    try {
+      const def = parseWorkflowMarkdown(md, f.replace(/\.md$/, ''));
+      if (!existsSync(`${file}.bak`)) copyFileSync(file, `${file}.bak`);
+      writeFileSync(`${file}.tmp`, serializeWorkflow(def));
+      renameSync(`${file}.tmp`, file);
+      console.log(`workflow ${f}: fluxo convertido para Mermaid`);
+    } catch (e) {
+      console.error(`workflow ${f}: não converti para Mermaid:`, (e as Error).message);
+    }
+  }
+}
+
+// Diagrama da execução: passos feitos/pulados/falhos marcados e o atual destacado.
+function runDiagram(ex: Exec, current: string): string {
+  const status: Record<string, 'done' | 'skipped' | 'failed'> = {};
+  for (const [id, st] of Object.entries(ex.nodes)) {
+    if (st.status === 'done') status[id] = 'done';
+    else if (st.status === 'skipped') status[id] = 'skipped';
+    else if (st.status === 'failed' || st.status === 'cancelled') status[id] = 'failed';
+  }
+  return toMermaid(ex.def, { current, status });
 }
 
 export function loadWorkflow(slug: string): WorkflowDef | null {
@@ -305,6 +335,11 @@ async function task(ex: Exec, node: WorkflowNode) {
   const ctx = contextFor(ex);
   const instruction = [
     `Você está executando o passo ${node.id} ("${node.title}") do workflow "${ex.def.name}".`,
+    'Fluxo completo (Mermaid; seu passo está na classe "atual", os concluídos em "feito"):',
+    '```mermaid',
+    runDiagram(ex, node.id),
+    '```',
+    '',
     node.instruction ?? '',
     ...hints,
     ctx ? `\nResultados dos passos anteriores:\n${ctx}` : '',
@@ -506,6 +541,7 @@ const findWf = (s: unknown) => {
 
 export function register(app: FastifyInstance): void {
   seedWorkflows();
+  migrateToMermaid();
   recoverWorkflowRuns();
   // gatilho cron do frontmatter (inclusive seeds e arquivos colados direto na pasta) → rotina vinculada
   for (const w of listWorkflows()) {
@@ -622,6 +658,13 @@ export function register(app: FastifyInstance): void {
       },
       {
         type: 'function',
+        name: 'get_workflow',
+        strict: true,
+        description: 'Mostra como um workflow está desenhado: fluxo em Mermaid e detalhes de cada passo (agente, instrução, condição).',
+        parameters: { type: 'object', additionalProperties: false, required: ['slug'], properties: { slug: { type: 'string' } } },
+      },
+      {
+        type: 'function',
         name: 'list_workflows',
         strict: true,
         description: 'Lista os workflows com gatilho e última execução.',
@@ -640,7 +683,7 @@ export function register(app: FastifyInstance): void {
             });
             emit({ type: 'ui.action', action: { type: 'show_view', view: 'workflow', params: { workflowId: w.slug } } });
             setYuiState('showing');
-            return { ok: true, slug: w.slug, nome: w.name, passos: w.nodes.map((n) => `${n.id}. ${n.title}${n.agent ? ` (${n.agent})` : ''}`), gatilho: w.trigger, erros: validateWorkflow(w) };
+            return { ok: true, slug: w.slug, nome: w.name, fluxo: toMermaid(w), passos: w.nodes.map((n) => `${n.id}. ${n.title}${n.agent ? ` (${n.agent})` : ''}`), gatilho: w.trigger, erros: validateWorkflow(w) };
           })();
         case 'run_workflow':
           return (async () => {
@@ -658,6 +701,15 @@ export function register(app: FastifyInstance): void {
             const saved = saveWorkflow({ def: { ...w, trigger: c ? { type: 'cron', cron: c } : { type: 'manual' } } }, w.slug);
             return { ok: true, nome: saved.name, gatilho: saved.trigger };
           })();
+        case 'get_workflow': {
+          const w = findWf(args.slug);
+          if (!w) return Promise.resolve({ ok: false, error: 'workflow não encontrado', disponiveis: listWorkflows().map((x) => x.slug) });
+          return Promise.resolve({
+            ok: true, slug: w.slug, nome: w.name, gatilho: w.trigger, fluxo: toMermaid(w),
+            passos: w.nodes.map((n) => ({ id: n.id, tipo: n.type, titulo: n.title, agente: n.agent ?? null, instrucao: n.instruction ?? null, condicao: n.condition ?? null })),
+            erros: validateWorkflow(w),
+          });
+        }
         case 'list_workflows':
           return Promise.resolve(
             listWorkflows().map((w) => ({ slug: w.slug, nome: w.name, gatilho: w.trigger, passos: w.nodes.length, ultima: listWorkflowRuns(w.slug, 1)[0]?.status ?? null })),

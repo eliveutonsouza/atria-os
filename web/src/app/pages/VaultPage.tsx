@@ -172,6 +172,26 @@ function Reader({ file, resolve, onOpen }: { file: VaultFile | null; resolve: (t
   const { props, body } = useMemo(() => splitFrontmatter(file?.text ?? ''), [file?.text])
   const html = useMemo(() => renderNote(body), [body])
   const ref = useRef<HTMLDivElement>(null)
+  // blocos ```mermaid viram diagrama
+  useEffect(() => {
+    const boxes = ref.current?.querySelectorAll<HTMLDivElement>('div.vmermaid') ?? []
+    if (!boxes.length) return
+    let alive = true
+    void import('../../lib/mermaid').then(({ renderMermaid }) => {
+      boxes.forEach((el) => {
+        renderMermaid(el.dataset.code ?? '')
+          .then((svg) => {
+            if (alive) el.innerHTML = svg
+          })
+          .catch((e: Error) => {
+            if (alive) el.textContent = `Diagrama inválido: ${e.message.split('\n')[0]}`
+          })
+      })
+    })
+    return () => {
+      alive = false
+    }
+  }, [html])
   // links para notas que ainda não existem aparecem apagados
   useEffect(() => {
     ref.current?.querySelectorAll<HTMLAnchorElement>('a.vlink').forEach((a) => {

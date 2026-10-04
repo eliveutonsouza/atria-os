@@ -77,9 +77,17 @@ md.core.ruler.after('inline', 'vtasks', (state) => {
   }
 })
 
+// ```mermaid vira um contêiner que o Reader desenha depois (a lib carrega sob demanda)
+const defaultFence = md.renderer.rules.fence!
+md.renderer.rules.fence = (tokens, idx, opts, env, self) => {
+  const t = tokens[idx]
+  if (t.info.trim().toLowerCase() === 'mermaid') return `<div class="vmermaid" data-code="${md.utils.escapeHtml(t.content)}"></div>`
+  return defaultFence(tokens, idx, opts, env, self)
+}
+
 export function renderNote(body: string): string {
   const html = md.render(body)
-  return DOMPurify.sanitize(html, { ADD_ATTR: ['data-note', 'target'] })
+  return DOMPurify.sanitize(html, { ADD_ATTR: ['data-note', 'data-code', 'target'] })
 }
 
 // Links de saída da nota (para o painel de conexões).

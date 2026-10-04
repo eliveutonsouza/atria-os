@@ -11,7 +11,10 @@ function pwaAssets(): Plugin {
     apply: 'build',
     closeBundle() {
       const dist = fileURLToPath(new URL('./dist', import.meta.url))
-      const assets = readdirSync(join(dist, 'assets')).map((f) => `/assets/${f}`)
+      // só o núcleo do app; chunks sob demanda (Mermaid, pdf.js…) entram no cache quando usados
+      const assets = readdirSync(join(dist, 'assets'))
+        .filter((f) => /^index-/.test(f) || /\.(css|woff2?)$/.test(f))
+        .map((f) => `/assets/${f}`)
       writeFileSync(join(dist, 'sw-assets.json'), JSON.stringify(assets))
       const sw = join(dist, 'sw.js')
       writeFileSync(sw, readFileSync(sw, 'utf8').replace('__BUILD__', Date.now().toString(36)))
