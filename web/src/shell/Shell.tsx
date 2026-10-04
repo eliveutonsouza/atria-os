@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import type { Bootstrap, ViewName, ViewParams } from '@shared/protocol'
 import { api } from '../api/client'
@@ -6,6 +6,8 @@ import { connectEvents } from '../api/events'
 import { sendContextDebounced } from '../lib/actions'
 import { ApprovalModal, CommandPalette, HistoryDrawer, Inbox, UpdateToast } from '../overlays/Overlays'
 import { pttDown, pttUp, toggleLive } from '../voice/live'
+import { AppShell } from '../app/AppShell'
+import type { AppPage } from '@shared/protocol'
 import { useYui, type Mode } from '../store/yui'
 import { CanvasPanel } from './CanvasPanel'
 import { Dock, dockInput, OrbButton, OrbLayer, TopBar, YuiCenter, YuiLeft } from './parts'
@@ -64,25 +66,54 @@ function parsePath(path: string): { view: ViewName; params: ViewParams } | null 
   return null
 }
 
+// /app/<página>/<id?> = dashboard (Yui minimizada); demais rotas = modo Yui.
+const APP_PAGES = new Set(['overview', 'ops', 'agents', 'runs', 'missions', 'workflows', 'schedule', 'projects', 'browser', 'terminal', 'claude', 'tools', 'inbox', 'infra', 'settings'])
+function appPathFor(page: string, p: Record<string, string>) {
+  const base = page === 'overview' ? '/app' : `/app/${page}`
+  return p.id ? `${base}/${encodeURIComponent(p.id)}` : base
+}
+function applyPath(path: string) {
+  const s = useYui.getState()
+  const seg = path.split('/').filter(Boolean).map(decodeURIComponent)
+  if (seg[0] === 'app') {
+    const page = seg[1] && APP_PAGES.has(seg[1]) ? seg[1] : 'overview'
+    s.set({ shellMode: 'app', appPage: page as AppPage, appParams: seg[2] ? { id: seg[2] } : {} })
+    return
+  }
+  if (s.shellMode === 'app') s.set({ shellMode: 'yui' })
+  const r = parsePath(path)
+  if (r) s.show(r.view, r.params)
+  else if (path === '/' && s.mode !== 'center') s.close()
+}
+
 function useRouteSync() {
   const loc = useLocation()
   const nav = useNavigate()
   const mode = useYui((s) => s.mode)
   const view = useYui((s) => s.view)
   const params = useYui((s) => s.viewParams)
+  const shellMode = useYui((s) => s.shellMode)
+  const appPage = useYui((s) => s.appPage)
+  const appParams = useYui((s) => s.appParams)
   const [ready, setReady] = useState(false)
+  const lastWanted = useRef<string | null>(null)
   useEffect(() => {
-    const r = parsePath(loc.pathname)
-    if (r) useYui.getState().show(r.view, r.params)
+    applyPath(loc.pathname)
     setReady(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  // navegação externa (voltar do navegador, clique em notificação) → aplica no estado
+  useEffect(() => {
+    if (ready && lastWanted.current !== null && loc.pathname !== lastWanted.current) applyPath(loc.pathname)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loc.pathname])
   useEffect(() => {
     if (!ready) return
-    const want = pathFor(mode, view, params)
-    if (want !== loc.pathname) nav(want, { replace: true })
+    const want = shellMode === 'app' ? appPathFor(appPage, appParams) : pathFor(mode, view, params)
+    lastWanted.current = want
+    if (want !== loc.pathname) nav(want, { replace: shellMode !== 'app' })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, mode, view, params])
+  }, [ready, mode, view, params, shellMode, appPage, appParams])
 }
 
 // ---------- bootstrap ----------
@@ -230,6 +261,7 @@ export function Shell() {
     <main style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: 'radial-gradient(120% 90% at 50% 28%, #0f1533 0%, #0a0c1d 45%, #06070d 100%)' }}>
       <OrbLayer />
       <TopBar />
+      <AppShell />
       <CanvasPanel />
       <YuiCenter />
       <YuiLeft />

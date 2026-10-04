@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ApprovalInfo, Brief, ChatMessage, CustomViewInfo, InboxItem, MissionInfo, ProjectSummary, RunInfo, ViewName, ViewParams, WorkflowRunInfo, YuiState } from '@shared/protocol'
+import type { AppPage, ApprovalInfo, Brief, ChatMessage, CustomViewInfo, InboxItem, MissionInfo, ProjectSummary, RunInfo, ViewName, ViewParams, WorkflowRunInfo, YuiState } from '@shared/protocol'
 
 export type Mode = 'center' | 'canvas' | 'focus'
 
@@ -48,6 +48,12 @@ export interface YuiStore {
   voiceMode: 'off' | 'ptt' | 'continuous'
   missions: Record<string, MissionInfo>
   canInstall: boolean
+  // v3: modo dashboard ('app') com a Yui minimizada no canto; 'yui' = conversa em tela cheia
+  shellMode: 'yui' | 'app'
+  appPage: AppPage
+  appParams: Record<string, string>
+  sidebarOpen: boolean
+  sidebarPinned: boolean
   updateReady: boolean
   pushEnabled: boolean
   workflowRuns: Record<string, WorkflowRunInfo>
@@ -105,6 +111,11 @@ export const useYui = create<YuiStore>((set, get) => ({
   voiceMode: 'off',
   missions: {},
   canInstall: false,
+  shellMode: 'yui',
+  appPage: 'overview',
+  appParams: {},
+  sidebarOpen: false,
+  sidebarPinned: (() => { try { return localStorage.getItem('yui.sidebarPinned') === '1' } catch { return false } })(),
   updateReady: false,
   pushEnabled: false,
   workflowRuns: {},

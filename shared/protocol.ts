@@ -429,3 +429,77 @@ export interface RoutineInfo {
   instruction: string | null;
   enabled: boolean;
 }
+
+// ---------- v3: dashboard ----------
+export type AppPage =
+  | 'overview' | 'ops' | 'agents' | 'runs' | 'missions' | 'workflows' | 'schedule' | 'projects'
+  | 'browser' | 'terminal' | 'claude' | 'tools' | 'inbox' | 'infra' | 'settings';
+
+export interface StatsOverview {
+  kpis: { runsToday: number; runsYesterday: number; success7d: number | null; failed7d: number; agentsActive: number; agentsTotal: number; approvals: number; cost7d: number; tokens7d: number };
+  daily: { date: string; done: number; failed: number; routine: number }[]; // 30 dias, antigo → hoje
+  byAgent: { agentId: string; agent: string; runs: number; success: number | null; avgMs: number | null; costUsd: number; tokens: number }[];
+  topTools: { name: string; count: number }[];
+}
+
+export interface OpsCard {
+  id: string; // runId ou approvalId
+  kind: 'run' | 'approval';
+  agent: string;
+  agentId: string;
+  task: string;
+  origin: 'yui' | 'manual' | 'routine' | 'mission' | 'workflow';
+  originLabel: string | null; // título da missão/workflow/rotina
+  project: string | null;
+  startedAt: string | null;
+  progress: number;
+}
+export interface OpsBoard {
+  pipeline: { inbound: number; brain: number; missions: number; workflows: number; running: number; queued: number; approvals: number; doneToday: number };
+  columns: { queued: OpsCard[]; running: OpsCard[]; waiting: OpsCard[]; doneToday: OpsCard[]; failed: OpsCard[] };
+  gantt: { agentId: string; agent: string; spans: { start: string; end: string | null; state: string; task: string }[] }[]; // últimas 24h
+}
+
+export interface ScheduleOccurrence {
+  routineId: string;
+  name: string;
+  at: string; // ISO
+  workflow: string | null;
+  agentId: string | null;
+  enabled: boolean;
+}
+
+export interface SettingsPayload {
+  values: Record<string, string | number | boolean | null>; // não-secretos
+  secrets: Record<string, boolean>; // segredo configurado?
+}
+
+export interface SetupStatus {
+  needsPassword: boolean; // primeiro acesso: criar senha
+  claude: 'claude.ai' | 'token' | 'none';
+  github: boolean;
+  openai: boolean;
+  push: number; // dispositivos inscritos
+  completed: boolean;
+}
+
+// WebSocket /api/browser/live
+export interface BrowserTab {
+  id: string;
+  title: string;
+  url: string;
+  active: boolean;
+}
+export type BrowserServerMsg =
+  | { type: 'frame'; targetId: string; data: string; width: number; height: number } // JPEG base64
+  | { type: 'tabs'; tabs: BrowserTab[] }
+  | { type: 'activity'; runId: string; agent: string; action: string; at: string }
+  | { type: 'status'; connected: boolean; controlling: boolean; error?: string };
+export type BrowserClientMsg =
+  | { type: 'select'; targetId: string }
+  | { type: 'navigate'; url: string }
+  | { type: 'nav'; action: 'back' | 'forward' | 'reload' }
+  | { type: 'control'; on: boolean }
+  | { type: 'mouse'; event: 'mousePressed' | 'mouseReleased' | 'mouseMoved' | 'mouseWheel'; x: number; y: number; button?: 'left' | 'right' | 'none'; clickCount?: number; deltaX?: number; deltaY?: number }
+  | { type: 'key'; event: 'keyDown' | 'keyUp' | 'char'; key: string; code?: string; text?: string }
+  | { type: 'viewport'; width: number; height: number };

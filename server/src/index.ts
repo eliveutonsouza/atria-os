@@ -28,6 +28,10 @@ import * as toolbox from './toolbox.ts';
 import * as agentsAdmin from './agentsAdmin.ts';
 import * as workflows from './workflows.ts';
 import * as push from './push.ts';
+import * as stats from './stats.ts';
+import * as browserLive from './browserLive.ts';
+import * as settings from './settings.ts';
+import * as onboarding from './onboarding.ts';
 import { sandboxUrl, sbToken } from './sandbox.ts';
 import { catalog, githubEnabled, startGithub, syncCatalog } from './github.ts';
 
@@ -64,7 +68,7 @@ await app.register(websocket);
 registerAuth(app);
 initTerminal();
 registerTerminal(app);
-for (const mod of [missions, customViews, toolbox, agentsAdmin, workflows, push]) mod.register(app);
+for (const mod of [missions, customViews, toolbox, agentsAdmin, workflows, push, stats, browserLive, settings, onboarding]) mod.register(app);
 
 app.get('/api/health', async () => ({ ok: true }));
 
