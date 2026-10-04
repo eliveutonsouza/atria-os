@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { RunInfo } from '../../shared/protocol.ts';
 import { config } from './config.ts';
@@ -25,6 +25,7 @@ const fileSafe = (s: string, max = 60) =>
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, max)
+    .replace(/[.\s]+$/, '')
     .trim() || 'sem título';
 
 const exists = (rel: string) => existsSync(join(vaultRoot(), rel));
@@ -33,6 +34,23 @@ function ensureDaily(day: string) {
   const rel = `Diario/${day}.md`;
   if (!exists(rel)) upsertNote(rel, `---\ntipo: diário\ntags: [diario]\n---\n# ${day}\n\n## Execuções\n`);
   return rel;
+}
+
+// Acrescenta uma linha no fim da seção "## <título>" (cria a seção no fim da nota se faltar).
+function appendUnder(rel: string, heading: string, line: string) {
+  const abs = join(vaultRoot(), rel);
+  const text = existsSync(abs) ? readFileSync(abs, 'utf8') : '';
+  const lines = text.replace(/\s*$/, '').split('\n');
+  const h = lines.findIndex((l) => l.trim() === `## ${heading}`);
+  if (h < 0) {
+    upsertNote(rel, `${lines.join('\n')}\n\n## ${heading}\n${line}\n`);
+    return;
+  }
+  let end = h + 1;
+  while (end < lines.length && !/^#{1,2}\s/.test(lines[end])) end++;
+  while (end > h + 1 && !lines[end - 1].trim()) end--;
+  lines.splice(end, 0, line.replace(/\n$/, ''));
+  upsertNote(rel, `${lines.join('\n')}\n`);
 }
 
 function ensureProjectNote(slug: string) {
@@ -59,7 +77,7 @@ export function writeRunReport(run: RunInfo) {
 
   // Execução sem mudança e sem falha: só uma linha no diário (menos ruído no Cérebro).
   if (!changedFiles && run.state === 'done') {
-    upsertNote(daily, `- ${time} ${icon} [[${run.agent}]]${project ? ` em [[${project}]]` : ''}: ${task.slice(0, 160)}\n`, 'append');
+    appendUnder(daily, 'Execuções', `- ${time} ${icon} [[${run.agent}]]${project ? ` em [[${project}]]` : ''}: ${task.slice(0, 160)}`);
     return;
   }
 
@@ -92,8 +110,8 @@ export function writeRunReport(run: RunInfo) {
     .filter((l) => l !== null)
     .join('\n');
   upsertNote(rel, body);
-  upsertNote(daily, `- ${time} ${icon} [[${title}]]\n`, 'append');
-  if (project) upsertNote(`05-Projetos/${project}.md`, `- [[${title}]]\n`, 'append');
+  appendUnder(daily, 'Execuções', `- ${time} ${icon} [[${title}]]`);
+  if (project) appendUnder(`05-Projetos/${project}.md`, 'Execuções', `- [[${title}]]`);
 }
 
 // Fechamento do dia: resumo com números reais do banco.
