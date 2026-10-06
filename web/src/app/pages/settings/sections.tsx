@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import type { SettingsPayload, SetupStatus } from '@shared/protocol'
+import type { ModelOption, ModelsCatalog, SettingsPayload, SetupStatus } from '@shared/protocol'
 import { api, ApiError } from '../../../api/client'
 import { C } from '../../../lib/colors'
+import { ago } from '../../../lib/format'
 import { disablePush, enablePush, isIOS, isStandalone, promptInstall, pushSupported, testPush } from '../../../pwa/pwa'
 import { useYui } from '../../../store/yui'
 import { Chip, Field, input, SmallBtn, StatusPill } from '../../../views/kit'
+import { ModelSelect } from '../../../views/ModelSelect'
+import { ConfirmDeleteModal } from '../../../views/ui'
 import { EmbeddedTerminal } from './EmbeddedTerminal'
 
 // ---------- dados compartilhados ----------
@@ -314,28 +317,153 @@ export function VoiceSection() {
 
 // ---------- Modelos ----------
 
+// Cada select: chave da configuração, lista do catálogo (GET /api/models) e textos (Desktop-Modelos.dc.html).
+const MODEL_ROWS: { key: string; title: string; desc: string; list: (c: ModelsCatalog) => ModelOption[]; openai: boolean }[] = [
+  { key: 'models.live', title: 'Voz em tempo real', desc: 'Conversa por voz com a Yui (GPT-Live).', list: (c) => c.openai.live, openai: true },
+  { key: 'models.brain', title: 'Cérebro da Yui', desc: 'Entende pedidos, escolhe ferramentas e responde.', list: (c) => c.openai.chat, openai: true },
+  { key: 'models.planner', title: 'Planejador', desc: 'Monta missões, workflows e decide aprovações.', list: (c) => c.openai.chat, openai: true },
+  { key: 'models.embed', title: 'Embeddings', desc: 'Busca por significado no Cérebro e na Empresa.', list: (c) => c.openai.embed, openai: true },
+  { key: 'claude.model', title: 'Claude Code (agentes)', desc: 'Modelo usado pelos agentes que não escolheram um próprio.', list: (c) => c.claude, openai: false },
+]
+const MODEL_KEYS = MODEL_ROWS.map((r) => r.key)
+const PRICING_EXAMPLE = '{"gpt-6-luna":{"in":1.25,"out":10},"gpt-live-1":{"perMinute":0.06}}'
+
+function pricingError(s: string): string | null {
+  if (!s.trim()) return null
+  try {
+    const j = JSON.parse(s) as unknown
+    if (!j || typeof j !== 'object' || Array.isArray(j)) return 'Use um objeto: { "modelo": { "in": 1.25, "out": 10 } }.'
+    for (const [m, p] of Object.entries(j as Record<string, unknown>)) {
+      if (!p || typeof p !== 'object' || Array.isArray(p)) return `${m} precisa ser um objeto com os preços.`
+      for (const [f, n] of Object.entries(p as Record<string, unknown>)) if (typeof n !== 'number' || n < 0) return `${m}.${f} precisa ser um número (≥ 0).`
+    }
+    return null
+  } catch {
+    return 'JSON inválido — confira aspas, vírgulas e chaves.'
+  }
+}
+
+// Linha do design: rótulo + explicação à esquerda, controle à direita (uma coluna no celular).
+function ModelRow({ title, desc, children }: { title: string; desc: string; children: ReactNode }) {
+  const phone = useYui((s) => s.device === 'phone')
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: phone ? 'minmax(0,1fr)' : '240px minmax(0,1fr)', gap: phone ? 8 : 20, padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,.06)', alignItems: 'start' }}>
+      <div>
+        <b style={{ fontSize: 14, fontWeight: 600, display: 'block' }}>{title}</b>
+        <small style={{ fontSize: 12.5, color: C.t2, lineHeight: 1.45, display: 'block', marginTop: 4 }}>{desc}</small>
+      </div>
+      <div style={{ minWidth: 0 }}>{children}</div>
+    </div>
+  )
+}
+
 export function ModelsSection() {
-  const { data, save, msg } = useSettings()
+  const { data, save, msg, reload } = useSettings()
   const [v, setV] = useState<Record<string, string | number | boolean | null>>({})
+  const [cat, setCat] = useState<ModelsCatalog | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [pricing, setPricing] = useState('')
+  const [priceMsg, setPriceMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const loadCat = useCallback(async (refresh = false) => {
+    setLoading(true)
+    try {
+      setCat(await api.get<ModelsCatalog>(`/api/models${refresh ? '?refresh=1' : ''}`))
+    } catch {
+      useYui.getState().say('Não consegui ler a lista de modelos agora.')
+    }
+    setLoading(false)
+  }, [])
   useEffect(() => {
-    if (data) setV(data.values)
+    void loadCat()
+  }, [loadCat])
+  useEffect(() => {
+    if (data) {
+      setV(data.values)
+      setPricing(String(data.values['pricing.openai'] ?? ''))
+    }
   }, [data])
   const set = (k: string, val: string | number) => setV((o) => ({ ...o, [k]: val }))
-  const keys = ['models.live', 'models.brain', 'models.planner', 'claude.model', 'runs.concurrency']
+  const keys = [...MODEL_KEYS, 'runs.concurrency']
+  // "Testar" do Outro…: relê a lista da conta e confere se o nome existe
+  const testModel = (openai: boolean) => async (m: string) => {
+    const c = await api.get<ModelsCatalog>('/api/models?refresh=1')
+    setCat(c)
+    if (!openai) return c.claude.some((o) => o.value === m) ? { ok: true, text: `${m} está disponível no Claude Code.` } : { ok: false, text: `${m} não aparece na lista do Claude Code — o agente tenta mesmo assim, mas pode falhar.` }
+    if (c.openai.error) return { ok: false, text: c.openai.error }
+    const all = [...c.openai.chat, ...c.openai.live, ...c.openai.embed]
+    return all.some((o) => o.value === m) ? { ok: true, text: `${m} está disponível na sua conta OpenAI.` } : { ok: false, text: `${m} não aparece na sua conta OpenAI (nome errado ou sem acesso).` }
+  }
+  const restore = async () => {
+    if (await save(Object.fromEntries(MODEL_KEYS.map((k) => [k, null])))) void loadCat()
+  }
+  const pErr = pricingError(pricing)
+  const savePricing = async () => {
+    setPriceMsg(null)
+    try {
+      await api.put('/api/settings', { 'pricing.openai': pricing.trim() ? JSON.stringify(JSON.parse(pricing)) : null })
+      setPriceMsg({ ok: true, text: 'Preços salvos.' })
+      void reload()
+    } catch (e) {
+      setPriceMsg({ ok: false, text: e instanceof ApiError ? e.message : 'Não consegui salvar.' })
+    }
+  }
+  const claudeDefault = cat?.defaults.claudeAccount ?? null
   return (
-    <Section title="Modelos" hint="Quem conversa, quem decide, quem planeja e com que modelo os agentes Claude trabalham.">
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
-        <Field label="Voz (OpenAI)" hint="Ex.: gpt-live-1"><input value={String(v['models.live'] ?? '')} onChange={(e) => set('models.live', e.target.value)} style={input} /></Field>
-        <Field label="Cérebro (OpenAI)" hint="Decide telas e delegações. Ex.: gpt-6-luna"><input value={String(v['models.brain'] ?? '')} onChange={(e) => set('models.brain', e.target.value)} style={input} /></Field>
-        <Field label="Planner de missões (OpenAI)" hint="Monta planos multi-agente. Ex.: gpt-6-sol"><input value={String(v['models.planner'] ?? '')} onChange={(e) => set('models.planner', e.target.value)} style={input} /></Field>
-        <Field label="Agentes Claude (padrão)" hint="Vazio = padrão da sua conta. Cada agente pode ter o seu."><input value={String(v['claude.model'] ?? '')} onChange={(e) => set('claude.model', e.target.value)} placeholder="padrão da conta" style={input} /></Field>
-        <Field label="Agentes ao mesmo tempo" hint="1 a 8. Mais = mais rápido, mais uso do plano."><input type="number" min={1} max={8} value={Number(v['runs.concurrency'] ?? 2)} onChange={(e) => set('runs.concurrency', Number(e.target.value))} style={input} /></Field>
-      </div>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <button type="button" style={bigBtn(true)} onClick={() => save(Object.fromEntries(keys.map((k) => [k, v[k] ?? ''])))}>Salvar</button>
-        <SaveMsg msg={msg} />
-      </div>
-    </Section>
+    <>
+      <Section title="Modelos" hint="Quem conversa, quem decide, quem planeja e com que modelo os agentes Claude trabalham.">
+        {cat?.openai.error ? (
+          <span role="alert" style={{ fontSize: 12.5, color: '#f39aa4' }}>{cat.openai.error}</span>
+        ) : (
+          <span style={{ fontSize: 12, color: C.t3 }}>{cat ? (cat.openai.at ? `Lista lida da sua conta OpenAI ${ago(cat.openai.at)}.` : 'Lista da OpenAI ainda não lida.') : 'Lendo a lista de modelos…'}</span>
+        )}
+        <div>
+          {MODEL_ROWS.map((r) => (
+            <ModelRow key={r.key} title={r.title} desc={r.desc}>
+              <ModelSelect
+                ariaLabel={r.title}
+                value={String(v[r.key] ?? '')}
+                onChange={(val) => set(r.key, val)}
+                options={cat ? r.list(cat) : []}
+                placeholderDefault={r.openai ? undefined : `Padrão da conta${claudeDefault ? ` — ${claudeDefault}` : ''}`}
+                onTest={testModel(r.openai)}
+              />
+              {!r.openai && <div style={{ fontSize: 12, color: C.t3, marginTop: 6 }}>Lista vem do Claude Code logado. Cada agente pode escolher o seu na página Agentes.</div>}
+            </ModelRow>
+          ))}
+          <ModelRow title="Agentes ao mesmo tempo" desc="1 a 8. Mais = mais rápido, mais uso do plano.">
+            <input type="number" min={1} max={8} value={Number(v['runs.concurrency'] ?? 2)} onChange={(e) => set('runs.concurrency', Number(e.target.value))} aria-label="Agentes ao mesmo tempo" style={{ ...input, maxWidth: 120, height: 44 }} />
+          </ModelRow>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button type="button" style={bigBtn(true)} onClick={() => save(Object.fromEntries(keys.map((k) => [k, v[k] ?? ''])))}>Salvar</button>
+          <button type="button" style={bigBtn()} disabled={loading} onClick={() => void loadCat(true)}>{loading ? 'Atualizando…' : 'Atualizar lista'}</button>
+          <button type="button" style={bigBtn()} onClick={restore}>Restaurar padrões</button>
+          <SaveMsg msg={msg} />
+        </div>
+      </Section>
+      <Section title="Preços da OpenAI" hint="Para o Consumo calcular o custo de modelos novos ou com preço diferente. Valores em US$ por 1 milhão de tokens; o nome vale como prefixo (gpt-6 cobre gpt-6-luna).">
+        <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12.5, color: C.t2 }}>
+          <li><span className="mono">in</span> / <span className="mono">out</span>: entrada e saída de texto · <span className="mono">cachedIn</span>: entrada em cache</li>
+          <li><span className="mono">audioIn</span> / <span className="mono">audioOut</span>: áudio da voz · <span className="mono">perMinute</span>: voz cobrada por minuto de sessão (US$/min)</li>
+          <li>Vazio = tabela padrão do console. O que você colocar aqui vence a tabela.</li>
+        </ul>
+        <textarea
+          className="mono"
+          value={pricing}
+          onChange={(e) => setPricing(e.target.value)}
+          placeholder={PRICING_EXAMPLE}
+          aria-label="Preços da OpenAI em JSON"
+          spellCheck={false}
+          rows={5}
+          style={{ ...input, fontSize: 13, resize: 'vertical', minHeight: 110 }}
+        />
+        {pErr && <span role="alert" style={{ fontSize: 12.5, color: '#f39aa4' }}>{pErr}</span>}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button type="button" style={bigBtn(true)} disabled={!!pErr} onClick={savePricing}>Salvar preços</button>
+          <SaveMsg msg={priceMsg} />
+        </div>
+      </Section>
+    </>
   )
 }
 
@@ -370,11 +498,15 @@ export function AgentsApprovalsSection() {
 
 // ---------- Notificações ----------
 
+interface PushDevice { id: number; device: string; created_at: string }
+
 export function NotificationsSection() {
-  const [devices, setDevices] = useState<{ device: string; created_at: string }[]>([])
+  const [devices, setDevices] = useState<PushDevice[]>([])
   const [note, setNote] = useState('')
+  const [del, setDel] = useState<PushDevice | null>(null)
+  const [busy, setBusy] = useState(false)
   const pushOn = useYui((s) => s.pushEnabled)
-  const load = useCallback(() => api.get<{ device: string; created_at: string }[]>('/api/push/devices').then(setDevices).catch(() => {}), [])
+  const load = useCallback(() => api.get<PushDevice[]>('/api/push/devices').then(setDevices).catch(() => {}), [])
   useEffect(() => {
     void load()
   }, [load])
@@ -397,14 +529,38 @@ export function NotificationsSection() {
         {devices.length === 0 ? (
           <span style={{ fontSize: 13, color: C.t3 }}>Nenhum dispositivo recebe notificações ainda.</span>
         ) : (
-          devices.map((d, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-              <span>{d.device || 'Dispositivo'}</span>
-              <span style={{ color: C.t3 }}>{new Date(d.created_at).toLocaleDateString('pt-BR')}</span>
+          devices.map((d) => (
+            <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
+                <span style={{ overflowWrap: 'anywhere' }}>{d.device || 'Dispositivo'}</span>
+                <span style={{ color: C.t3, fontSize: 12 }}>inscrito em {new Date(d.created_at).toLocaleDateString('pt-BR')}</span>
+              </span>
+              <button type="button" style={{ ...bigBtn(), color: '#f39aa4' }} onClick={() => setDel(d)} aria-label={`Remover ${d.device || 'dispositivo'}`}>Remover</button>
             </div>
           ))
         )}
+        {devices.length > 0 && <span style={{ fontSize: 12, color: C.t3 }}>Removido aqui, o aparelho para de receber avisos. Para voltar, abra o console nele e ative de novo.</span>}
       </Section>
+      {del && (
+        <ConfirmDeleteModal
+          title={`Remover ${del.device || 'dispositivo'}?`}
+          text="Este aparelho deixa de receber aprovações, falhas e entregas da Yui. Dá para ativar de novo pelo próprio aparelho."
+          rows={[{ label: 'Aparelho', value: del.device || 'Dispositivo' }, { label: 'Inscrito em', value: new Date(del.created_at).toLocaleString('pt-BR') }]}
+          busy={busy}
+          onCancel={() => setDel(null)}
+          onConfirm={async () => {
+            setBusy(true)
+            try {
+              await api.del(`/api/push/devices/${del.id}`)
+              setDel(null)
+              void load()
+            } catch {
+              useYui.getState().say('Não consegui remover o dispositivo agora.')
+            }
+            setBusy(false)
+          }}
+        />
+      )}
     </>
   )
 }

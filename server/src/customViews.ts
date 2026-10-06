@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
@@ -82,6 +82,25 @@ export function saveCustom(spec: CustomViewSpec, source: string, id: string = ui
   const info = getCustom(id)!;
   emit({ type: 'custom.created', view: info });
   return info;
+}
+
+// id vira nome de pasta/arquivo em views/: só caracteres simples.
+const safeViewId = (id: string) => /^[\w-]{1,80}$/.test(id);
+
+export function deleteCustom(id: string): boolean {
+  if (!safeViewId(id)) return false;
+  const ok = db.prepare('DELETE FROM custom_views WHERE id = ?').run(id).changes > 0;
+  rmSync(join(viewsDir(), id), { recursive: true, force: true });
+  rmSync(join(viewsDir(), `${id}.json`), { force: true });
+  return ok;
+}
+
+export function renameCustom(id: string, title: string): CustomViewInfo | null {
+  const cur = getCustom(id);
+  const t = title.trim().slice(0, 120);
+  if (!cur || !t) return null;
+  db.prepare('UPDATE custom_views SET title = ?, spec_json = ? WHERE id = ?').run(t, JSON.stringify({ ...cur.spec, title: t }), id);
+  return getCustom(id);
 }
 
 function showCustom(id: string) {
@@ -230,6 +249,16 @@ export function register(app: FastifyInstance): void {
     (db.prepare('SELECT * FROM custom_views ORDER BY created_at DESC LIMIT 50').all() as Row[]).map((r) => ({ id: r.id, title: r.title, source: r.source, createdAt: r.created_at })),
   );
   app.get('/api/custom/:id', (req, reply) => getCustom((req.params as { id: string }).id) ?? reply.code(404).send({ error: 'not found' }));
+  app.delete('/api/custom/:id', (req, reply) => {
+    const { id } = req.params as { id: string };
+    if (!safeViewId(id)) return reply.code(400).send({ error: 'id inválido' });
+    return deleteCustom(id) ? reply.code(204).send() : reply.code(404).send({ error: 'tela não encontrada' });
+  });
+  app.patch('/api/custom/:id', (req, reply) => {
+    const title = (req.body as { title?: unknown } | undefined)?.title;
+    if (typeof title !== 'string' || !title.trim()) return reply.code(400).send({ error: 'informe o título' });
+    return renameCustom((req.params as { id: string }).id, title) ?? reply.code(404).send({ error: 'tela não encontrada' });
+  });
   app.get('/api/runs/:id/result-view', (req) => resultView((req.params as { id: string }).id));
 
   // Páginas HTML geradas por agentes: iframe sandbox, acesso por token HMAC (origem opaca não leva cookie).

@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react'
 import type { VaultBacklink, VaultEditorState, VaultFile, VaultStatus, VaultSuggestion, VaultTreeEntry } from '@shared/protocol'
 import { api } from '../../api/client'
 import { onVaultChanged } from '../../api/events'
 import { C } from '../../lib/colors'
 import { useYui } from '../../store/yui'
-import { useHeader } from '../../views/ui'
+import { ActionSheet, type SheetAction } from '../../views/Sheet'
+import { ConfirmDeleteModal, useHeader } from '../../views/ui'
 import { outgoing, renderNote, splitFrontmatter } from '../../vault/markdown'
+import { ContextMenu, PathPrompt } from '../../vault/VaultDialogs'
 import '../../vault/vault.css'
 
 // Vault (Vault.dc.html): árvore de arquivos, VS Code (openvscode-server em /code) e leitura,
@@ -77,7 +79,29 @@ function makeResolver(tree: VaultTreeEntry[]) {
 const iconBtn: CSSProperties = { width: 'var(--vault-ib, 28px)', height: 'var(--vault-ib, 28px)', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'transparent', color: C.t2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
 const label: CSSProperties = { fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', fontWeight: 600 }
 
-function Explorer({ tree, selected, onPick, onCreate, narrow }: { tree: VaultTreeEntry[]; selected: string; onPick: (p: string) => void; onCreate: (folder: string) => void; narrow: boolean }) {
+const within = (p: string, base: string) => p === base || p.startsWith(`${base}/`)
+
+function Explorer({ tree, selected, onPick, onCreate, onNewFolder, onMenu, narrow }: {
+  tree: VaultTreeEntry[]
+  selected: string
+  onPick: (p: string) => void
+  onCreate: (folder: string) => void
+  onNewFolder: () => void
+  onMenu: (t: VaultTreeEntry, x: number, y: number) => void
+  narrow: boolean
+}) {
+  // menu de contexto: botão direito no mouse, toque longo no celular/tablet
+  const press = useRef<{ timer?: number; fired: boolean }>({ fired: false })
+  const endPress = () => window.clearTimeout(press.current.timer)
+  const startPress = (e: RPointerEvent, t: VaultTreeEntry) => {
+    press.current.fired = false
+    if (e.pointerType !== 'touch') return
+    const { clientX, clientY } = e
+    press.current.timer = window.setTimeout(() => {
+      press.current.fired = true
+      onMenu(t, clientX, clientY)
+    }, 550)
+  }
   const [open, setOpen] = useState<Set<string>>(() => {
     try {
       return new Set(JSON.parse(store.get('yui.vault.open') ?? '["01-Projeto","00-Inbox"]') as string[])
@@ -124,8 +148,11 @@ function Explorer({ tree, selected, onPick, onCreate, narrow }: { tree: VaultTre
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar notas…" className="vault-input" style={{ paddingLeft: 30 }} />
         </label>
         <div style={{ ...label, color: C.t2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Arquivos</span>
-          <button aria-label="Nova nota" title="Nova nota" style={iconBtn} onClick={() => onCreate(selected.includes('/') ? selected.split('/')[0] : '00-Inbox')}>
+          <span style={{ flex: 1 }}>Arquivos</span>
+          <button aria-label="Nova pasta" title="Nova pasta" style={{ ...iconBtn, marginRight: 6 }} onClick={onNewFolder}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7h7l2 2h9v10H3zM12 12v5M9.5 14.5h5" /></svg>
+          </button>
+          <button aria-label="Nova nota" title="Nova nota" style={iconBtn} onClick={() => onCreate(selected.includes('/') ? selected.split('/').slice(0, -1).join('/') : '00-Inbox')}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
           </button>
         </div>
@@ -138,7 +165,25 @@ function Explorer({ tree, selected, onPick, onCreate, narrow }: { tree: VaultTre
           return (
             <button
               key={t.path}
-              onClick={() => (t.dir ? toggle(t.path) : onPick(t.path))}
+              onClick={() => {
+                if (press.current.fired) {
+                  press.current.fired = false
+                  return
+                }
+                if (t.dir) toggle(t.path)
+                else onPick(t.path)
+              }}
+              onPointerDown={(e) => startPress(e, t)}
+              onPointerUp={endPress}
+              onPointerLeave={endPress}
+              onPointerCancel={endPress}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                endPress()
+                if (press.current.fired && (e.nativeEvent as PointerEvent).pointerType !== 'mouse') return // toque longo já abriu
+                press.current.fired = true
+                onMenu(t, e.clientX, e.clientY)
+              }}
               className="vault-row"
               title={t.path}
               aria-expanded={t.dir ? open.has(t.path) : undefined}
@@ -148,6 +193,7 @@ function Explorer({ tree, selected, onPick, onCreate, narrow }: { tree: VaultTre
                 background: on ? 'rgba(103,216,242,.09)' : 'transparent',
                 color: on ? '#fff' : hidden ? C.t3 : t.dir ? '#dfe3f3' : '#b4b9cf',
                 minHeight: narrow ? 42 : 27,
+                WebkitTouchCallout: 'none',
               }}
             >
               <span style={{ width: 12, display: 'flex', color: C.t2, transform: `rotate(${open.has(t.path) ? 90 : 0}deg)`, opacity: t.dir ? 1 : 0, transition: 'transform .15s' }}>
@@ -163,7 +209,9 @@ function Explorer({ tree, selected, onPick, onCreate, narrow }: { tree: VaultTre
         })}
         {!rows.length && <div style={{ padding: 12, fontSize: 12.5, color: C.t3 }}>{needle ? 'Nada encontrado.' : 'Vault vazio.'}</div>}
       </div>
-      <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,.06)', fontSize: 11.5, color: C.t2 }}>{notes} notas</div>
+      <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,.06)', fontSize: 11.5, color: C.t2 }}>
+        {notes} notas{narrow ? ' · toque longo para mais ações' : ''}
+      </div>
     </aside>
   )
 }
@@ -378,6 +426,7 @@ function MobileEditor({ file, onSaved }: { file: VaultFile; onSaved: () => void 
 
 export function VaultPage() {
   const narrow = useYui((s) => s.narrow)
+  const coarse = useYui((s) => s.coarse)
   const tablet = useYui((s) => s.device === 'tablet')
   const [ctxOpen, setCtxOpen] = useState(false)
   const [initial] = useState(() => useYui.getState().appParams.id)
@@ -390,15 +439,27 @@ export function VaultPage() {
   const [mobileEdit, setMobileEdit] = useState(false)
   const [creating, setCreating] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
+  const [menu, setMenu] = useState<{ t: VaultTreeEntry; x: number; y: number } | null>(null)
+  const [prompt, setPrompt] = useState<{ kind: 'move' | 'folder'; path: string; dir: boolean } | null>(null)
+  const [del, setDel] = useState<{ path: string; dir: boolean; count: number } | null>(null)
+  const [busy, setBusy] = useState(false)
   const { tree, reload } = useTree()
   const resolve = useMemo(() => makeResolver(tree), [tree])
   const lastEditorAt = useRef(Date.now())
   const showEditor = !narrow && mode !== 'read'
 
+  // ações da nota aberta (no celular, só quando a nota está na tela; vão para o ⋯)
+  const noteActions = file && (!narrow || mobileView === 'note')
   useHeader('Conhecimento · vault Obsidian', 'Vault', [
     { label: 'Ver no Cérebro', fn: () => useYui.getState().set({ appPage: 'brain', appParams: {} }) },
-    { label: '+ Nova nota', primary: true, fn: () => setCreating((selected.includes('/') ? selected.split('/')[0] : '') || '00-Inbox') },
-  ], [selected])
+    ...(noteActions
+      ? [
+          { label: 'Renomear ou mover', fn: () => setPrompt({ kind: 'move', path: selected, dir: false }) },
+          { label: 'Excluir nota', danger: true, fn: () => setDel({ path: selected, dir: false, count: 1 }) },
+        ]
+      : []),
+    { label: '+ Nova nota', primary: true, fn: () => setCreating((selected.includes('/') ? selected.split('/').slice(0, -1).join('/') : '') || '00-Inbox') },
+  ], [selected, noteActions])
 
   const loadFile = useCallback(() => {
     api
@@ -491,7 +552,108 @@ export function VaultPage() {
   }
 
   const commit = () => api.post<VaultStatus>('/api/vault/commit').then(setStatus).catch(() => {})
-  const folders = tree.filter((t) => t.dir && !t.path.startsWith('.') && !t.path.includes('/'))
+  const folders = tree.filter((t) => t.dir && !t.path.startsWith('.'))
+
+  // ---------- renomear/mover, pastas e exclusão ----------
+  const say = (t: string) => useYui.getState().say(t)
+  const move = async (from: string, dir: boolean, to: string) => {
+    let dest = to
+    if (!dir && /\.md$/i.test(from) && !/\.[a-z0-9]+$/i.test(dest)) dest += '.md'
+    if (dest === from) return setPrompt(null)
+    if (dir && within(dest, from)) throw new Error('Não dá para mover uma pasta para dentro dela mesma.')
+    const r = await api.post<{ path: string }>('/api/vault/move', { from, to: dest })
+    setPrompt(null)
+    reload()
+    if (within(selected, from)) setSelected(r.path + selected.slice(from.length))
+  }
+  const newFolder = async (path: string) => {
+    await api.post('/api/vault/folder', { path })
+    setPrompt(null)
+    reload()
+  }
+  const remove = () => {
+    if (!del) return
+    setBusy(true)
+    const q = encodeURIComponent(del.path)
+    api
+      .del(del.dir ? `/api/vault/folder?path=${q}` : `/api/vault/file?path=${q}`)
+      .then(() => {
+        if (within(selected, del.path)) {
+          const next = tree.find((t) => !t.dir && t.path.endsWith('.md') && !within(t.path, del.path))?.path ?? DEFAULT_NOTE
+          setSelected(next)
+          setMobileView('list')
+        }
+        setDel(null)
+        reload()
+      })
+      .catch((e: Error) => say(`Não consegui excluir: ${e.message}`))
+      .finally(() => setBusy(false))
+  }
+  const entryActions = (t: VaultTreeEntry): SheetAction[] =>
+    t.dir
+      ? [
+          { label: 'Nova nota aqui', fn: () => setCreating(t.path) },
+          { label: 'Nova subpasta', fn: () => setPrompt({ kind: 'folder', path: `${t.path}/`, dir: true }) },
+          { label: 'Renomear ou mover pasta', fn: () => setPrompt({ kind: 'move', path: t.path, dir: true }) },
+          { label: 'Excluir pasta', danger: true, fn: () => setDel({ path: t.path, dir: true, count: t.count ?? 0 }) },
+        ]
+      : [
+          { label: 'Abrir', fn: () => pick(t.path) },
+          { label: 'Renomear ou mover', fn: () => setPrompt({ kind: 'move', path: t.path, dir: false }) },
+          { label: 'Excluir nota', danger: true, fn: () => setDel({ path: t.path, dir: false, count: 1 }) },
+        ]
+  const openMenu = (t: VaultTreeEntry, x: number, y: number) => setMenu({ t, x, y })
+  const openNewFolder = () => setPrompt({ kind: 'folder', path: '', dir: true })
+
+  const overlays = (
+    <>
+      {menu &&
+        (coarse || narrow ? (
+          <ActionSheet title={menu.t.path} actions={entryActions(menu.t)} onClose={() => setMenu(null)} />
+        ) : (
+          <ContextMenu x={menu.x} y={menu.y} title={menu.t.path} actions={entryActions(menu.t)} onClose={() => setMenu(null)} />
+        ))}
+      {prompt?.kind === 'move' && (
+        <PathPrompt
+          title={prompt.dir ? 'Renomear ou mover pasta' : 'Renomear ou mover nota'}
+          hint="Mude o nome ou o caminho (pasta/subpasta/nome). Links [[…]] de outras notas não são atualizados."
+          label="Caminho no vault"
+          initial={prompt.dir ? prompt.path : prompt.path.replace(/\.md$/i, '')}
+          confirm="Salvar"
+          onCancel={() => setPrompt(null)}
+          onSubmit={(v) => move(prompt.path, prompt.dir, v)}
+        />
+      )}
+      {prompt?.kind === 'folder' && (
+        <PathPrompt
+          title="Nova pasta"
+          hint="Use / para criar dentro de outra pasta (ex.: 06-Ideias/Produtos)."
+          label="Caminho da pasta"
+          initial={prompt.path}
+          confirm="Criar pasta"
+          onCancel={() => setPrompt(null)}
+          onSubmit={newFolder}
+        />
+      )}
+      {del && (
+        <ConfirmDeleteModal
+          title={del.dir ? 'Excluir pasta?' : 'Excluir nota?'}
+          text={
+            del.dir
+              ? 'A pasta e tudo dentro dela saem do vault e vão para a lixeira (.trash). Links para essas notas ficam quebrados.'
+              : 'A nota sai do vault e vai para a lixeira (.trash). Links para ela ficam quebrados.'
+          }
+          rows={[
+            { label: del.dir ? 'Pasta' : 'Nota', value: del.path.replace(/\.md$/i, '') },
+            ...(del.dir ? [{ label: 'Notas dentro', value: String(del.count) }] : []),
+          ]}
+          busy={busy}
+          onCancel={() => setDel(null)}
+          onConfirm={remove}
+        />
+      )}
+    </>
+  )
 
   const createBox = creating && (
     <div className="vault-card" style={{ padding: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -512,9 +674,10 @@ export function VaultPage() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {createBox}
+        {overlays}
         {mobileView === 'list' ? (
           <div style={{ height: 'calc(var(--vvh) - var(--tabbar) - 190px)', minHeight: 280, display: 'flex' }}>
-            <Explorer tree={tree} selected={selected} onPick={pick} onCreate={setCreating} narrow />
+            <Explorer tree={tree} selected={selected} onPick={pick} onCreate={setCreating} onNewFolder={openNewFolder} onMenu={openMenu} narrow />
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -552,13 +715,14 @@ export function VaultPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {createBox}
+      {overlays}
       {tablet && showEditor && (
         <div role="note" style={{ fontSize: 12.5, color: C.t2, padding: '8px 12px', borderRadius: 10, background: 'rgba(245,181,74,.06)', border: '1px solid rgba(245,181,74,.18)' }}>
           O editor VS Code funciona melhor no computador. No tablet, o modo Leitura é mais confortável.
         </div>
       )}
       <section className="vault-grid" style={tablet ? { height: 'calc(var(--vvh) - var(--sat) - 150px)', minHeight: 360 } : { height: 'calc(100dvh - 158px)', minHeight: 520 }}>
-        <Explorer tree={tree} selected={selected} onPick={pick} onCreate={setCreating} narrow={false} />
+        <Explorer tree={tree} selected={selected} onPick={pick} onCreate={setCreating} onNewFolder={openNewFolder} onMenu={openMenu} narrow={false} />
         <div className="vault-center">
           <div className="vault-bar">
             <div role="group" aria-label="Modo de visualização" className="vault-seg">

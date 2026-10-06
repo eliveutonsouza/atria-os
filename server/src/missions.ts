@@ -1,7 +1,7 @@
 import { trackOpenAI } from './usage.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ApprovalInfo, MissionInfo, MissionStep, RunInfo } from '../../shared/protocol.ts';
 import { db, kvGet, now, uid } from './db.ts';
 import { config } from './config.ts';
@@ -30,10 +30,24 @@ CREATE TABLE IF NOT EXISTS missions (
 );
 `);
 
-type MissionRow = { id: string; title: string; goal: string; project: string | null; status: MissionInfo['status']; plan_json: string; created_at: string; finished_at: string | null };
+// Rascunhos (status draft): detalhes do pedido e "pedir meu OK antes de" entram no planejamento.
+function addColumn(col: string, def: string) {
+  const cols = db.prepare('PRAGMA table_info(missions)').all() as { name: string }[];
+  if (!cols.some((c) => c.name === col)) db.exec(`ALTER TABLE missions ADD COLUMN ${col} ${def}`);
+}
+addColumn('details', 'TEXT');
+addColumn('approval_before', 'TEXT');
+
+type MissionRow = {
+  id: string; title: string; goal: string; project: string | null; status: MissionInfo['status']; plan_json: string; created_at: string; finished_at: string | null;
+  details: string | null; approval_before: string | null;
+};
 
 function toInfo(r: MissionRow): MissionInfo {
-  return { id: r.id, title: r.title, goal: r.goal, project: r.project, status: r.status, steps: JSON.parse(r.plan_json), createdAt: r.created_at, finishedAt: r.finished_at };
+  return {
+    id: r.id, title: r.title, goal: r.goal, project: r.project, status: r.status, steps: JSON.parse(r.plan_json), createdAt: r.created_at, finishedAt: r.finished_at,
+    details: r.details, approvalBefore: r.approval_before ? (JSON.parse(r.approval_before) as string[]) : [],
+  };
 }
 
 export function getMission(id: string): MissionInfo | null {
@@ -81,7 +95,11 @@ function connectorsLine(): string {
   }
 }
 
-export async function planMission(goal: string, projectSlug: string | null): Promise<MissionInfo> {
+export interface PlanOpts { details?: string | null; approvalBefore?: string[]; status?: 'draft' | 'running' }
+
+const APPROVAL_LABEL: Record<string, string> = { deploy: 'deploy/publicação', enviar: 'envio de mensagem/e-mail' };
+
+async function planSteps(goal: string, projectSlug: string | null, opts: PlanOpts): Promise<{ title: string; steps: MissionStep[] }> {
   const agents = loadAgents();
   const ids = agents.map((a) => a.id);
   const schema = {
@@ -109,8 +127,11 @@ export async function planMission(goal: string, projectSlug: string | null): Pro
       },
     },
   };
+  const approvals = (opts.approvalBefore ?? []).map((a) => APPROVAL_LABEL[a]).filter(Boolean);
   const prompt = [
     `Objetivo do usuário: ${goal}`,
+    ...(opts.details?.trim() ? [`Detalhes e referências do usuário: ${opts.details.trim()}`] : []),
+    ...(approvals.length ? [`Peça aprovação (risky=true) antes de: ${approvals.join('; ')}.`] : []),
     projectContext(projectSlug),
     `Agentes disponíveis:\n${agents.map((a) => `- ${a.id}: ${a.name} — ${a.description}`).join('\n')}`,
     `Conectores dos agentes: ${connectorsLine() || 'Google Calendar, Gmail, Drive, Linear, Vercel, Supabase, Figma'}; navegador Playwright e Chrome do usuário.`,
@@ -148,10 +169,179 @@ export async function planMission(goal: string, projectSlug: string | null): Pro
     };
   });
   breakCycles(steps);
-  const m: MissionInfo = { id: uid(), title: plan.title, goal, project: projectSlug, status: 'running', steps, createdAt: now(), finishedAt: null };
-  db.prepare('INSERT INTO missions(id, title, goal, project, status, plan_json, created_at) VALUES(?, ?, ?, ?, ?, ?, ?)').run(m.id, m.title, m.goal, m.project, m.status, JSON.stringify(m.steps), m.createdAt);
+  return { title: plan.title, steps };
+}
+
+export async function planMission(goal: string, projectSlug: string | null, opts: PlanOpts = {}): Promise<MissionInfo> {
+  const plan = await planSteps(goal, projectSlug, opts);
+  return insertMission({ title: plan.title, goal, project: projectSlug, details: opts.details ?? null, approvalBefore: opts.approvalBefore ?? [], steps: plan.steps, status: opts.status ?? 'running' });
+}
+
+function insertMission(p: { title: string; goal: string; project: string | null; details: string | null; approvalBefore: string[]; steps: MissionStep[]; status: MissionInfo['status'] }): MissionInfo {
+  const m: MissionInfo = { id: uid(), ...p, createdAt: now(), finishedAt: null };
+  db.prepare('INSERT INTO missions(id, title, goal, project, status, plan_json, created_at, details, approval_before) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(m.id, m.title, m.goal, m.project, m.status, JSON.stringify(m.steps), m.createdAt, m.details, JSON.stringify(m.approvalBefore));
   emit({ type: 'mission.updated', mission: m });
   return m;
+}
+
+// Rascunho montado à mão: sem planejador, título = primeira linha do objetivo.
+export function createManualDraft(goal: string, projectSlug: string | null, opts: PlanOpts = {}): MissionInfo {
+  const title = goal.trim().split('\n')[0].trim().slice(0, 60) || 'Nova missão';
+  return insertMission({ title, goal: goal.trim(), project: projectSlug, details: opts.details ?? null, approvalBefore: opts.approvalBefore ?? [], steps: [], status: 'draft' });
+}
+
+// ---------- edição (rascunho; pausada/bloqueada só nas etapas pendentes) ----------
+
+export class MissionEditError extends Error {
+  code: 400 | 404 | 409;
+  constructor(code: 400 | 404 | 409, message: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
+export interface StepInput { id: string; title: string; agentId: string; instruction: string; dependsOn: string[]; risky: boolean; display: MissionStep['display'] }
+export interface MissionPatch { title?: string; goal?: string; project?: string | null; details?: string | null; approvalBefore?: string[]; steps?: StepInput[] }
+
+// Primeira dependência circular encontrada (ids no caminho), ou null.
+function findCycle(steps: { id: string; dependsOn: string[] }[]): string[] | null {
+  const byId = new Map(steps.map((s) => [s.id, s]));
+  const state = new Map<string, 1 | 2>(); // 1 = no caminho, 2 = resolvida
+  const path: string[] = [];
+  const visit = (id: string): string[] | null => {
+    if (state.get(id) === 2) return null;
+    if (state.get(id) === 1) return [...path.slice(path.indexOf(id)), id];
+    state.set(id, 1);
+    path.push(id);
+    for (const d of byId.get(id)?.dependsOn ?? []) {
+      const c = visit(d);
+      if (c) return c;
+    }
+    path.pop();
+    state.set(id, 2);
+    return null;
+  };
+  for (const s of steps) {
+    const c = visit(s.id);
+    if (c) return c;
+  }
+  return null;
+}
+
+function normalizeSteps(input: unknown): MissionStep[] {
+  if (!Array.isArray(input)) throw new MissionEditError(400, 'steps precisa ser uma lista');
+  if (input.length > 30) throw new MissionEditError(400, 'no máximo 30 etapas');
+  const ids = new Set<string>();
+  const steps = input.map((raw, i) => {
+    const s = (raw ?? {}) as Partial<StepInput>;
+    const id = String(s.id ?? '').trim();
+    if (!id) throw new MissionEditError(400, `etapa ${i + 1} sem id`);
+    if (ids.has(id)) throw new MissionEditError(400, `id de etapa repetido: ${id}`);
+    ids.add(id);
+    const title = String(s.title ?? '').trim();
+    if (!title) throw new MissionEditError(400, `etapa ${id} sem título`);
+    const agent = s.agentId ? findAgent(String(s.agentId)) : undefined;
+    if (!agent) throw new MissionEditError(400, `etapa "${title}": agente desconhecido (${s.agentId || 'vazio'})`);
+    return {
+      id,
+      title: title.slice(0, 120),
+      agentId: agent.id,
+      agent: agent.name,
+      instruction: String(s.instruction ?? ''),
+      dependsOn: Array.isArray(s.dependsOn) ? [...new Set(s.dependsOn.map(String))] : [],
+      risky: !!s.risky,
+      display: s.display === 'blocks' || s.display === 'html' ? s.display : null,
+      status: 'pending',
+      runId: null,
+      result: null,
+    } satisfies MissionStep;
+  });
+  for (const s of steps) {
+    if (s.dependsOn.includes(s.id)) throw new MissionEditError(400, `a etapa "${s.title}" não pode depender dela mesma`);
+    const bad = s.dependsOn.find((d) => !ids.has(d));
+    if (bad) throw new MissionEditError(400, `a etapa "${s.title}" depende de uma etapa que não existe (${bad})`);
+  }
+  const cycle = findCycle(steps);
+  if (cycle) throw new MissionEditError(400, `dependência circular entre etapas: ${cycle.join(' → ')}`);
+  return steps;
+}
+
+const sameStep = (a: MissionStep, b: MissionStep) =>
+  a.title === b.title && a.agentId === b.agentId && a.instruction === b.instruction && a.risky === b.risky && a.display === b.display &&
+  a.dependsOn.length === b.dependsOn.length && a.dependsOn.every((d) => b.dependsOn.includes(d));
+
+function saveAll(m: MissionInfo) {
+  db.prepare('UPDATE missions SET title = ?, goal = ?, project = ?, details = ?, approval_before = ?, status = ?, plan_json = ?, finished_at = ? WHERE id = ?')
+    .run(m.title, m.goal, m.project, m.details ?? null, JSON.stringify(m.approvalBefore ?? []), m.status, JSON.stringify(m.steps), m.finishedAt, m.id);
+  emit({ type: 'mission.updated', mission: m });
+}
+
+export function updateMission(id: string, patch: MissionPatch): MissionInfo {
+  const m = getMission(id);
+  if (!m) throw new MissionEditError(404, 'not found');
+  if (m.status === 'draft') {
+    if (patch.goal !== undefined) {
+      if (!String(patch.goal).trim()) throw new MissionEditError(400, 'o objetivo não pode ficar vazio');
+      m.goal = String(patch.goal).trim();
+    }
+    if (patch.title !== undefined && String(patch.title).trim()) m.title = String(patch.title).trim().slice(0, 80);
+    if (patch.project !== undefined) {
+      if (patch.project && !findProject(patch.project)) throw new MissionEditError(400, 'projeto não encontrado');
+      m.project = patch.project || null;
+    }
+    if (patch.details !== undefined) m.details = patch.details ? String(patch.details) : null;
+    if (patch.approvalBefore !== undefined) m.approvalBefore = Array.isArray(patch.approvalBefore) ? patch.approvalBefore.filter((a) => a in APPROVAL_LABEL) : [];
+    if (patch.steps !== undefined) m.steps = normalizeSteps(patch.steps);
+  } else if (m.status === 'paused' || m.status === 'blocked') {
+    if (patch.title !== undefined || patch.goal !== undefined || patch.project !== undefined || patch.details !== undefined || patch.approvalBefore !== undefined) {
+      throw new MissionEditError(409, 'com a missão em andamento só dá para editar as etapas pendentes');
+    }
+    if (patch.steps !== undefined) {
+      const next = normalizeSteps(patch.steps);
+      const old = new Map(m.steps.map((s) => [s.id, s]));
+      for (const prev of m.steps) {
+        if (prev.status === 'pending') continue;
+        const cur = next.find((s) => s.id === prev.id);
+        if (!cur) throw new MissionEditError(409, `a etapa "${prev.title}" já saiu da fila e não pode ser removida`);
+        if (!sameStep(prev, cur)) throw new MissionEditError(409, `a etapa "${prev.title}" já saiu da fila e não pode ser alterada`);
+      }
+      // etapas que já saíram da fila mantêm estado, run e resultado
+      m.steps = next.map((s) => {
+        const prev = old.get(s.id);
+        return prev && prev.status !== 'pending' ? prev : s;
+      });
+    }
+  } else {
+    throw new MissionEditError(409, 'só dá para editar rascunhos ou missões pausadas/bloqueadas');
+  }
+  saveAll(m);
+  return m;
+}
+
+export async function replanMission(id: string): Promise<MissionInfo> {
+  const m = getMission(id);
+  if (!m) throw new MissionEditError(404, 'not found');
+  if (m.status !== 'draft') throw new MissionEditError(409, 'só rascunhos podem ser replanejados');
+  const plan = await planSteps(m.goal, m.project, { details: m.details, approvalBefore: m.approvalBefore });
+  const cur = getMission(id);
+  if (!cur || cur.status !== 'draft') throw new MissionEditError(409, 'o rascunho mudou durante o planejamento');
+  cur.title = plan.title;
+  cur.steps = plan.steps;
+  saveAll(cur);
+  return cur;
+}
+
+export function startMission(id: string): MissionInfo {
+  const m = getMission(id);
+  if (!m) throw new MissionEditError(404, 'not found');
+  if (m.status !== 'draft') throw new MissionEditError(409, 'a missão já foi iniciada');
+  if (!m.steps.length) throw new MissionEditError(400, 'adicione pelo menos uma etapa antes de iniciar');
+  m.status = 'running';
+  m.finishedAt = null;
+  saveAll(m);
+  advance(m.id);
+  return getMission(id)!;
 }
 
 // Dependências circulares (raras) são cortadas: a etapa mantém só dependências que vêm antes dela na lista.
@@ -305,6 +495,7 @@ runBus.on('finished', (run: RunInfo) => {
 export function controlMission(id: string, action: 'pause' | 'resume' | 'cancel' | 'retry'): MissionInfo | null {
   const m = getMission(id);
   if (!m) return null;
+  if (m.status === 'draft') return m; // rascunho só muda pelo editor (iniciar/descartar)
   if (action === 'pause' && m.status === 'running') m.status = 'paused';
   else if (action === 'resume' && (m.status === 'paused' || m.status === 'blocked')) m.status = 'running';
   else if (action === 'retry') {
@@ -470,11 +661,27 @@ export function register(app: FastifyInstance): void {
     app.post(`/api/missions/:id/${action}`, (req, reply) => controlMission((req.params as { id: string }).id, action) ?? reply.code(404).send({ error: 'not found' }));
   }
   app.delete('/api/missions/:id', (req, reply) => reply.code(deleteMission((req.params as { id: string }).id) ? 204 : 404).send());
-  app.post('/api/missions', async (req, reply) => {
-    const b = (req.body ?? {}) as { goal?: string; project?: string | null };
-    if (!b.goal) return reply.code(400).send({ error: 'goal' });
-    const m = await planMission(b.goal, b.project ?? null);
-    advance(m.id);
+  // Erros de edição viram { error } com o código certo (400 validação, 404, 409 estado).
+  const guard = async <T>(reply: FastifyReply, fn: () => T | Promise<T>) => {
+    try {
+      return await fn();
+    } catch (e) {
+      if (e instanceof MissionEditError) return reply.code(e.code).send({ error: e.message });
+      throw e;
+    }
+  };
+  // mode manual = rascunho sem planejador; mode ai = planeja. Rascunho por padrão; start:true já começa a executar.
+  app.post('/api/missions', (req, reply) => guard(reply, async () => {
+    const b = (req.body ?? {}) as { goal?: string; project?: string | null; details?: string | null; approvalBefore?: string[]; mode?: 'ai' | 'manual'; start?: boolean };
+    if (!b.goal?.trim()) return reply.code(400).send({ error: 'Descreva o objetivo da missão.' });
+    if (b.project && !findProject(b.project)) return reply.code(400).send({ error: 'projeto não encontrado' });
+    const opts: PlanOpts = { details: b.details ?? null, approvalBefore: Array.isArray(b.approvalBefore) ? b.approvalBefore.filter((a) => a in APPROVAL_LABEL) : [] };
+    if (b.mode === 'manual') return createManualDraft(b.goal, b.project ?? null, opts);
+    const m = await planMission(b.goal.trim(), b.project ?? null, { ...opts, status: b.start ? 'running' : 'draft' });
+    if (b.start) advance(m.id);
     return getMission(m.id);
-  });
+  }));
+  app.put('/api/missions/:id', (req, reply) => guard(reply, () => updateMission((req.params as { id: string }).id, (req.body ?? {}) as MissionPatch)));
+  app.post('/api/missions/:id/replan', (req, reply) => guard(reply, () => replanMission((req.params as { id: string }).id)));
+  app.post('/api/missions/:id/start', (req, reply) => guard(reply, () => startMission((req.params as { id: string }).id)));
 }

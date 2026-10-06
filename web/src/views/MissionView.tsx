@@ -5,6 +5,7 @@ import { useApi } from '../api/useApi'
 import { C } from '../lib/colors'
 import { dropMission } from '../lib/actions'
 import { useYui } from '../store/yui'
+import { MissionEditor } from './MissionEditor'
 import { ConfirmDeleteModal, Empty, ErrorNote, Eyebrow, Skeleton, useHeader } from './ui'
 
 // Missão: plano de execução multi-agente (PRD §94/§36) — grafo de etapas + lista com estado ao vivo.
@@ -62,11 +63,20 @@ export function DeleteMissionModal({ mission: m, onClose }: { mission: MissionIn
   )
 }
 
+// Rascunho abre direto no editor; pausada/bloqueada abre o editor restrito (só etapas pendentes) em "Editar etapas".
 export function MissionView() {
   const id = useYui((s) => s.viewParams.missionId)
   const live = useYui((s) => (id ? s.missions[id] : undefined))
   const { data, loading, error, reload } = useApi<MissionInfo>(id ? `/api/missions/${encodeURIComponent(id)}` : null, [id])
   const m = live ?? data
+  const [editing, setEditing] = useState(false)
+  const editable = m?.status === 'paused' || m?.status === 'blocked'
+  if (m && m.status === 'draft') return <MissionEditor key={`draft:${m.id}`} mission={m} />
+  if (m && editing && editable) return <MissionEditor key={`edit:${m.id}`} mission={m} restricted onClose={() => setEditing(false)} />
+  return <MissionDetail id={id} m={m} loading={loading} error={error} reload={reload} onEdit={editable ? () => setEditing(true) : undefined} />
+}
+
+function MissionDetail({ id, m, loading, error, reload, onEdit }: { id?: string; m?: MissionInfo | null; loading: boolean; error: unknown; reload: () => void; onEdit?: () => void }) {
   const act = (a: 'pause' | 'resume' | 'cancel' | 'retry') => () => {
     if (!id) return
     api.post<MissionInfo>(`/api/missions/${id}/${a}`).then((r) => {
@@ -84,7 +94,8 @@ export function MissionView() {
           ? [{ label: 'Tentar de novo', fn: act('retry'), primary: true }, ...(m.status === 'blocked' ? [{ label: 'Cancelar', fn: act('cancel') }] : [])]
           : []
   const [delOpen, setDelOpen] = useState(false)
-  useHeader('Mission', m?.title ?? 'Missão', m ? [...actions, { label: 'Excluir missão', fn: () => setDelOpen(true), danger: true }] : actions, [m?.status, m?.id])
+  const edit = onEdit ? [{ label: 'Editar etapas', fn: onEdit }] : []
+  useHeader('Mission', m?.title ?? 'Missão', m ? [...actions, ...edit, { label: 'Excluir missão', fn: () => setDelOpen(true), danger: true }] : actions, [m?.status, m?.id, !!onEdit])
   if (!id) return <Empty text="Nenhuma missão aberta." hint="Peça algo grande: “Yui, cria uma landing page para uma clínica.”" />
   if (loading && !m) return <Skeleton kpis={0} rows={5} />
   if (error || !m) return <ErrorNote text="Não encontrei essa missão." />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { InboxItem, RepoInfo, ViewName } from '@shared/protocol'
+import type { ChatMessage, InboxItem, RepoInfo, ViewName } from '@shared/protocol'
 import { api } from '../api/client'
 import { enterApp } from '../app/nav'
 import { applyUpdate, disablePush, enablePush, isIOS, isStandalone, promptInstall, testPush } from '../pwa/pwa'
@@ -8,6 +8,7 @@ import { C, toneColor } from '../lib/colors'
 import { dockInput } from '../shell/parts'
 import { useYui } from '../store/yui'
 import { BottomSheet } from '../views/Sheet'
+import { ConfirmDeleteModal } from '../views/ui'
 
 function openInboxItem(ib: InboxItem) {
   const s = useYui.getState()
@@ -42,20 +43,63 @@ export function HistoryDrawer() {
   const open = useYui((s) => s.histOpen)
   const hist = useYui((s) => s.hist)
   const endRef = useRef<HTMLDivElement>(null)
+  const [more, setMore] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [confirm, setConfirm] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const prepending = useRef(false)
   useEffect(() => {
-    if (open) endRef.current?.scrollIntoView({ block: 'end' })
+    // ao carregar mensagens antigas no topo, não pula para o fim
+    if (prepending.current) prepending.current = false
+    else if (open) endRef.current?.scrollIntoView({ block: 'end' })
   }, [open, hist.length])
+
+  const loadMore = async () => {
+    const oldest = hist[0]?.at
+    setLoading(true)
+    try {
+      const r = await api.get<{ messages: ChatMessage[]; hasMore: boolean }>(`/api/messages?limit=60${oldest ? `&before=${encodeURIComponent(oldest)}` : ''}`)
+      const s = useYui.getState()
+      const seen = new Set(s.hist.map((h) => `${h.who}|${h.at}|${h.text}`))
+      const older = r.messages.filter((m) => !seen.has(`${m.who}|${m.at}|${m.text}`))
+      prepending.current = older.length > 0
+      s.set({ hist: [...older, ...s.hist] })
+      setMore(r.hasMore)
+    } catch {
+      useYui.getState().say('Não consegui carregar mensagens antigas agora.', { hist: false })
+    }
+    setLoading(false)
+  }
+
+  const clear = async () => {
+    setBusy(true)
+    try {
+      await api.del('/api/messages')
+      useYui.getState().set({ hist: [] })
+      setMore(false)
+      setConfirm(false)
+    } catch {
+      useYui.getState().say('Não consegui limpar a conversa agora.', { hist: false })
+    }
+    setBusy(false)
+  }
+
+  const linkBtn = { minHeight: 44, padding: '0 8px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13 } as const
   return (
     <aside
       aria-label="Conversa"
       aria-hidden={!open}
       style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 'min(360px,90dvw)', zIndex: 52, paddingTop: 'var(--sat)', paddingBottom: 'var(--sab)', paddingLeft: 'var(--sal)', boxSizing: 'border-box', transform: open ? 'translateX(0)' : 'translateX(-105%)', transition: 'transform .4s cubic-bezier(.2,.8,.2,1)', background: 'rgba(12,14,30,.95)', borderRight: '1px solid rgba(255,255,255,.08)', backdropFilter: 'blur(18px)', display: 'flex', flexDirection: 'column', visibility: open ? 'visible' : 'hidden' }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 20px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-        <span style={{ fontSize: 14, fontWeight: 600 }}>Conversa</span>
-        <button onClick={() => useYui.getState().set({ histOpen: false })} style={{ minHeight: 44, padding: '0 8px', border: 'none', background: 'transparent', color: C.t2, cursor: 'pointer', fontSize: 14 }}>Fechar</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4, padding: '8px 12px 8px 20px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+        <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>Conversa</span>
+        {hist.length > 0 && <button onClick={() => setConfirm(true)} style={{ ...linkBtn, color: '#f39aa4' }}>Limpar conversa</button>}
+        <button onClick={() => useYui.getState().set({ histOpen: false })} style={{ ...linkBtn, color: C.t2, fontSize: 14 }}>Fechar</button>
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {hist.length > 0 && more && (
+          <button disabled={loading} onClick={() => void loadMore()} style={{ ...linkBtn, alignSelf: 'center', color: C.cyan }}>{loading ? 'Carregando…' : 'Carregar mais'}</button>
+        )}
         {!hist.length && <div style={{ fontSize: 14, color: C.t3 }}>Ainda não conversamos hoje.</div>}
         {hist.map((h) => (
           <div key={h.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -65,6 +109,16 @@ export function HistoryDrawer() {
         ))}
         <div ref={endRef} />
       </div>
+      {confirm && (
+        <ConfirmDeleteModal
+          title="Limpar a conversa?"
+          text="Apaga todo o histórico de mensagens entre você e a Yui guardado no console. Execuções, missões e memórias não são afetadas."
+          rows={[{ label: 'Mensagens nesta tela', value: String(hist.length) }]}
+          busy={busy}
+          onCancel={() => setConfirm(false)}
+          onConfirm={() => void clear()}
+        />
+      )}
     </aside>
   )
 }

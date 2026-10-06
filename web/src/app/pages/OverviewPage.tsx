@@ -6,6 +6,7 @@ import { dockInput } from '../../shell/parts'
 import { useYui } from '../../store/yui'
 import { useHeader } from '../../views/ui'
 import { Card, dayLabel, Dot, elapsed, fmtCost, fmtTokens, HBar, Kpi, Legend, openApp, ORIGIN_LABEL } from './common'
+import { UsageSummaryCard } from './UsagePage'
 
 // Visão geral (Overview.dc.html): KPIs, execuções por dia, sucesso por agente, trabalhando agora, próximos agendamentos, projetos.
 
@@ -70,6 +71,8 @@ export function OverviewPage() {
         <Kpi label="Aguardando você" value={k ? String(k.approvals) : '—'} color={C.warn} delta="aprovações" deltaColor="#f5c97a" />
         <Kpi label={`Custo · ${days} dias`} value={k ? fmtCost(k.cost7d) : '—'} color={C.lav} delta={k ? `${fmtTokens(k.tokens7d)} tokens` : undefined} />
       </section>
+
+      <UsageSummaryCard />
 
       <section className="app-grid-3">
         <Card className="app-span-2" title="Execuções por dia" right={<Legend items={[{ label: 'concluídas', color: C.cyan }, { label: 'falhas', color: C.warn }, { label: 'rotinas', color: C.violet }]} />}>

@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { Block, CustomViewInfo } from '@shared/protocol'
 import { useApi } from '../api/useApi'
 import { C, toneColor } from '../lib/colors'
 import { useYui } from '../store/yui'
+import { CustomViewDialogs } from './ArtifactsView'
 import { GroupedBars, KpiTile, Legend, LineArea, Pie } from '../charts/Charts'
 import { card, Dot, Empty, ErrorNote, Eyebrow, Skeleton, useHeader } from './ui'
 
@@ -13,13 +14,33 @@ export function CustomView() {
   const live = useYui((s) => (id ? s.customViews[id] : undefined))
   const { data, loading, error } = useApi<CustomViewInfo>(id && !live ? `/api/custom/${encodeURIComponent(id)}` : null, [id])
   const view = live ?? data
-  useHeader(view?.spec.eyebrow ?? 'Yui', view?.spec.title ?? 'Tela', [], [view?.id])
+  const [act, setAct] = useState<'rename' | 'delete' | null>(null)
+  const [renamed, setRenamed] = useState<{ id: string; title: string } | null>(null)
+  const title = renamed && renamed.id === view?.id ? renamed.title : view?.spec.title
+  useHeader(view?.spec.eyebrow ?? 'Yui', title ?? 'Tela', view
+    ? [
+        { label: 'Renomear', fn: () => setAct('rename') },
+        { label: 'Excluir', danger: true, fn: () => setAct('delete') },
+      ]
+    : [], [view?.id, title])
   if (!id) return <Empty text="Nenhuma tela selecionada." hint="Peça: “Yui, faz um gráfico das execuções por agente.”" />
   if (loading && !view) return <Skeleton rows={3} />
   if (error || !view) return <ErrorNote text="Não encontrei essa tela." />
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22, maxWidth: 1100 }}>
       {view.spec.blocks.map((b, i) => <BlockView key={i} block={b} />)}
+      {act && (
+        <CustomViewDialogs
+          view={{ id: view.id, title: title ?? view.spec.title, createdAt: view.createdAt }}
+          action={act}
+          onClose={() => setAct(null)}
+          onDone={(t) => {
+            setAct(null)
+            if (t) setRenamed({ id: view.id, title: t })
+            else useYui.getState().show('artifact')
+          }}
+        />
+      )}
     </div>
   )
 }

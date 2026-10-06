@@ -22,7 +22,13 @@ const DEFAULTS: Record<string, Price> = {
   'gpt-5-nano': { in: 0.05, out: 0.4, cachedIn: 0.005 },
   'gpt-5-mini': { in: 0.25, out: 2, cachedIn: 0.025 },
   'gpt-5': { in: 1.25, out: 10, cachedIn: 0.125 },
-  'gpt-realtime': { in: 4, out: 16, cachedIn: 0.4, audioIn: 32, audioOut: 64 },
+  // GPT-6 (lançados 2026-09-22) e voz GPT-Live, conforme developers.openai.com/api/docs/pricing
+  'gpt-6-luna': { in: 0.1, out: 0.5, cachedIn: 0.01 },
+  'gpt-6-sol': { in: 2, out: 10, cachedIn: 0.1 },
+  'gpt-6.1-sol': { in: 2, out: 10, cachedIn: 0.1 },
+  'gpt-live-1': { in: 0, out: 0, perMinute: 0.05 },
+  'gpt-realtime-2.1-mini': { in: 0.6, out: 2.4, cachedIn: 0.06, audioIn: 10, audioOut: 20 },
+  'gpt-realtime': { in: 4, out: 24, cachedIn: 0.4, audioIn: 32, audioOut: 64 },
   'text-embedding-3-small': { in: 0.02, out: 0 },
   'text-embedding-3-large': { in: 0.13, out: 0 },
 };

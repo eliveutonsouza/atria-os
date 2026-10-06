@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import type { MissionInfo } from '@shared/protocol'
 import { useApi } from '../../api/useApi'
 import { C } from '../../lib/colors'
-import { dockInput } from '../../shell/parts'
 import { useYui } from '../../store/yui'
+import { MissionEditor } from '../../views/MissionEditor'
 import { DeleteMissionModal, MissionView } from '../../views/MissionView'
 import { Empty } from '../../views/ui'
 import { Dot, openApp, relTime, Tag, useViewParams } from './common'
 
 // Missões: planos de execução multi-agente. Lista à esquerda, plano (MissionView) à direita.
+// "+ Nova missão" e rascunhos abrem o editor (MissionEditor) ocupando a página toda.
 
 const STATUS: Record<MissionInfo['status'], [string, string]> = {
   draft: ['rascunho', C.lav],
@@ -20,10 +21,7 @@ const STATUS: Record<MissionInfo['status'], [string, string]> = {
   cancelled: ['cancelada', C.t3],
 }
 
-function newMission() {
-  useYui.getState().say('Qual é a missão? Descreva o objetivo e eu monto o plano com os agentes certos.')
-  setTimeout(() => dockInput.el?.focus(), 30)
-}
+const newMission = () => openApp('missions', 'new')
 
 export function MissionsPage() {
   const id = useYui((s) => s.appParams.id)
@@ -32,26 +30,30 @@ export function MissionsPage() {
   const device = useYui((s) => s.device)
   const phone = device === 'phone'
   const [del, setDel] = useState<MissionInfo | null>(null)
-  // no celular com missão aberta o cabeçalho é do MissionView (‹ Voltar + ações da missão)
-  useEffect(() => {
-    if (id && phone) return
-    useYui.getState().setHeader({ eyebrow: 'Missões', title: 'Planos de execução', actions: [{ label: '+ Nova missão', fn: newMission, primary: true }] })
-  }, [id, phone])
   const list = useMemo(() => {
     const m = new Map<string, MissionInfo>()
     for (const x of data ?? []) m.set(x.id, x)
     for (const x of Object.values(live)) m.set(x.id, x)
     return [...m.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   }, [data, live])
-  useViewParams(id ? { missionId: id } : {})
+  const draft = id && id !== 'new' ? list.find((m) => m.id === id && m.status === 'draft') : undefined
+  const editing = id === 'new' || !!draft
+  // no celular com missão aberta (e no editor) o cabeçalho é do detalhe/editor
+  useEffect(() => {
+    if ((id && phone) || editing) return
+    useYui.getState().setHeader({ eyebrow: 'Missões', title: 'Planos de execução', actions: [{ label: '+ Nova missão', fn: newMission, primary: true }] })
+  }, [id, phone, editing])
+  useViewParams(id && id !== 'new' ? { missionId: id } : {})
 
+  // nova missão / rascunho: editor na página toda
+  if (editing) return <MissionEditor key={id} mission={draft ?? null} />
   // celular: missão aberta ocupa a tela toda (sem a lista)
   if (phone && id) return <MissionView />
 
   return (
     <div className="app-split" style={{ alignItems: 'flex-start' }}>
       <section style={{ width: id ? (device === 'tablet' ? 280 : 340) : '100%', maxWidth: '100%', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {list.length === 0 && <Empty text="Nenhuma missão ainda." hint="Peça algo grande para a Yui: “cria uma landing page para uma clínica”." />}
+        {list.length === 0 && <Empty text="Nenhuma missão ainda." hint="Toque em “+ Nova missão” ou peça algo grande para a Yui: “cria uma landing page para uma clínica”." />}
         {list.map((m) => {
           const [l, c] = STATUS[m.status]
           const done = m.steps.filter((s) => s.status === 'done').length
@@ -79,7 +81,7 @@ export function MissionsPage() {
                 ))}
               </span>
               <span className="app-muted">
-                {done}/{m.steps.length} etapas{m.project ? ` · ${m.project}` : ''} · {relTime(m.createdAt)}
+                {m.status === 'draft' ? `${m.steps.length} etapa${m.steps.length === 1 ? '' : 's'} · não iniciada` : `${done}/${m.steps.length} etapas`}{m.project ? ` · ${m.project}` : ''} · {relTime(m.createdAt)}
               </span>
               {phone && <span aria-hidden style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 22, color: C.t3 }}>›</span>}
             </button>

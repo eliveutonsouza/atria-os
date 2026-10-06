@@ -16,8 +16,11 @@ dicas:
   - O painel Conexões sugere ligações em "Yui sugere ligar"; clique em ligar para aceitar.
   - O histórico fica em git dentro do vault. As mudanças viram versão sozinhas em cerca de 2 minutos; "Salvar versão" grava na hora.
   - No celular não há VS Code: use a lista, leia e toque em Editar para mudanças simples.
+  - Botão direito numa nota ou pasta da árvore abre o menu com Renomear ou mover, Nova subpasta e Excluir. No celular e no tablet, segure o dedo sobre o item.
+  - Excluir não apaga de vez: a nota ou a pasta vai para a lixeira do vault (.trash), de onde dá para recuperar pelo servidor.
 erros:
   - Apagar ou reescrever notas que os agentes criaram (relatórios, lições). Acrescente em vez de substituir.
+  - Renomear uma nota esperando que os links mudem junto. Os [[links]] de outras notas continuam com o nome antigo; ajuste-os depois.
 relacionados: [cerebro, empresa, execucoes]
 ---
 # Vault
@@ -30,10 +33,11 @@ Um vault de notas markdown em /workspace/.yui/vault, com pastas como 00-Inbox, 0
 2. **Escolha o modo.** **Editor** (VS Code dentro do console), **Lado a lado** (editor e leitura) ou **Leitura**. **Abrir em aba ↗** abre o VS Code em tela cheia.
 3. **Crie.** **+ Nova nota**: escolha a pasta, dê um título e clique em **Criar**. Ou peça à Yui "anota isso" (vai para 00-Inbox).
 4. **Navegue pelas ligações.** O painel Conexões mostra Backlinks (quem cita esta nota), Links (quem ela cita) e sugestões da Yui. **Constelação →** abre a nota no Cérebro.
-5. **Salve a versão.** Quando o rodapé mostrar alterações a salvar, **Salvar versão** grava no histórico.
+5. **Organize.** **Nova pasta** (ícone de pasta ao lado de Nova nota) cria uma pasta; use / para criar dentro de outra. No cabeçalho da nota aberta (no celular, no ⋯), **Renomear ou mover** muda o nome ou o caminho e **Excluir nota** manda para a lixeira. Para pastas, use o menu da árvore: **Renomear ou mover pasta** e **Excluir pasta** (leva tudo o que está dentro).
+6. **Salve a versão.** Quando o rodapé mostrar alterações a salvar, **Salvar versão** grava no histórico.
 
 ## O que você vê na tela
-- Árvore de arquivos com busca e botão Nova nota.
+- Árvore de arquivos com busca e botões Nova pasta e Nova nota; menu de cada item no botão direito (ou toque longo).
 - Caminho da nota e o status do VS Code (VS Code ou "VS Code iniciando").
 - Rodapé: "git · tudo salvo no histórico" ou o número de alterações pendentes; total de notas e links.
 - Tags da nota como #tag.

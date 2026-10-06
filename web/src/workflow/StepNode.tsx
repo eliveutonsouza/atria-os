@@ -1,7 +1,7 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import type { WorkflowNodeType } from '@shared/protocol'
 import { C } from '../lib/colors'
-import type { FlowNode } from './graph'
+import type { FlowNode, MissionFlowNode } from './graph'
 
 // Nós do fluxograma no idioma visual do design: vidro, bordas 14–16px, brilho na cor do tipo.
 
@@ -103,3 +103,33 @@ function Badge({ t, c }: { t: string; c: string }) {
 }
 
 export const nodeTypes = { step: StepNode }
+
+// Etapa de missão: cartão compacto ligado da esquerda para a direita (dependências).
+export function MissionStepNode({ data, selected }: NodeProps<MissionFlowNode>) {
+  const { mstep: s, n, depsLabel, locked } = data
+  const color = s.risky ? C.warn : C.cyan
+  const badge = s.status !== 'pending' ? STATUS_BADGE[s.status] : undefined
+  const hHandle = { ...handle, width: 10, height: 10 }
+  return (
+    <div
+      className={s.status === 'running' ? 'wf-pulse' : undefined}
+      style={{
+        width: 200, padding: '10px 12px', borderRadius: 12, background: '#121735', position: 'relative', boxSizing: 'border-box',
+        border: `1px solid ${selected ? color : s.risky ? 'rgba(245,181,74,.5)' : 'rgba(103,216,242,.35)'}`,
+        boxShadow: selected ? `0 0 0 3px ${s.risky ? 'rgba(245,181,74,.22)' : 'rgba(103,216,242,.22)'}` : '0 10px 30px rgba(0,0,0,.35)',
+        opacity: locked && s.status !== 'running' ? 0.6 : 1,
+      }}
+    >
+      <Handle type="target" position={Position.Left} style={hHandle} />
+      <div style={{ fontSize: 10, letterSpacing: '.12em', textTransform: 'uppercase', color, fontWeight: 700, marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {n} · {s.agent || 'sem agente'}{s.risky ? ' · pede OK' : ''}
+      </div>
+      <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{s.title}</div>
+      {depsLabel && <div style={{ fontSize: 11, color: '#9aa0bb', marginTop: 2 }}>{depsLabel}</div>}
+      {badge && <Badge {...badge} />}
+      <Handle type="source" position={Position.Right} style={hHandle} />
+    </div>
+  )
+}
+
+export const missionNodeTypes = { mission: MissionStepNode }

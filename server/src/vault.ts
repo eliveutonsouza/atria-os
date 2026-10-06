@@ -165,6 +165,25 @@ export function removeNote(rel: string) {
   changed([p.rel]);
 }
 
+export function createFolder(rel: string): string {
+  const p = safePath(rel.trim().replace(/\/+$/, ''));
+  if (existsSync(p.abs)) throw new VaultError(409, 'já existe');
+  mkdirSync(p.abs, { recursive: true });
+  changed([p.rel]);
+  return p.rel;
+}
+
+// Pasta inteira vai para a lixeira (.trash), como as notas.
+export function removeFolder(rel: string) {
+  const p = safePath(rel.trim().replace(/\/+$/, ''), { mustExist: true });
+  if (!statSync(p.abs).isDirectory()) throw new VaultError(400, 'não é uma pasta');
+  const notes = [...idx.notes.keys()].filter((n) => n.startsWith(`${p.rel}/`));
+  const trash = join(vaultRoot(), '.trash', `${Date.now()}-${p.rel.replace(/\//g, '__')}`);
+  mkdirSync(dirname(trash), { recursive: true });
+  renameSync(p.abs, trash);
+  changed([p.rel, ...notes]);
+}
+
 function moveNote(from: string, to: string): string {
   const a = safePath(from, { mustExist: true });
   const b = safePath(to);
@@ -447,6 +466,15 @@ export function register(app: FastifyInstance) {
     wrap(() => {
       const b = (req.body ?? {}) as { from?: string; to?: string };
       return { path: moveNote(b.from ?? '', b.to ?? '') };
+    })(req, reply),
+  );
+  app.post('/api/vault/folder', (req, reply) =>
+    wrap(() => ({ path: createFolder(((req.body ?? {}) as { path?: string }).path ?? '') }))(req, reply),
+  );
+  app.delete('/api/vault/folder', (req, reply) =>
+    wrap(() => {
+      removeFolder((req.query as Q).path ?? ((req.body ?? {}) as { path?: string }).path ?? '');
+      return reply.code(204).send(undefined);
     })(req, reply),
   );
   app.get('/api/vault/backlinks', (req, reply) => wrap(() => backlinks(safePath((req.query as Q).path).rel))(req, reply));

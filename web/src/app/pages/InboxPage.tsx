@@ -1,8 +1,11 @@
-import type { ApprovalInfo } from '@shared/protocol'
+import { useState } from 'react'
+import type { ApprovalInfo, InboxItem } from '@shared/protocol'
+import { api } from '../../api/client'
 import { useApi } from '../../api/useApi'
 import { resolveApproval } from '../../lib/actions'
 import { C, toneColor } from '../../lib/colors'
 import { useYui } from '../../store/yui'
+import { Tabs } from '../../views/kit'
 import { Empty, useHeader } from '../../views/ui'
 import { relTime } from './common'
 
@@ -15,8 +18,34 @@ function review(runId: string) {
   s.show('runs', { runId })
 }
 
-// Aprovações & inbox: decide direto daqui (Aprovar/Rejeitar), sem abrir o modal.
+// GET /api/approvals/history (server/src/historyApi.ts)
+interface ApprovalHistoryItem {
+  id: string
+  runId: string
+  title: string
+  status: 'approved' | 'rejected' | 'expired'
+  kind: string | null
+  createdAt: string
+  resolvedAt: string | null
+}
+
+const RESOLVED: Record<ApprovalHistoryItem['status'], [string, string]> = {
+  approved: ['aprovada', C.ok],
+  rejected: ['rejeitada', C.crit],
+  expired: ['expirou', C.t3],
+}
+
+async function dismiss(ib: InboxItem) {
+  try {
+    await api.post(`/api/inbox/${encodeURIComponent(ib.id)}/dismiss`)
+  } catch (e) {
+    useYui.getState().say(`Não consegui dispensar: ${(e as Error).message}.`)
+  }
+}
+
+// Aprovações & inbox: decide direto daqui (Aprovar/Rejeitar), sem abrir o modal; aba Histórico com as já resolvidas.
 export function InboxPage() {
+  const [tab, setTab] = useState<'pending' | 'history'>('pending')
   const inbox = useYui((s) => s.inbox)
   const approvals = useApi<ApprovalInfo[]>('/api/approvals', [inbox.length], 10000)
   useHeader('Aprovações', inbox.length ? `${inbox.length} coisa${inbox.length > 1 ? 's' : ''} precisa${inbox.length > 1 ? 'm' : ''} de você` : 'Nada pendente')
@@ -28,8 +57,21 @@ export function InboxPage() {
     await resolveApproval(id, ok)
     approvals.reload()
   }
+  const tabs = (
+    <div className={phone ? 'h-scroll' : undefined} style={{ minWidth: 0 }}>
+      <Tabs value={tab} onChange={setTab} items={[{ id: 'pending', label: 'Pendentes', count: list.length + others.length }, { id: 'history', label: 'Histórico' }]} />
+    </div>
+  )
+  if (tab === 'history')
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 920 }}>
+        {tabs}
+        <ApprovalHistory />
+      </div>
+    )
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 920 }}>
+      {tabs}
       {list.length === 0 && others.length === 0 && <Empty text="Nada precisa de você agora." hint="Aprovações de deploy, envio e publicação aparecem aqui." />}
       {list.map((a) => {
         const danger = a.kind === 'destructive'
@@ -61,16 +103,55 @@ export function InboxPage() {
         )
       })}
       {others.map((ib) => (
-        <button
-          key={ib.id}
-          onClick={() => ib.action.type === 'view' && useYui.getState().show(ib.action.view, ib.action.params ?? {})}
-          className="app-row"
-          style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '14px 16px', borderRadius: 14, border: '1px solid rgba(255,255,255,.06)', background: 'rgba(255,255,255,.025)', color: C.text, textAlign: 'left', cursor: 'pointer' }}
-        >
-          <span style={{ fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: toneColor(ib.tone), fontWeight: 600 }}>{ib.tag}</span>
-          <span style={{ fontSize: 14 }}>{ib.label}</span>
-        </button>
+        <div key={ib.id} style={{ display: 'flex', alignItems: 'center', gap: 8, borderRadius: 14, border: '1px solid rgba(255,255,255,.06)', background: 'rgba(255,255,255,.025)', minWidth: 0 }}>
+          <button
+            onClick={() => ib.action.type === 'view' && useYui.getState().show(ib.action.view, ib.action.params ?? {})}
+            className="app-row"
+            style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, padding: '14px 16px', borderRadius: 14, border: 'none', background: 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer' }}
+          >
+            <span style={{ fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: toneColor(ib.tone), fontWeight: 600 }}>{ib.tag}</span>
+            <span style={{ fontSize: 14, overflowWrap: 'anywhere' }}>{ib.label}</span>
+          </button>
+          {ib.id.startsWith('failed:') && (
+            <button className="app-btn small" style={{ marginRight: 10, flexShrink: 0, minHeight: phone ? 44 : undefined }} onClick={() => void dismiss(ib)} title="Tira do inbox; a execução continua no histórico">
+              Dispensar
+            </button>
+          )}
+        </div>
       ))}
+    </div>
+  )
+}
+
+function ApprovalHistory() {
+  const { data, loading, error } = useApi<ApprovalHistoryItem[]>('/api/approvals/history?limit=50', [], 30000)
+  const phone = useYui((s) => s.device === 'phone')
+  if (loading && !data) return <Empty text="Carregando…" />
+  if (error || !data) return <Empty text="Não consegui ler o histórico de aprovações." />
+  if (!data.length) return <Empty text="Nenhuma aprovação resolvida ainda." hint="Aprovações aprovadas, rejeitadas ou expiradas aparecem aqui." />
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {data.map((a) => {
+        const [label, color] = RESOLVED[a.status] ?? [a.status, C.t2]
+        return (
+          <button
+            key={a.id}
+            onClick={() => review(a.runId)}
+            className="app-row"
+            style={{ display: 'grid', gridTemplateColumns: phone ? 'minmax(0,1fr) auto' : 'minmax(0,1fr) 110px 90px', gap: 12, alignItems: 'center', minHeight: 44, padding: '12px 10px', border: 'none', borderBottom: '1px solid rgba(255,255,255,.05)', background: 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer' }}
+          >
+            <span style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+              <span style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: phone ? 'normal' : 'nowrap', overflowWrap: 'anywhere' }}>{a.title}</span>
+              <span style={{ fontSize: 11.5, color: C.t3 }}>
+                {a.kind === 'destructive' ? 'exclusão' : 'aprovação'}
+                {phone ? ` · ${relTime(a.resolvedAt ?? a.createdAt)}` : ''}
+              </span>
+            </span>
+            <span style={{ fontSize: 12, color, whiteSpace: 'nowrap' }}>{label}</span>
+            {!phone && <span className="app-mono" style={{ fontSize: 11, color: C.t3, textAlign: 'right' }}>{relTime(a.resolvedAt ?? a.createdAt)}</span>}
+          </button>
+        )
+      })}
     </div>
   )
 }

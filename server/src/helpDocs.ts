@@ -53,7 +53,7 @@ export interface ParsedDoc {
   pagina: AppPage | null;
 }
 
-const PAGES = new Set<AppPage>(['overview', 'ops', 'agents', 'runs', 'missions', 'workflows', 'schedule', 'projects', 'browser', 'terminal', 'claude', 'tools', 'inbox', 'infra', 'settings', 'vault', 'brain', 'company', 'help']);
+const PAGES = new Set<AppPage>(['overview', 'ops', 'agents', 'runs', 'missions', 'workflows', 'schedule', 'projects', 'browser', 'terminal', 'claude', 'tools', 'inbox', 'infra', 'settings', 'vault', 'brain', 'company', 'help', 'usage', 'reminders']);
 export const asPage = (v: string | string[] | undefined): AppPage | null => {
   const s = str(v).trim();
   return PAGES.has(s as AppPage) ? (s as AppPage) : null;

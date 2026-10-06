@@ -78,6 +78,31 @@ export function cancelarLembrete(id: string): boolean {
   return db.prepare(`UPDATE reminders SET status = 'cancelled' WHERE id = ? AND status IN ('pending', 'missed')`).run(id).changes > 0;
 }
 
+export const getLembrete = (id: string): Lembrete | null => (db.prepare('SELECT * FROM reminders WHERE id = ?').get(id) as Lembrete | undefined) ?? null;
+
+// Edição pelo painel: só pendentes/perdidos; um perdido editado volta a pendente. null = não existe ou já saiu da fila.
+export function editarLembrete(id: string, input: { texto?: string; quando?: string; repetir?: Repeticao | null }): Lembrete | null {
+  const cur = getLembrete(id);
+  if (!cur || (cur.status !== 'pending' && cur.status !== 'missed')) return null;
+  const text = input.texto === undefined ? cur.text : input.texto.trim().slice(0, 300);
+  if (!text) throw new Error('lembrete sem texto');
+  let due = cur.due_at;
+  if (input.quando !== undefined) {
+    const t = Date.parse(input.quando);
+    if (!Number.isFinite(t)) throw new Error(`data inválida: ${input.quando}`);
+    if (t < Date.now() - 60_000) throw new Error('esse horário já passou');
+    if (t > Date.now() + 400 * DAY) throw new Error('no máximo ~1 ano à frente');
+    due = new Date(t).toISOString();
+  } else if (cur.status === 'missed') throw new Error('escolha um novo horário para o lembrete perdido');
+  const rep = input.repetir === undefined ? cur.repeat : input.repetir && REPETICOES.includes(input.repetir) ? input.repetir : null;
+  db.prepare(`UPDATE reminders SET text = ?, due_at = ?, repeat = ?, status = 'pending' WHERE id = ?`).run(text, due, rep, id);
+  return getLembrete(id);
+}
+
+export function excluirLembrete(id: string): boolean {
+  return db.prepare('DELETE FROM reminders WHERE id = ?').run(id).changes > 0;
+}
+
 type Notifier = (text: string) => void;
 let notifier: Notifier = () => {};
 

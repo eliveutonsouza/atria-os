@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { AgentConfig, ClaudeInitInfo, RunInfo } from '@shared/protocol'
-import { api } from '../api/client'
+import { createPortal } from 'react-dom'
+import type { AgentConfig, AgentInfo, AgentUsageRef, ClaudeInitInfo, ModelsCatalog, RunInfo } from '@shared/protocol'
+import { api, ApiError } from '../api/client'
 import { useApi } from '../api/useApi'
 import { startRun } from '../lib/actions'
 import { C } from '../lib/colors'
@@ -8,16 +9,21 @@ import { ago } from '../lib/format'
 import { useYui } from '../store/yui'
 import { card, Empty, ErrorNote, Skeleton, useHeader } from './ui'
 import { Chip, Field, input, mcpStatusMeta, SearchBox, SmallBtn, StatusPill } from './kit'
+import { ModelSelect } from './ModelSelect'
+import { BottomSheet } from './Sheet'
 
 // Ficha do agente: prompt, skills, conectores MCP (allowlist), plugins, modelo e turnos — salvos no
 // frontmatter de /workspace/.claude/agents/<id>.md, aplicados a cada execução.
 
 type Detail = AgentConfig & { runs: RunInfo[] }
-const MODELS = ['', 'opus', 'sonnet', 'haiku']
 const RUN_COLOR: Record<string, string> = { running: C.cyan, queued: C.t2, waiting_approval: C.warn, done: C.ok, failed: C.crit, cancelled: C.t3 }
 
-export function AgentDetailView() {
+// onGone: para onde ir depois de arquivar/demitir (padrão: lista de agentes do canvas).
+export function AgentDetailView({ onGone }: { onGone?: () => void } = {}) {
   const id = useYui((s) => s.viewParams.agentId)
+  const models = useApi<ModelsCatalog>('/api/models')
+  const [firing, setFiring] = useState(false)
+  const gone = onGone ?? (() => useYui.getState().show('agents'))
   const { data, loading, error, reload } = useApi<Detail>(id ? `/api/agents/${encodeURIComponent(id)}` : null, [id])
   const caps = useApi<ClaudeInitInfo | { at?: string }>('/api/capabilities')
   const init = caps.data && 'tools' in caps.data ? (caps.data as ClaudeInitInfo) : null
@@ -61,7 +67,7 @@ export function AgentDetailView() {
       return
     }
     await api.del(`/api/agents/${encodeURIComponent(id)}`).catch(() => null)
-    useYui.getState().show('agents')
+    gone()
   }
 
   useHeader(
@@ -72,7 +78,8 @@ export function AgentDetailView() {
       { label: 'Testar', primary: !dirty, fn: () => id && void startRun(id, null, 'Apresente-se em 2 frases: quem você é, o que faz e quais ferramentas/conectores você tem disponíveis agora. Não altere nada.') },
       { label: 'Abrir no terminal', fn: () => useYui.getState().show('terminal', { kind: 'shell', cmd: `claude --agent ${JSON.stringify(draft?.name ?? id)}` }) },
       { label: 'Duplicar', fn: () => void duplicate() },
-      { label: draft?.archived ? 'Reativar' : 'Arquivar', fn: () => void archive(), danger: !draft?.archived },
+      { label: draft?.archived ? 'Reativar' : 'Arquivar', fn: () => void archive() },
+      { label: 'Demitir', fn: () => setFiring(true), danger: true },
     ],
     [saving, dirty, draft?.name, draft?.archived, draft?.group],
   )
@@ -86,10 +93,13 @@ export function AgentDetailView() {
   const mcpServers = init?.mcp ?? []
   const skills = (init?.skills ?? []).filter((s) => !skillQ || s.toLowerCase().includes(skillQ.toLowerCase()))
   const plugins = init?.plugins ?? []
+  const defaultId = models.data ? models.data.defaults.claudeConsole || models.data.defaults.claudeAccount : null
+  const defaultLabel = (defaultId && models.data?.claude.find((m) => m.value === defaultId)?.label) || defaultId || 'conta do Claude'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22, maxWidth: 1100 }}>
-      {draft.archived && <div style={{ ...card, borderColor: 'rgba(245,181,74,.25)', color: '#f5c97a', fontSize: 14 }}>Agente arquivado — não recebe tarefas. Use “Reativar”.</div>}
+      {firing && <FireAgentModal agent={draft} onCancel={() => setFiring(false)} onDone={gone} />}
+      {draft.archived && <div style={{ ...card, borderColor: 'rgba(245,181,74,.25)', color: '#f5c97a', fontSize: 14 }}>Agente arquivado — não recebe tarefas. Use “Reativar” ou, para excluir de vez, “Demitir”.</div>}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(220px,100%),1fr))', gap: 14 }}>
         <Field label="Nome">
@@ -98,15 +108,19 @@ export function AgentDetailView() {
         <Field label="Grupo">
           <input style={input} value={draft.group} onChange={(e) => set({ group: e.target.value })} />
         </Field>
-        <Field label="Modelo" hint="vazio = padrão do console">
-          <select style={input} value={draft.model ?? ''} onChange={(e) => set({ model: e.target.value || null })}>
-            {[...new Set([...MODELS, draft.model ?? ''])].map((m) => (
-              <option key={m} value={m} style={{ background: '#10142a' }}>
-                {m || 'padrão'}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
+          <span className="eyebrow">Modelo</span>
+          <ModelSelect
+            ariaLabel="Modelo do agente"
+            value={draft.model ?? ''}
+            onChange={(v) => set({ model: v.trim() || null })}
+            options={models.data?.claude ?? []}
+            placeholderDefault={`Padrão do console — ${defaultLabel}`}
+          />
+          <span style={{ fontSize: 12, color: C.t3, overflowWrap: 'anywhere' }}>
+            Padrão definido em Configurações › Modelos.{defaultId && <> Hoje: <span className="mono">{defaultId}</span>.</>}
+          </span>
+        </div>
         <Field label="Máx. de turnos" hint="vazio = 80">
           <input style={input} type="number" min={1} max={500} value={draft.maxTurns ?? ''} onChange={(e) => set({ maxTurns: e.target.value ? Number(e.target.value) : null })} />
         </Field>
@@ -211,5 +225,110 @@ export function AgentDetailView() {
         )}
       </section>
     </div>
+  )
+}
+
+const USAGE_TAG: Record<AgentUsageRef['kind'], string> = { routine: 'Rotina', workflow: 'Workflow', mission: 'Missão', toolbox: 'Ferramenta' }
+
+// Demitir = excluir de vez (Desktop-Demitir.dc.html): mostra onde o agente está escalado e quem assume.
+export function FireAgentModal({ agent, onCancel, onDone }: { agent: { id: string; name: string }; onCancel: () => void; onDone: () => void }) {
+  const phone = useYui((s) => s.device === 'phone')
+  const usage = useApi<AgentUsageRef[]>(`/api/agents/${encodeURIComponent(agent.id)}/usage`, [agent.id])
+  const team = useApi<AgentInfo[]>('/api/agents')
+  const [rep, setRep] = useState('')
+  const [busy, setBusy] = useState(false)
+  const refs = usage.data ?? []
+  const others = (team.data ?? []).filter((a) => a.id !== agent.id)
+  const needsRep = refs.length > 0
+  const ready = !!usage.data && (!needsRep || !!rep)
+
+  useEffect(() => {
+    if (phone) return // a folha inferior cuida do ESC
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onCancel() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [busy, onCancel, phone])
+
+  const confirm = async () => {
+    if (!ready) return
+    setBusy(true)
+    try {
+      await api.del(`/api/agents/${encodeURIComponent(agent.id)}?hard=1${needsRep ? `&replaceWith=${encodeURIComponent(rep)}` : ''}`)
+      const who = others.find((a) => a.id === rep)?.name
+      useYui.getState().say(`${agent.name} demitido${needsRep && who ? `; ${who} assumiu os lugares dele` : ''}.`, { state: 'success' })
+      onDone()
+    } catch (e) {
+      // 409: o uso mudou desde que o modal abriu — recarrega a lista
+      if (e instanceof ApiError && e.status === 409) usage.reload()
+      useYui.getState().say(`Não consegui demitir ${agent.name}: ${(e as Error).message}`, { state: 'warning' })
+      setBusy(false)
+    }
+  }
+
+  const body = (
+    <>
+      <div style={{ fontSize: 11, letterSpacing: '.2em', color: C.crit, fontWeight: 700 }}>AÇÃO DESTRUTIVA · NÃO DÁ PARA DESFAZER</div>
+      <div id="fam-title" style={{ fontSize: 18, fontWeight: 700, overflowWrap: 'anywhere' }}>Demitir o agente {agent.name}?</div>
+      <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: '#c9cde0' }}>
+        O arquivo do agente é apagado e ele não volta quando o console reinicia. As execuções antigas continuam no histórico.
+      </p>
+      {!usage.data ? (
+        <span style={{ fontSize: 13, color: C.t3 }}>{usage.error ? 'Não consegui ver onde ele é usado.' : 'Vendo onde ele é usado…'}</span>
+      ) : refs.length === 0 ? (
+        <span style={{ fontSize: 13, color: C.t2 }}>Ele não está escalado em nenhuma rotina, workflow, missão ou ferramenta.</span>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ fontSize: 12, color: C.t2, marginBottom: 4 }}>Ele está escalado em {refs.length} {refs.length === 1 ? 'lugar' : 'lugares'}</div>
+          {refs.map((u) => (
+            <div key={`${u.kind}:${u.id}`} style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '9px 0', borderBottom: '1px solid rgba(255,255,255,.06)', fontSize: 13.5, minWidth: 0 }}>
+              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'rgba(255,255,255,.06)', color: C.t2, flexShrink: 0 }}>{USAGE_TAG[u.kind]}</span>
+              <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+                {u.label}
+                {u.detail && <span style={{ color: C.t3 }}> · {u.detail}</span>}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {needsRep && (
+        <label style={{ fontSize: 12, color: C.t2, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          Quem assume esses lugares
+          <select value={rep} onChange={(e) => setRep(e.target.value)} disabled={busy} style={{ ...input, height: 44, borderRadius: 12, background: '#0e1126' }}>
+            <option value="">Escolha um agente…</option>
+            {others.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name} · {a.group}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: phone ? 'repeat(2, minmax(0, 1fr))' : 'auto auto', justifyContent: phone ? undefined : 'end', gap: 8 }}>
+        <button autoFocus disabled={busy} onClick={onCancel} style={{ height: phone ? 50 : 42, padding: '0 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.03)', color: '#dfe3f3', fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Cancelar
+        </button>
+        <button
+          disabled={busy || !ready}
+          onClick={() => void confirm()}
+          style={{ height: phone ? 50 : 42, padding: '0 16px', borderRadius: 10, border: 'none', background: '#e2566a', color: '#fff', fontSize: 13.5, fontWeight: 700, cursor: ready ? 'pointer' : 'not-allowed', fontFamily: 'inherit', opacity: busy || !ready ? 0.6 : 1 }}
+        >
+          {busy ? 'Demitindo…' : needsRep ? 'Reatribuir e demitir' : 'Demitir'}
+        </button>
+      </div>
+    </>
+  )
+  if (phone)
+    return (
+      <BottomSheet label={`Demitir ${agent.name}`} role="alertdialog" tone="rgba(240,98,114,.5)" onClose={busy ? () => {} : onCancel}>
+        {body}
+      </BottomSheet>
+    )
+  return createPortal(
+    <div onClick={busy ? undefined : onCancel} style={{ position: 'fixed', inset: 0, background: 'rgba(4,5,10,.66)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: 16 }}>
+      <div role="alertdialog" aria-modal="true" aria-labelledby="fam-title" onClick={(e) => e.stopPropagation()} style={{ width: 520, maxWidth: '100%', maxHeight: 'calc(var(--vvh) - 32px)', overflowY: 'auto', boxSizing: 'border-box', padding: 22, borderRadius: 18, background: '#10132a', border: '1px solid rgba(240,98,114,.35)', boxShadow: '0 30px 80px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {body}
+      </div>
+    </div>,
+    document.body,
   )
 }

@@ -5,7 +5,7 @@ import { useApi } from '../../api/useApi'
 import { C } from '../../lib/colors'
 import { useYui } from '../../store/yui'
 import { input } from '../../views/kit'
-import { Empty, useHeader } from '../../views/ui'
+import { ConfirmDeleteModal, Empty, useHeader } from '../../views/ui'
 import { Dot, elapsed, fmtCost, fmtDuration, fmtTokens, openApp, relTime, Tag } from './common'
 
 // Execuções: tabela filtrável (agente, projeto, estado, origem) + detalhe com timeline, eventos e resultado.
@@ -19,6 +19,15 @@ const STATE: Record<string, [string, string]> = {
   cancelled: ['cancelado', C.t3],
 }
 const origin = (r: RunInfo) => (r.missionId ? 'missão' : r.workflowRunId ? 'workflow' : 'Yui/manual')
+const isActive = (r: RunInfo) => r.state === 'running' || r.state === 'queued' || r.state === 'waiting_approval'
+const PURGE_DAYS = [7, 30, 90]
+
+// Tira execuções apagadas do estado vivo (não há evento de exclusão no SSE).
+function dropLive(keep: (r: RunInfo) => boolean) {
+  const s = useYui.getState()
+  s.set({ runs: Object.fromEntries(Object.entries(s.runs).filter(([, r]) => keep(r))) })
+}
+
 const sortKey = (r: RunInfo) => (r.state === 'running' || r.state === 'queued' || r.state === 'waiting_approval' ? '9' : '1') + (r.finishedAt ?? r.startedAt ?? '')
 
 export function RunsPage() {
@@ -27,7 +36,16 @@ export function RunsPage() {
   const tablet = device === 'tablet'
   const sel = useYui((s) => s.appParams.id)
   const live = useYui((s) => s.runs)
-  const { data } = useApi<{ runs: RunInfo[] }>('/api/runs', [], 20000)
+  const { data, reload } = useApi<{ runs: RunInfo[] }>('/api/runs', [], 20000)
+  // páginas antigas ("Carregar mais") e execuções apagadas nesta tela
+  const [older, setOlder] = useState<RunInfo[]>([])
+  const [cursor, setCursor] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [removed, setRemoved] = useState<Set<string>>(new Set())
+  const [purgePick, setPurgePick] = useState(false)
+  const [purgeDays, setPurgeDays] = useState<number | null>(null)
+  const [purging, setPurging] = useState(false)
   const [q, setQ] = useState('')
   const [agent, setAgent] = useState('')
   const [state, setState] = useState('')
@@ -36,14 +54,80 @@ export function RunsPage() {
   useHeader('Execuções', 'Histórico de execuções', [
     { label: 'Operações', fn: () => openApp('ops') },
     { label: 'Missões', fn: () => openApp('missions') },
+    { label: 'Limpar antigas', fn: () => setPurgePick(true), danger: true },
   ])
 
   const runs = useMemo(() => {
     const m = new Map<string, RunInfo>()
+    for (const r of older) m.set(r.id, r)
     for (const r of data?.runs ?? []) m.set(r.id, r)
     for (const r of Object.values(live)) m.set(r.id, { ...m.get(r.id), ...r })
+    for (const id of removed) m.delete(id)
     return [...m.values()].sort((a, b) => sortKey(b).localeCompare(sortKey(a)))
-  }, [data, live])
+  }, [data, live, older, removed])
+
+  const loadMore = async () => {
+    // 1ª página extra: parte da execução mais antiga já carregada (duplicatas são descartadas no Map)
+    const loaded = runs.map((r) => r.startedAt ?? r.finishedAt).filter(Boolean) as string[]
+    const before = cursor ?? loaded.sort()[0] ?? null
+    setLoadingMore(true)
+    try {
+      const r = await api.get<{ runs: RunInfo[]; hasMore: boolean; next: string | null }>(`/api/runs/page?limit=40${before ? `&before=${encodeURIComponent(before)}` : ''}`)
+      setOlder((o) => [...o, ...r.runs])
+      setCursor(r.next)
+      setHasMore(r.hasMore)
+    } catch {
+      useYui.getState().say('Não consegui carregar execuções mais antigas agora.')
+    }
+    setLoadingMore(false)
+  }
+
+  const purge = async (days: number) => {
+    setPurging(true)
+    try {
+      const r = await api.post<{ deleted: number }>('/api/runs/purge', { olderThanDays: days })
+      const cutoff = Date.now() - days * 86400_000
+      const old = (r: RunInfo) => !isActive(r) && new Date(r.finishedAt ?? r.startedAt ?? Date.now()).getTime() < cutoff
+      dropLive((x) => !old(x))
+      setOlder((o) => o.filter((x) => !old(x)))
+      reload()
+      useYui.getState().say(r.deleted ? `Apaguei ${r.deleted} execuç${r.deleted > 1 ? 'ões' : 'ão'} com mais de ${days} dias.` : `Nenhuma execução com mais de ${days} dias.`)
+      setPurgeDays(null)
+    } catch (e) {
+      useYui.getState().say(`Não consegui limpar: ${(e as Error).message}.`)
+    }
+    setPurging(false)
+  }
+
+  const onDeleted = (id: string) => {
+    setRemoved((s) => new Set(s).add(id))
+    dropLive((r) => r.id !== id)
+    openApp('runs')
+  }
+
+  const purgeUi = (
+    <>
+      {purgePick && (
+        <section className="app-card" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '12px 14px' }}>
+          <span style={{ fontSize: 13, color: C.t2, flex: narrow ? '1 1 100%' : '0 1 auto' }}>Apagar execuções terminadas há mais de</span>
+          {PURGE_DAYS.map((d) => (
+            <button key={d} className="app-btn small" style={narrow ? { flex: 1, minHeight: 44 } : undefined} onClick={() => { setPurgePick(false); setPurgeDays(d) }}>{d} dias</button>
+          ))}
+          <button className="app-btn small" style={narrow ? { flex: '1 1 100%', minHeight: 44 } : undefined} onClick={() => setPurgePick(false)}>Cancelar</button>
+        </section>
+      )}
+      {purgeDays !== null && (
+        <ConfirmDeleteModal
+          title={`Apagar execuções com mais de ${purgeDays} dias?`}
+          text="Apaga do histórico as execuções concluídas, com falha ou canceladas, com eventos e resultado. Execuções rodando, na fila ou aguardando você ficam."
+          rows={[{ label: 'Mais antigas que', value: new Date(Date.now() - purgeDays * 86400_000).toLocaleDateString('pt-BR') }]}
+          busy={purging}
+          onCancel={() => setPurgeDays(null)}
+          onConfirm={() => void purge(purgeDays)}
+        />
+      )}
+    </>
+  )
 
   const agents = [...new Set(runs.map((r) => r.agent))].sort()
   const projects = [...new Set(runs.map((r) => r.project).filter(Boolean) as string[])].sort()
@@ -60,9 +144,10 @@ export function RunsPage() {
 
   const selectStyle = { ...input, height: 34, padding: '0 10px', width: 'auto', minWidth: 120 } as const
   // celular: execução aberta ocupa a tela toda (sem filtros nem lista)
-  if (narrow && current) return <RunDetail run={current} full />
+  if (narrow && current) return <RunDetail run={current} full onDeleted={onDeleted} />
   return (
     <>
+      {purgeUi}
       <section className={narrow ? 'app-filters-narrow' : undefined} style={narrow ? undefined : { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <input aria-label="Buscar execuções" placeholder="Buscar tarefa ou resultado…" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...input, height: narrow ? 42 : 34, flex: '1 1 220px' }} />
         <select aria-label="Agente" value={agent} onChange={(e) => setAgent(e.target.value)} style={selectStyle}>
@@ -154,17 +239,38 @@ export function RunsPage() {
               )
             )
           })}
+          {hasMore && runs.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+              <button className="app-btn small" disabled={loadingMore} style={narrow ? { width: '100%', minHeight: 44, justifyContent: 'center' } : undefined} onClick={() => void loadMore()}>
+                {loadingMore ? 'Carregando…' : 'Carregar mais'}
+              </button>
+            </div>
+          )}
         </section>
-        {current && <RunDetail run={current} />}
+        {current && <RunDetail run={current} onDeleted={onDeleted} />}
       </div>
     </>
   )
 }
 
-function RunDetail({ run, full = false }: { run: RunInfo; full?: boolean }) {
+function RunDetail({ run, full = false, onDeleted }: { run: RunInfo; full?: boolean; onDeleted: (id: string) => void }) {
   const tablet = useYui((s) => s.device === 'tablet')
   const [lines, setLines] = useState<RunEventLine[] | null>(null)
   const [tech, setTech] = useState(false)
+  const [confirm, setConfirm] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const remove = async () => {
+    setBusy(true)
+    try {
+      await api.del(`/api/runs/${run.id}`)
+      setConfirm(false)
+      onDeleted(run.id)
+      useYui.getState().say('Execução excluída.')
+    } catch (e) {
+      useYui.getState().say(`Não consegui excluir: ${(e as Error).message}.`)
+    }
+    setBusy(false)
+  }
   useEffect(() => {
     setLines(null)
     api.get<RunEventLine[]>(`/api/runs/${run.id}/events`).then(setLines).catch(() => setLines([]))
@@ -237,7 +343,22 @@ function RunDetail({ run, full = false }: { run: RunInfo; full?: boolean }) {
             Cancelar
           </button>
         )}
+        <button className="app-btn small danger" onClick={() => setConfirm(true)}>Excluir</button>
       </div>
+      {confirm && (
+        <ConfirmDeleteModal
+          title="Excluir esta execução?"
+          text={active ? 'Ela ainda está ativa: vou cancelar o agente antes. Some do histórico com eventos e resultado.' : 'Some do histórico com eventos e resultado. Missões e workflows que a usaram continuam existindo.'}
+          rows={[
+            { label: 'Tarefa', value: run.task },
+            { label: 'Agente', value: run.agent },
+            { label: 'Estado', value: l },
+          ]}
+          busy={busy}
+          onCancel={() => setConfirm(false)}
+          onConfirm={() => void remove()}
+        />
+      )}
       {tech && (
         <div className="app-mono" style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(0,0,0,.35)', border: '1px solid rgba(255,255,255,.06)', fontSize: 11.5, lineHeight: 1.7, color: C.t2, maxHeight: 320, overflowY: 'auto', overflowWrap: 'anywhere' }}>
           <div>session {run.sessionId ?? '—'}</div>

@@ -3,7 +3,7 @@ titulo: Projetos
 grupo: Organizar
 pagina: projects
 ordem: 4
-resumo: Seus repositórios do GitHub num catálogo só, com saúde, atividade e atalhos para terminal, Claude, logs e preview.
+resumo: Seus repositórios do GitHub num catálogo só, com saúde, atividade, configuração e atalhos para terminal, Claude, logs e preview. Dá para adicionar e remover projetos pelo painel.
 usar_quando: Para abrir um projeto e agir nele: ver se está saudável, olhar logs, abrir o Claude ou o preview, pedir uma correção.
 nao_usar_quando: Para saúde da VPS inteira (CPU, RAM, containers), use Infra & logs.
 frases:
@@ -12,11 +12,15 @@ frases:
   - "Agora no projeto clinica-site."
   - "Como está o projeto da clínica?"
 dicas:
-  - Você não cadastra projeto: eles vêm do GitHub sozinhos. Repositórios ainda não clonados são clonados quando você abre ou delega algo.
+  - Os projetos vêm do GitHub sozinhos; repositórios ainda não clonados são clonados quando você abre ou delega algo. Para clonar na hora ou trazer um repositório de fora do seu GitHub, use "+ Adicionar projeto".
   - "Todos do GitHub" mostra também os não clonados; "Só clonados" volta ao que está na VPS.
-  - Um arquivo yui.json na raiz do projeto define URL de saúde, container dos logs, pasta de preview e pedidos extras de aprovação.
+  - "Configuração do projeto" (no fim da tela do projeto) edita o yui.json: URL de saúde, container dos logs, pasta de preview e comandos que pedem aprovação.
+  - "Remover do console" apaga só a pasta local na VPS. O repositório no GitHub não muda.
 erros:
   - Lista vazia. Conecte o GitHub em Configurações › Conexões; o catálogo aparece em alguns minutos.
+  - "Não consegui remover". Há execução ativa no projeto: cancele em Execuções e tente de novo.
+  - Remover e o projeto voltar. Abrir o projeto ou delegar algo nele clona de novo; repositórios com push recente também são clonados quando o console reinicia.
+  - "Não consegui clonar" pela URL. Só https, sem usuário/senha na URL; repositório privado fora do GitHub não funciona.
 relacionados: [infra, terminal, claude-code, missoes]
 ---
 # Projetos
@@ -30,11 +34,15 @@ Cada projeto é um repositório seu no GitHub, guardado em /workspace/<nome> qua
 3. **Aja.** **Claude no projeto** abre o Claude Code interativo na pasta; **Terminal** abre um shell; **Logs** leva a Infra & logs; **Comandos do Claude** abre a central de comandos; **Preview** mostra o site.
 4. **Peça correção.** Se o projeto tem um problema detectado, **Pedir correção** acorda o Backend com a descrição do erro.
 5. **Troque o projeto ativo por voz.** "Agora no Stoqmate" faz os próximos pedidos irem para ele.
+6. **Adicione um projeto.** **+ Adicionar projeto** abre o formulário: em **Do GitHub** escolha um repositório do catálogo ainda não clonado; em **URL git** cole um endereço https (e, se quiser, o nome da pasta). **Clonar e adicionar** clona em /workspace/<pasta> e abre o projeto.
+7. **Configure.** Em **Configuração do projeto**, clique em **Editar** (ou **Configurar** no topo), preencha URL de saúde, container dos logs, pasta de preview e um comando por linha em "Comandos que pedem aprovação", e **Salvar configuração**.
+8. **Remova.** **Remover do console** pede confirmação e apaga a pasta local do clone, inclusive alterações não enviadas. O GitHub não é afetado.
 
 ## O que você vê na tela
 - Ponto colorido e porcentagem de saúde (ou "clonado"/"no GitHub" quando não há medição).
 - Linguagem e quando foi o último push.
 - Atividade recente: execuções e eventos do projeto.
+- Configuração do projeto: o que está no yui.json, com Editar e Remover do console.
 
 ## Exemplos do dia a dia
 - Cliente diz que o site caiu → abra o projeto, veja a saúde, clique em Logs.

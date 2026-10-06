@@ -141,7 +141,16 @@ export function register(app: FastifyInstance): void {
     return reply.code(204).send();
   });
 
-  app.get('/api/push/devices', () => db.prepare('SELECT device, created_at FROM push_subscriptions ORDER BY created_at DESC').all());
+  // id = rowid da inscrição (o endpoint é longo e não sai do servidor)
+  app.get('/api/push/devices', () => db.prepare('SELECT rowid AS id, device, created_at FROM push_subscriptions ORDER BY created_at DESC').all());
+
+  app.delete('/api/push/devices/:id', async (req, reply) => {
+    const id = Number((req.params as { id: string }).id);
+    if (!Number.isInteger(id)) return reply.code(400).send({ error: 'id' });
+    const r = db.prepare('DELETE FROM push_subscriptions WHERE rowid = ?').run(id);
+    if (!r.changes) return reply.code(404).send({ error: 'dispositivo não encontrado' });
+    return reply.code(204).send();
+  });
 
   app.post('/api/push/test', async () => ({
     sent: await sendPush({ title: 'Yui', body: 'Notificações funcionando neste dispositivo. ✓', url: '/', tag: 'test' }, { force: true }),

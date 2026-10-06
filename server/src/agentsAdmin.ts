@@ -1,14 +1,18 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import type { AgentConfig, RunInfo } from '../../shared/protocol.ts';
+import type { AgentConfig, AgentUsageRef, ApprovalInfo, MissionStep, RunInfo, ToolboxItem } from '../../shared/protocol.ts';
 import { config } from './config.ts';
-import { db } from './db.ts';
+import { db, kvGet, kvSet } from './db.ts';
 import { emit } from './bus.ts';
-import { agentsDir, invalidateAgents, loadAllAgents, serializeAgent, type AgentDef } from './agents.ts';
+import { agentsDir, agentsWorking, invalidateAgents, loadAllAgents, serializeAgent, type AgentDef } from './agents.ts';
 import { registerAgentOptions, registerBrain, registerRunPrompt } from './extensions.ts';
 import { getInit } from './capabilities.ts';
-import { toRunInfo } from './runs.ts';
+import { askApproval, toRunInfo } from './runs.ts';
+import { listRoutines, updateRoutine } from './routines.ts';
+import { listWorkflows, saveWorkflow } from './workflows.ts';
+import { getMission } from './missions.ts';
+import { narrate } from './live.ts';
 
 // Agentes navegáveis e configuráveis: skills, MCP (allowlist), plugins, modelo e turnos por agente,
 // gravados no frontmatter de /workspace/.claude/agents/<id>.md (o mesmo arquivo que o Claude Code lê).
@@ -96,19 +100,132 @@ function recentRuns(agentId: string): RunInfo[] {
   return rows.map(toRunInfo);
 }
 
+// Agentes demitidos (excluídos de vez): o seed não os traz de volta.
+const deletedIds = (): string[] => {
+  try {
+    const v = JSON.parse(kvGet('agents_deleted') ?? '[]') as unknown;
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+
 // Seeds novos (ex.: Designer) entram no workspace existente sem sobrescrever nada.
-function seedMissingAgents() {
+export function seedMissingAgents() {
   const seedDir = join(config.seedDir, '.claude', 'agents');
   if (!existsSync(seedDir)) return;
   const dir = agentsDir();
   mkdirSync(dir, { recursive: true });
+  const deleted = new Set(deletedIds());
   for (const f of readdirSync(seedDir).filter((f) => f.endsWith('.md'))) {
+    if (deleted.has(f.replace(/\.md$/, ''))) continue;
     if (!existsSync(join(dir, f))) {
       cpSync(join(seedDir, f), join(dir, f));
       console.log(`agentes: seed ${f} adicionado`);
     }
   }
   invalidateAgents();
+}
+
+// ---------- demitir (excluir de vez) ----------
+
+const toolboxFile = () => join(config.workspaceDir, '.yui', 'toolbox.json');
+type ToolboxRow = Omit<ToolboxItem, 'status'>;
+function readToolbox(): ToolboxRow[] {
+  try {
+    const list = JSON.parse(readFileSync(toolboxFile(), 'utf8')) as ToolboxRow[];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+const ACTIVE_MISSION = ['draft', 'running', 'paused', 'blocked'];
+const OPEN_STEP = new Set(['pending', 'waiting_approval', 'running', 'failed']);
+const STEP_LABEL: Record<string, string> = { pending: 'na fila', waiting_approval: 'aguardando aprovação', running: 'rodando', failed: 'falhou' };
+type MissionRow = { id: string; title: string; status: string; plan_json: string };
+const activeMissions = () =>
+  db.prepare(`SELECT id, title, status, plan_json FROM missions WHERE status IN (${ACTIVE_MISSION.map(() => '?').join(',')}) ORDER BY created_at`).all(...ACTIVE_MISSION) as MissionRow[];
+const openStepsOf = (m: MissionRow, id: string) =>
+  (JSON.parse(m.plan_json) as MissionStep[]).filter((st) => st.agentId === id && OPEN_STEP.has(st.status));
+const listJoin = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} e ${xs[xs.length - 1]}` : xs[0] ?? '');
+
+// Onde o agente está escalado: rotinas, passos de workflow, etapas de missões em aberto e Caixa de Ferramentas.
+export function agentUsage(id: string): AgentUsageRef[] {
+  const refs: AgentUsageRef[] = [];
+  for (const r of listRoutines()) if (r.agent_id === id) refs.push({ kind: 'routine', id: r.id, label: `${r.name} · ${r.cron}` });
+  for (const w of listWorkflows()) {
+    const steps = w.nodes.filter((n) => n.type === 'task' && n.agent === id).map((n) => n.id);
+    if (steps.length) refs.push({ kind: 'workflow', id: w.slug, label: w.name, detail: `${steps.length > 1 ? 'passos' : 'passo'} ${listJoin(steps)}` });
+  }
+  for (const m of activeMissions()) {
+    const steps = openStepsOf(m, id);
+    if (steps.length) {
+      const detail = steps.length === 1 ? `etapa ${steps[0].id} (${STEP_LABEL[steps[0].status] ?? steps[0].status})` : `etapas ${listJoin(steps.map((st) => st.id))}`;
+      refs.push({ kind: 'mission', id: m.id, label: m.title, detail });
+    }
+  }
+  for (const t of readToolbox()) if (t.agent === id) refs.push({ kind: 'toolbox', id: t.id, label: t.name });
+  return refs;
+}
+
+const USAGE_KIND: Record<AgentUsageRef['kind'], string> = { routine: 'Rotina', workflow: 'Workflow', mission: 'Missão', toolbox: 'Ferramenta' };
+
+// Linhas do modal de aprovação da Yui: onde ele é usado e quem assume.
+export function agentDeleteSummary(a: AgentDef, usage: AgentUsageRef[], replacement: AgentDef | null): ApprovalInfo['rows'] {
+  return [
+    { label: 'Agente', value: `${a.name} [${a.id}]` },
+    ...usage.map((u) => ({ label: USAGE_KIND[u.kind], value: u.detail ? `${u.label} · ${u.detail}` : u.label })),
+    { label: 'Quem assume', value: replacement ? `${replacement.name} [${replacement.id}]` : usage.length ? '—' : 'ninguém (sem uso)' },
+    { label: 'Desfazer', value: 'não é possível (cópia fica no histórico de agentes)', tone: 'crit' },
+  ];
+}
+
+const activeAgent = (id: string | null | undefined) => (id ? loadAllAgents().find((a) => a.id === id && !a.archived) : undefined);
+
+// Exclusão definitiva: reatribui o uso ao substituto, guarda cópia no histórico, apaga o .md e impede o seed de recriar.
+export function deleteAgent(id: string, replaceWith: string | null): { ok: true; reassigned: number } | { ok: false; error: string; usage?: AgentUsageRef[] } {
+  const a = findAny(id);
+  if (!a) return { ok: false, error: 'agente não encontrado' };
+  const usage = agentUsage(id);
+  const rep = replaceWith && replaceWith !== id ? activeAgent(replaceWith) : undefined;
+  if (replaceWith && !rep) return { ok: false, error: 'substituto inválido (precisa ser outro agente ativo)', usage };
+  if (usage.length && !rep) return { ok: false, error: 'o agente está em uso: escolha quem assume', usage };
+
+  if (rep) {
+    for (const r of listRoutines()) if (r.agent_id === id) updateRoutine(r.id, { agentId: rep.id });
+    for (const w of listWorkflows()) {
+      const uses = w.nodes.some((n) => n.agent === id) || w.team.includes(id);
+      if (!uses) continue;
+      const nodes = w.nodes.map((n) => (n.agent === id ? { ...n, agent: rep.id } : n));
+      const team = [...new Set(w.team.map((t) => (t === id ? rep.id : t)))];
+      saveWorkflow({ def: { ...w, nodes, team } }, w.slug);
+    }
+    for (const m of activeMissions()) {
+      if (!openStepsOf(m, id).length) continue;
+      const steps = (JSON.parse(m.plan_json) as MissionStep[]).map((st) => (st.agentId === id && OPEN_STEP.has(st.status) ? { ...st, agentId: rep.id, agent: rep.name } : st));
+      db.prepare('UPDATE missions SET plan_json = ? WHERE id = ?').run(JSON.stringify(steps), m.id);
+      const info = getMission(m.id);
+      if (info) emit({ type: 'mission.updated', mission: info });
+    }
+    const tb = readToolbox();
+    if (tb.some((t) => t.agent === id)) {
+      const f = toolboxFile();
+      writeFileSync(`${f}.tmp`, `${JSON.stringify(tb.map((t) => (t.agent === id ? { ...t, agent: rep.id } : t)), null, 2)}\n`);
+      renameSync(`${f}.tmp`, f);
+    }
+  }
+
+  const file = join(agentsDir(), `${id}.md`);
+  if (existsSync(file)) {
+    mkdirSync(historyDir(), { recursive: true });
+    cpSync(file, join(historyDir(), `${id}-demitido-${new Date().toISOString().replace(/[:.]/g, '-')}.md`));
+    unlinkSync(file);
+  }
+  kvSet('agents_deleted', JSON.stringify([...new Set([...deletedIds(), id])]));
+  invalidateAgents();
+  emit({ type: 'agents.updated', agentsWorking: agentsWorking() });
+  return { ok: true, reassigned: rep ? usage.length : 0 };
 }
 
 export function register(app: FastifyInstance): void {
@@ -144,9 +261,22 @@ export function register(app: FastifyInstance): void {
     return toConfig(copy);
   });
 
+  app.get('/api/agents/:id/usage', async (req, reply) => {
+    const a = findAny((req.params as { id: string }).id);
+    if (!a) return reply.code(404).send({ error: 'not found' });
+    return agentUsage(a.id);
+  });
+
+  // Sem ?hard = arquivar (volta com Reativar). Com ?hard=1 = demitir: exclui de vez, reatribuindo a ?replaceWith.
   app.delete('/api/agents/:id', async (req, reply) => {
     const a = findAny((req.params as { id: string }).id);
     if (!a) return reply.code(404).send({ error: 'not found' });
+    const q = (req.query ?? {}) as { hard?: string; replaceWith?: string };
+    if (q.hard === '1' || q.hard === 'true') {
+      const r = deleteAgent(a.id, q.replaceWith?.trim() || null);
+      if (!r.ok) return reply.code(r.usage ? 409 : 404).send({ error: r.error, usage: r.usage ?? [] });
+      return r;
+    }
     writeAgent({ ...a, archived: true });
     return reply.code(204).send();
   });
@@ -206,6 +336,21 @@ export function register(app: FastifyInstance): void {
       },
       {
         type: 'function',
+        name: 'demitir_agente',
+        strict: true,
+        description: 'Pede a exclusão definitiva de um agente, passando rotinas, passos de workflow, etapas de missão e ferramentas dele para um substituto. Só exclui depois que o usuário aprovar no modal de ação destrutiva.',
+        parameters: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['agente', 'substituto'],
+          properties: {
+            agente: { type: 'string', description: 'id ou nome do agente a demitir' },
+            substituto: { type: ['string', 'null'], description: 'id ou nome de quem assume os lugares dele; null se ele não é usado em nada' },
+          },
+        },
+      },
+      {
+        type: 'function',
         name: 'open_agent',
         strict: true,
         description: 'Abre a ficha de um agente (prompt, skills, MCP, plugins, execuções) para o usuário ver/editar.',
@@ -224,6 +369,28 @@ export function register(app: FastifyInstance): void {
         });
         return Promise.resolve({ ok: true, id: a.id, nome: a.name });
       }
+      if (tool === 'demitir_agente') {
+        const byKey = (v: unknown) => {
+          const k = String(v ?? '').toLowerCase().trim();
+          return k ? loadAllAgents().find((x) => x.id === k || x.name.toLowerCase() === k) : undefined;
+        };
+        const a = byKey(args.agente);
+        if (!a) return Promise.resolve({ ok: false, error: 'agente não encontrado', disponiveis: loadAllAgents().map((x) => x.id) });
+        const usage = agentUsage(a.id);
+        const rep = args.substituto ? byKey(args.substituto) : undefined;
+        if (args.substituto && (!rep || rep.archived || rep.id === a.id)) return Promise.resolve({ ok: false, error: 'substituto inválido: precisa ser outro agente ativo' });
+        if (usage.length && !rep) {
+          return Promise.resolve({ ok: false, error: 'o agente está em uso: pergunte ao usuário quem assume', uso: usage.map((u) => `${USAGE_KIND[u.kind]} ${u.label}${u.detail ? ` (${u.detail})` : ''}`) });
+        }
+        if (ctx.dryRun) return Promise.resolve({ ok: true, status: 'aguardando_aprovacao' });
+        // Não espera o clique: o turno da Yui termina já e a exclusão acontece só se o usuário aprovar.
+        void askApproval(`delete:agent:${a.id}`, `Demitir o agente "${a.name}" definitivamente?`, agentDeleteSummary(a, usage, rep ?? null), undefined, { kind: 'destructive' }).then((ok) => {
+          if (!ok) return narrate(`Ok, mantive o agente ${a.name}.`, { speak: true });
+          const r = deleteAgent(a.id, rep?.id ?? null);
+          narrate(r.ok ? `Agente ${a.name} demitido${rep ? `; ${rep.name} assumiu os lugares dele` : ''}.` : `Não consegui demitir ${a.name}: ${r.error}.`, { speak: true });
+        });
+        return Promise.resolve({ ok: true, status: 'aguardando_aprovacao', nome: a.name, substituto: rep?.name ?? null, aviso: 'Nada foi excluído ainda: só exclui se o usuário aprovar no modal.' });
+      }
       if (tool === 'open_agent') {
         if (ctx.dryRun) return Promise.resolve({ ok: true });
         const k = String(args.agent).toLowerCase().trim();
@@ -235,6 +402,6 @@ export function register(app: FastifyInstance): void {
       return undefined;
     },
     instructions:
-      '- "Abre o agente X", "mostra a configuração do Designer" => open_agent. Se nenhum agente servir a um pedido recorrente, crie um com create_agent e delegue a ele.',
+      '- "Abre o agente X", "mostra a configuração do Designer" => open_agent. Se nenhum agente servir a um pedido recorrente, crie um com create_agent e delegue a ele. "Demite/exclui/apaga o agente X" => demitir_agente: é irreversível, use só quando o usuário pedir claramente para excluir aquele agente (nunca por iniciativa própria; para só pausar, ele pode Arquivar no painel). Se o agente estiver em uso, pergunte quem assume antes de chamar. Abre um modal de aprovação; diga que aguarda a aprovação dele e nunca diga que já demitiu.',
   });
 }

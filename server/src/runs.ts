@@ -4,7 +4,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { query, type CanUseTool, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { ApprovalInfo, InboxItem, RunInfo, RunEventLine, RunState, RunStep } from '../../shared/protocol.ts';
 import { config } from './config.ts';
-import { db, kvSet, now, uid } from './db.ts';
+import { db, kvGet, kvSet, now, uid } from './db.ts';
 import { emit } from './bus.ts';
 import { findAgent, agentsWorking, type AgentDef } from './agents.ts';
 import { ensureProject, findProject } from './projects.ts';
@@ -271,6 +271,7 @@ export function pendingApprovals(): ApprovalInfo[] {
 }
 
 export function inboxItems(): InboxItem[] {
+  const dismissed = new Set(dismissedInbox());
   const items: InboxItem[] = pendingApprovals().map((a) => ({
     id: `approval:${a.id}`,
     tag: a.kind === 'destructive' ? 'Exclusão' : 'Aprovação',
@@ -282,9 +283,67 @@ export function inboxItems(): InboxItem[] {
     .prepare(`SELECT id, task, project FROM runs WHERE state = 'failed' AND finished_at > ? ORDER BY finished_at DESC LIMIT 3`)
     .all(new Date(Date.now() - 24 * 3600_000).toISOString()) as { id: string; task: string; project: string | null }[];
   for (const f of failed) {
+    if (dismissed.has(`failed:${f.id}`)) continue;
     items.push({ id: `failed:${f.id}`, tag: 'Falha', label: f.task, tone: 'crit', action: { type: 'view', view: 'runs', params: { runId: f.id } } });
   }
   return items;
+}
+
+// Falhas dispensadas pelo usuário somem do inbox (aprovações pendentes nunca são dispensáveis).
+const dismissedInbox = (): string[] => {
+  try {
+    const v = JSON.parse(kvGet('inbox_dismissed') ?? '[]');
+    return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+
+export function dismissInboxItem(id: string): boolean {
+  if (!id.startsWith('failed:')) return false;
+  const list = dismissedInbox().filter((x) => x !== id);
+  kvSet('inbox_dismissed', JSON.stringify([...list, id].slice(-200)));
+  emit({ type: 'inbox.updated', inbox: inboxItems() });
+  return true;
+}
+
+// ---------- histórico: paginação e exclusão ----------
+
+const ACTIVE_STATES = `('running','queued','waiting_approval')`;
+
+// Página do histórico por data de criação (mais novas primeiro); `before` = created_at do último item já mostrado.
+export function listRunsPage(before: string | null, limit = 40): { runs: RunInfo[]; next: string | null } {
+  const rows = (before
+    ? db.prepare(`SELECT * FROM runs WHERE created_at < ? ORDER BY created_at DESC LIMIT ?`).all(before, limit)
+    : db.prepare(`SELECT * FROM runs ORDER BY created_at DESC LIMIT ?`).all(limit)) as RunRow[];
+  return { runs: rows.map(toRunInfo), next: rows.at(-1)?.created_at ?? null };
+}
+
+// Exclui uma execução (eventos vão junto). Ativa: cancela e espera o loop soltar a run antes de apagar.
+export async function deleteRun(id: string): Promise<boolean> {
+  if (!getRun(id)) return false;
+  if (running.has(id)) {
+    cancelRun(id);
+    for (let i = 0; i < 100 && running.has(id); i++) await new Promise((r) => setTimeout(r, 50));
+    if (running.has(id)) throw new Error('a execução não parou a tempo; tente de novo');
+  } else cancelRun(id);
+  expireApprovals(id);
+  db.prepare('DELETE FROM run_events WHERE run_id = ?').run(id);
+  db.prepare('DELETE FROM runs WHERE id = ?').run(id);
+  emit({ type: 'inbox.updated', inbox: inboxItems() });
+  return true;
+}
+
+// Apaga execuções terminadas há mais de N dias; ativas e na fila ficam.
+export function purgeRuns(olderThanDays: number): number {
+  const cutoff = new Date(Date.now() - olderThanDays * 86400_000).toISOString();
+  const where = `state NOT IN ${ACTIVE_STATES} AND COALESCE(finished_at, created_at) < ?`;
+  const n = db.transaction(() => {
+    db.prepare(`DELETE FROM run_events WHERE run_id IN (SELECT id FROM runs WHERE ${where})`).run(cutoff);
+    return db.prepare(`DELETE FROM runs WHERE ${where}`).run(cutoff).changes;
+  })();
+  if (n) emit({ type: 'inbox.updated', inbox: inboxItems() });
+  return n;
 }
 
 function systemAppend(agent: AgentDef, projectName: string | null): string {

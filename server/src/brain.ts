@@ -5,9 +5,7 @@ import { VIEW_NAMES } from '../../shared/protocol.ts';
 import { config } from './config.ts';
 import { db, kvGet, now, uid } from './db.ts';
 import { emit, setYuiState } from './bus.ts';
-import { existsSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { agentInfos, agentsDir, invalidateAgents, loadAgents, parseAgent, serializeAgent } from './agents.ts';
+import { agentInfos, loadAgents } from './agents.ts';
 import { activeProject, findProject, listProjectConfigs, projectDetail, projectLogs, setActiveProject } from './projects.ts';
 import { enqueueRun, inboxItems, listRuns, pendingApprovals } from './runs.ts';
 import { infra, overview } from './metrics.ts';
@@ -111,16 +109,6 @@ const TOOLS: OpenAI.Responses.FunctionTool[] = [
   },
   { type: 'function', name: 'list_repos', strict: true, description: 'Busca nos repositórios GitHub do usuário (catálogo completo, clonados ou não).', parameters: S({ query: nullableStr('trecho do nome/descrição; null lista os mais recentes') }, ['query']) },
   { type: 'function', name: 'open_approval', strict: true, description: 'Mostra ao usuário o modal da aprovação pendente mais antiga.', parameters: S({}, []) },
-  {
-    type: 'function', name: 'create_agent', strict: true,
-    description: 'Cria um novo agente especialista (quando nenhum existente serve). Fica disponível na hora.',
-    parameters: S({
-      name: { type: 'string', description: 'nome curto, ex.: SEO' },
-      description: { type: 'string', description: 'uma linha: o que faz e quais ferramentas usa' },
-      group: { type: 'string', description: 'Engineering | Operações | Growth | Design' },
-      prompt: { type: 'string', description: 'instruções do agente em português (papel, como trabalhar, entregáveis)' },
-    }, ['name', 'description', 'group', 'prompt']),
-  },
 ];
 
 // Conectores MCP vistos no último run (gravado por runs.ts no init do SDK).
@@ -231,15 +219,6 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
         .slice(0, 25)
         .map((p) => ({ slug: p.slug, repo: p.repo, descricao: p.description, ultimo_push: p.pushedAt, clonado: p.cloned }));
     }
-    case 'create_agent': {
-      const slug = String(args.name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'agente';
-      const file = join(agentsDir(), `${slug}.md`);
-      if (existsSync(file)) return { ok: true, id: slug, nota: 'já existia' };
-      const def = parseAgent(slug, `---\nname: x\n---\n`);
-      writeFileSync(file, serializeAgent({ ...def, name: String(args.name), description: String(args.description), group: String(args.group || 'Geral'), prompt: String(args.prompt) }));
-      invalidateAgents();
-      return { ok: true, id: slug };
-    }
     case 'open_approval': {
       const a = pendingApprovals()[0];
       if (!a) return { ok: false, error: 'nenhuma aprovação pendente' };
@@ -269,7 +248,11 @@ function dryResult(name: string): unknown {
   return { ok: true };
 }
 
-const allTools = () => [...TOOLS, ...brainExtensions().flatMap((e) => e.tools)];
+// Nome repetido derruba a chamada na OpenAI: vale a primeira definição.
+const allTools = () => {
+  const seen = new Set<string>();
+  return [...TOOLS, ...brainExtensions().flatMap((e) => e.tools)].filter((t) => !seen.has(t.name) && !!seen.add(t.name));
+};
 const allInstructions = () => [instructionsText(), ...brainExtensions().map((e) => e.instructions).filter(Boolean)].join('\n');
 
 // Retorna a frase final da Yui. Efeitos de UI já foram emitidos durante o loop.

@@ -5,7 +5,7 @@ import { useApi } from '../../api/useApi'
 import { startRun } from '../../lib/actions'
 import { C } from '../../lib/colors'
 import { useYui } from '../../store/yui'
-import { AgentDetailView } from '../../views/AgentDetailView'
+import { AgentDetailView, FireAgentModal } from '../../views/AgentDetailView'
 import { Empty, useHeader } from '../../views/ui'
 import { agentColor, Card, Dot, fmtCost, fmtDuration, fmtTokens, HBar, Kpi, openApp, relTime, useViewParams } from './common'
 
@@ -21,6 +21,7 @@ interface AgentStats {
   topTools: { name: string; count: number }[]
 }
 type Tab = 'stats' | 'config' | 'runs'
+type Filter = 'active' | 'archived'
 
 async function newAgent() {
   try {
@@ -45,6 +46,19 @@ export function AgentsPage() {
   const agents = useApi<AgentInfo[]>('/api/agents', [working], 15000)
   const ov = useApi<StatsOverview>('/api/stats/overview?days=7', [], 60000)
   const list = agents.data ?? []
+  const [filter, setFilter] = useState<Filter>('active')
+  const all = useApi<AgentConfig[]>('/api/agents/all', [working, filter])
+  const archived = (all.data ?? []).filter((a) => a.archived)
+  const [firing, setFiring] = useState<AgentConfig | null>(null)
+  const refresh = () => {
+    agents.reload()
+    all.reload()
+  }
+  // depois de arquivar/demitir: volta para a lista
+  const gone = () => {
+    refresh()
+    openApp('agents')
+  }
   // celular: sem id mostra só a lista (não abre o primeiro agente sozinho)
   const id = phone ? paramId : (paramId ?? list[0]?.id)
   const [tab, setTab] = useState<Tab>('stats')
@@ -87,17 +101,37 @@ export function AgentsPage() {
   const detail = (
     <>
       {tabs}
-      {tab === 'stats' && id && <AgentStatsTab id={id} info={list.find((a) => a.id === id)} />}
-      {tab === 'config' && <AgentDetailView />}
+      {tab === 'stats' && id && <AgentStatsTab id={id} info={list.find((a) => a.id === id)} onGone={gone} />}
+      {tab === 'config' && <AgentDetailView onGone={gone} />}
       {tab === 'runs' && id && <AgentRunsTab id={id} />}
     </>
   )
+
+  const reactivate = async (a: AgentConfig) => {
+    try {
+      await api.put(`/api/agents/${encodeURIComponent(a.id)}`, { archived: false })
+      refresh()
+      useYui.getState().say(`${a.name} reativado.`, { state: 'success' })
+    } catch {
+      useYui.getState().say(`Não consegui reativar ${a.name}.`, { state: 'warning' })
+    }
+  }
 
   // celular: agente aberto ocupa a tela toda (sem a lista)
   if (phone && id) return <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>{detail}</div>
 
   return (
     <div className="app-split" style={{ alignItems: 'flex-start' }}>
+      {firing && (
+        <FireAgentModal
+          agent={firing}
+          onCancel={() => setFiring(null)}
+          onDone={() => {
+            setFiring(null)
+            refresh()
+          }}
+        />
+      )}
       <section style={{ width: phone ? '100%' : device === 'tablet' ? 280 : 380, maxWidth: '100%', display: 'flex', flexDirection: 'column', gap: 10, flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span className="app-muted">
@@ -109,8 +143,49 @@ export function AgentsPage() {
             </button>
           )}
         </div>
-        {phone && list.length === 0 && !agents.loading && <Empty text="Nenhum agente ainda." hint="Crie um com “+ Novo agente” ou peça para a Yui." />}
-        {list.map((a) => {
+        <div role="tablist" aria-label="Filtro de agentes" style={{ display: 'flex', gap: 6 }}>
+          {(
+            [
+              ['active', `Ativos · ${list.length}`],
+              ['archived', `Arquivados${all.data ? ` · ${archived.length}` : ''}`],
+            ] as [Filter, string][]
+          ).map(([f, l]) => (
+            <button
+              key={f}
+              role="tab"
+              aria-selected={filter === f}
+              onClick={() => setFilter(f)}
+              style={{ padding: '6px 12px', minHeight: phone ? 44 : 32, fontSize: phone ? 14 : 12.5, borderRadius: 999, cursor: 'pointer', color: filter === f ? C.text : C.t2, background: filter === f ? 'rgba(103,216,242,.1)' : 'transparent', border: `1px solid ${filter === f ? 'rgba(103,216,242,.3)' : 'rgba(255,255,255,.08)'}` }}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+        {filter === 'archived' && (
+          <>
+            {archived.length === 0 && !all.loading && <Empty text="Nenhum agente arquivado." hint="Arquivar pausa um agente sem apagar; demitir exclui de vez." />}
+            {archived.map((a) => (
+              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: phone ? 14 : '10px 12px', borderRadius: phone ? 16 : 14, background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.05)' }}>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: '1 1 140px' }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: C.t2 }}>
+                    {a.name} <span style={{ fontSize: 11, color: C.t3, fontWeight: 500 }}>· {a.group}</span>
+                  </span>
+                  <span style={{ fontSize: 12, color: C.t3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.description || 'Arquivado'}</span>
+                </span>
+                <span style={{ display: 'flex', gap: 6 }}>
+                  <button className="app-btn small" style={{ minHeight: phone ? 44 : undefined }} onClick={() => void reactivate(a)}>
+                    Reativar
+                  </button>
+                  <button className="app-btn small" style={{ minHeight: phone ? 44 : undefined, color: '#f39aa4', borderColor: 'rgba(240,98,114,.35)' }} onClick={() => setFiring(a)}>
+                    Demitir
+                  </button>
+                </span>
+              </div>
+            ))}
+          </>
+        )}
+        {filter === 'active' && phone && list.length === 0 && !agents.loading && <Empty text="Nenhum agente ainda." hint="Crie um com “+ Novo agente” ou peça para a Yui." />}
+        {filter === 'active' && list.map((a) => {
           const sel = a.id === id
           const c = a.status === 'running' ? C.cyan : a.status === 'waiting' ? C.warn : null
           const ok = okBy.get(a.id)
@@ -151,7 +226,8 @@ export function AgentsPage() {
   )
 }
 
-function AgentStatsTab({ id, info }: { id: string; info?: AgentInfo }) {
+function AgentStatsTab({ id, info, onGone }: { id: string; info?: AgentInfo; onGone: () => void }) {
+  const [firing, setFiring] = useState(false)
   const st = useApi<AgentStats>(`/api/stats/agent/${encodeURIComponent(id)}`, [id], 30000)
   const cfg = useApi<AgentConfig>(`/api/agents/${encodeURIComponent(id)}`, [id])
   useHeader(
@@ -160,6 +236,7 @@ function AgentStatsTab({ id, info }: { id: string; info?: AgentInfo }) {
     [
       { label: 'Testar', primary: true, fn: () => void startRun(id, null, 'Apresente-se em 2 frases: quem você é, o que faz e quais ferramentas/conectores você tem disponíveis agora. Não altere nada.') },
       { label: 'Abrir no terminal', fn: () => useYui.getState().show('terminal', { kind: 'shell', cmd: `claude --agent ${JSON.stringify(info?.name ?? id)}` }) },
+      { label: 'Demitir', fn: () => setFiring(true), danger: true },
     ],
     [id, info?.name, info?.group],
   )
@@ -168,6 +245,7 @@ function AgentStatsTab({ id, info }: { id: string; info?: AgentInfo }) {
   const status = info?.status === 'running' ? `● Rodando · ${info.task ?? ''}` : info?.status === 'waiting' ? `● Aguardando · ${info.task ?? ''}` : `Dormindo · última atividade ${relTime(info?.lastActivity)}`
   return (
     <>
+      {firing && <FireAgentModal agent={{ id, name: info?.name ?? id }} onCancel={() => setFiring(false)} onDone={onGone} />}
       <div style={{ fontSize: 12.5, color: info?.status === 'running' ? C.cyan : info?.status === 'waiting' ? C.warn : C.t2 }}>{status}</div>
       <div className="app-grid-2" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 }}>
         <Kpi label="Execuções 30d" value={d ? String(d.runs30d) : '—'} size={28} />

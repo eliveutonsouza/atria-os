@@ -101,6 +101,21 @@ export function onSettingsChange(fn: Listener) {
   listeners.push(fn);
 }
 
+// Preços da OpenAI: { "modelo": { "in": 1.25, "out": 10, "perMinute": 0.06 } } com números ≥ 0 (ver pricing.ts).
+function validatePricing(s: string) {
+  let j: unknown;
+  try {
+    j = JSON.parse(s);
+  } catch {
+    throw new Error('preços: JSON inválido');
+  }
+  if (!j || typeof j !== 'object' || Array.isArray(j)) throw new Error('preços: use { "modelo": { "in": 1.25, "out": 10 } }');
+  for (const [m, p] of Object.entries(j as Record<string, unknown>)) {
+    if (!p || typeof p !== 'object' || Array.isArray(p)) throw new Error(`preços: ${m} precisa ser um objeto`);
+    for (const [f, n] of Object.entries(p as Record<string, unknown>)) if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) throw new Error(`preços: ${m}.${f} precisa ser um número ≥ 0`);
+  }
+}
+
 function validate(key: string, v: unknown): string | null {
   const d = SETTINGS[key];
   if (!d) throw new Error(`chave desconhecida: ${key}`);
@@ -121,7 +136,8 @@ function validate(key: string, v: unknown): string | null {
       const s = String(v).trim();
       if (d.maxLen && s.length > d.maxLen) throw new Error(`${key}: até ${d.maxLen} caracteres`);
       if (key === 'user.email' && s && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) throw new Error('e-mail inválido');
-      if (key === 'openai.key' && s && !/^sk-[A-Za-z0-9_-]{20,}$/.test(s)) throw new Error('chave OpenAI inválida (começa com sk-)');
+      if (key === 'pricing.openai' && s) validatePricing(s);
+      if (key === 'openai.key' && s &&!/^sk-[A-Za-z0-9_-]{20,}$/.test(s)) throw new Error('chave OpenAI inválida (começa com sk-)');
       return s;
     }
   }

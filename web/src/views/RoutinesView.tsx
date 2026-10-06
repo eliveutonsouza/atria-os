@@ -5,7 +5,7 @@ import { useApi } from '../api/useApi'
 import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
 import { CRON_PRESETS, dayLabel, describeCron, hhmm, send } from '../workflow/http'
-import { Empty, ErrorNote, Skeleton, useHeader } from './ui'
+import { ConfirmDeleteModal, Empty, ErrorNote, Skeleton, useHeader } from './ui'
 
 // Rotinas agendadas (cron): "Hoje" estilo PRD §85 + gestão (criar/editar/pausar/rodar agora/excluir).
 
@@ -18,6 +18,8 @@ export function RoutinesView() {
   const workflows = useApi<WorkflowDef[]>('/api/workflows').data ?? []
   const agents = useApi<AgentInfo[]>('/api/agents').data ?? []
   const [editing, setEditing] = useState<RoutineInfo | 'new' | null>(null)
+  const [deleting, setDeleting] = useState<RoutineInfo | null>(null)
+  const [busy, setBusy] = useState(false)
   const say = useYui.getState().say
   const phone = useYui((s) => s.device === 'phone')
 
@@ -56,6 +58,25 @@ export function RoutinesView() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 26, maxWidth: 1100 }}>
+      {deleting && (
+        <ConfirmDeleteModal
+          title={`Excluir a rotina "${deleting.name}"?`}
+          text="Ela para de rodar no horário agendado. Execuções que ela já fez continuam no histórico."
+          rows={[
+            { label: 'Quando', value: describeCron(deleting.cron) },
+            { label: 'Faz', value: target(deleting) },
+          ]}
+          busy={busy}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => {
+            setBusy(true)
+            void act(() => send('DELETE', `/api/routines/${deleting.id}`), 'Rotina removida.').finally(() => {
+              setBusy(false)
+              setDeleting(null)
+            })
+          }}
+        />
+      )}
       {editing && <RoutineForm initial={editing === 'new' ? null : editing} workflows={workflows} agents={agents} phone={phone} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reload() }} />}
 
       <section>
@@ -101,7 +122,7 @@ export function RoutinesView() {
                   {r.enabled ? 'Pausar' : 'Ativar'}
                 </button>
                 <button className="wf-btn ghost" onClick={() => setEditing(r)}>Editar</button>
-                <button className="wf-btn ghost" style={{ color: '#f39aa4' }} onClick={() => void act(() => send('DELETE', `/api/routines/${r.id}`), 'Rotina removida.')}>Excluir</button>
+                <button className="wf-btn ghost" style={{ color: '#f39aa4' }} onClick={() => setDeleting(r)}>Excluir</button>
               </div>
             </div>
           ))

@@ -140,7 +140,10 @@ export async function startGithub(): Promise<void> {
   await initGithub();
   const n = await syncCatalog();
   console.log(`github: ${n} repositórios no catálogo`);
-  const recent = catalog().filter((r) => !r.archived && r.pushed_at && Date.now() - new Date(r.pushed_at).getTime() < 30 * 86400_000);
+  // removidos pelo usuário (Projetos › Remover do console) não voltam sozinhos
+  const removedRaw = db.prepare(`SELECT value FROM kv WHERE key = 'projects_removed'`).get() as { value: string } | undefined;
+  const removed = new Set<string>(removedRaw ? JSON.parse(removedRaw.value) : []);
+  const recent = catalog().filter((r) => !r.archived && !removed.has(r.slug) && r.pushed_at && Date.now() - new Date(r.pushed_at).getTime() < 30 * 86400_000);
   for (const r of recent) {
     await ensureCloned(r.name_with_owner).catch((e) => console.error(`clone ${r.name_with_owner}:`, e.message));
   }

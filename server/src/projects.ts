@@ -1,11 +1,14 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { join, resolve, sep } from 'node:path';
+import { promisify } from 'node:util';
 import type { LogsPayload, ProjectDetail, ProjectSummary, Tone } from '../../shared/protocol.ts';
 import { config } from './config.ts';
 import { db, kvGet, kvSet } from './db.ts';
 import { containerLogs } from './docker.ts';
 import { sandboxUrl } from './sandbox.ts';
 import { catalog, ensureCloned } from './github.ts';
+import { trustDirs } from './trust.ts';
 
 // Projeto = diretório em /workspace/<slug>. Configuração opcional em /workspace/<slug>/yui.json:
 // { "name": "Stoqmate", "healthUrl": "https://...", "container": "stoqmate-api", "preview": "dist",
@@ -224,4 +227,163 @@ export function relTime(iso: string): string {
   if (s < 3600) return `há ${Math.round(s / 60)}min`;
   if (s < 86400) return `há ${Math.round(s / 3600)}h`;
   return `há ${Math.round(s / 86400)}d`;
+}
+
+// ---------- CRUD de projetos (painel) ----------
+
+export const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,62}$/;
+const run = promisify(execFile);
+
+// Projeto local por slug exato (nunca por aproximação: é usado para apagar).
+export function localProject(slug: string): ProjectConfig | undefined {
+  return localProjects().find((p) => p.slug === slug);
+}
+
+const projectDirOf = (slug: string) => {
+  const dir = resolve(config.workspaceDir, slug);
+  if (!dir.startsWith(resolve(config.workspaceDir) + sep) || slug.startsWith('.') || slug.includes('/')) throw new Error('slug inválido');
+  return dir;
+};
+
+export function slugFromUrl(url: string): string {
+  const last = new URL(url).pathname.replace(/\/+$/, '').split('/').pop() ?? '';
+  return last.replace(/\.git$/i, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63);
+}
+
+// URL https sem credenciais embutidas (tokens ficam no gh/credential helper, nunca no .git/config).
+export function validGitUrl(url: unknown): string | null {
+  if (typeof url !== 'string') return null;
+  try {
+    const u = new URL(url.trim());
+    if (u.protocol !== 'https:' || u.username || u.password || !u.hostname || u.pathname.split('/').filter(Boolean).length < 2) return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+export function removedProjects(): string[] {
+  const raw = kvGet('projects_removed');
+  return raw ? (JSON.parse(raw) as string[]) : [];
+}
+const unremove = (slug: string) => kvSet('projects_removed', JSON.stringify(removedProjects().filter((s) => s !== slug)));
+
+export async function addProject(input: { repo?: string; url?: string; slug?: string }): Promise<ProjectConfig> {
+  if (input.repo) {
+    const r = catalog().find((x) => x.name_with_owner === input.repo);
+    if (!r) throw new Error(`repositório fora do catálogo: ${input.repo}`);
+    if (localProject(r.slug)) throw new Error(`o projeto ${r.slug} já está no console`);
+    unremove(r.slug);
+    await ensureCloned(r.name_with_owner);
+    return localProject(r.slug) ?? (() => { throw new Error('clone não apareceu no workspace'); })();
+  }
+  const url = validGitUrl(input.url);
+  if (!url) throw new Error('informe uma URL git https válida (sem usuário/senha), ex.: https://github.com/dono/repo.git');
+  const slug = (input.slug || slugFromUrl(url)).trim();
+  if (!SLUG_RE.test(slug)) throw new Error('nome da pasta inválido: use letras minúsculas, números e hífen');
+  const dir = projectDirOf(slug);
+  if (existsSync(dir)) throw new Error(`já existe a pasta ${slug} no workspace`);
+  unremove(slug);
+  try {
+    await run('git', ['clone', '--filter=blob:none', '--', url, dir], { env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, timeout: 600_000, maxBuffer: 20 * 1024 * 1024 });
+  } catch (e) {
+    rmSync(dir, { recursive: true, force: true });
+    const msg = String((e as { stderr?: string }).stderr || (e as Error).message).trim().split('\n').pop();
+    throw new Error(`não consegui clonar: ${msg}`);
+  }
+  const gh = /^https:\/\/github\.com\/([^/]+\/[^/]+?)(?:\.git)?\/?$/i.exec(url)?.[1];
+  writeFileSync(join(dir, 'yui.json'), `${JSON.stringify({ name: slug, ...(gh ? { repo: gh } : {}) }, null, 2)}\n`);
+  const exclude = join(dir, '.git', 'info', 'exclude');
+  if (existsSync(exclude) && !readFileSync(exclude, 'utf8').includes('yui.json')) writeFileSync(exclude, `${readFileSync(exclude, 'utf8')}\nyui.json\n`);
+  trustDirs([dir]);
+  return localProject(slug)!;
+}
+
+export function activeRunsIn(slug: string): number {
+  return (db.prepare(`SELECT COUNT(*) AS n FROM runs WHERE project = ? AND state IN ('running','queued','waiting_approval')`).get(slug) as { n: number }).n;
+}
+
+// Remove só a pasta local do clone; o repositório no GitHub não é tocado.
+export function removeProject(slug: string): void {
+  const p = localProject(slug);
+  if (!p) throw Object.assign(new Error('projeto não está no console'), { code: 404 });
+  if (activeRunsIn(slug)) throw Object.assign(new Error('há execuções ativas neste projeto; cancele antes de remover'), { code: 409 });
+  rmSync(projectDirOf(slug), { recursive: true, force: true });
+  healthCache.delete(slug);
+  // não volta sozinho no próximo início (o clone automático dos repositórios recentes pula os removidos)
+  const removed = new Set(removedProjects());
+  removed.add(slug);
+  kvSet('projects_removed', JSON.stringify([...removed]));
+  if (activeProject() === slug) kvSet('active_project', '');
+}
+
+export interface ProjectSettings {
+  name?: string;
+  healthUrl?: string;
+  container?: string;
+  preview?: string;
+  approvalPatterns?: string[];
+}
+
+export function readProjectSettings(slug: string): ProjectSettings & { repo?: string } {
+  const p = localProject(slug);
+  if (!p) throw Object.assign(new Error('projeto não está no console'), { code: 404 });
+  return { name: p.name, repo: p.repo, healthUrl: p.healthUrl, container: p.container, preview: p.preview, approvalPatterns: p.approvalPatterns ?? [] };
+}
+
+// Valida e normaliza; devolve a mensagem de erro em vez de lançar.
+export function validateSettings(b: unknown): { ok: ProjectSettings } | { error: string } {
+  if (!b || typeof b !== 'object') return { error: 'corpo inválido' };
+  const x = b as Record<string, unknown>;
+  const str = (k: string) => (x[k] === undefined || x[k] === null ? '' : typeof x[k] === 'string' ? (x[k] as string).trim() : null);
+  const out: ProjectSettings = {};
+  const name = str('name');
+  if (name === null || name.length > 80) return { error: 'nome inválido (até 80 caracteres)' };
+  if (name) out.name = name;
+  const health = str('healthUrl');
+  if (health === null) return { error: 'healthUrl inválida' };
+  if (health) {
+    try {
+      const u = new URL(health);
+      if (u.protocol !== 'https:' && u.protocol !== 'http:') return { error: 'healthUrl precisa começar com http(s)://' };
+    } catch {
+      return { error: 'healthUrl inválida' };
+    }
+    out.healthUrl = health;
+  }
+  const container = str('container');
+  if (container === null || (container && !/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/.test(container))) return { error: 'container inválido (nome do container Docker)' };
+  if (container) out.container = container;
+  const preview = str('preview');
+  if (preview === null || (preview && (preview.startsWith('/') || preview.split(/[\\/]/).includes('..') || preview.length > 120))) return { error: 'preview precisa ser uma pasta relativa ao projeto (ex.: dist)' };
+  if (preview) out.preview = preview.replace(/\/+$/, '');
+  const pats = x.approvalPatterns ?? [];
+  if (!Array.isArray(pats) || pats.length > 20 || pats.some((p) => typeof p !== 'string' || p.length > 200)) return { error: 'approvalPatterns: lista de até 20 textos (até 200 caracteres cada)' };
+  out.approvalPatterns = (pats as string[]).map((p) => p.trim()).filter(Boolean);
+  return { ok: out };
+}
+
+// Grava no yui.json preservando chaves que o painel não edita (repo etc.).
+export function writeProjectSettings(slug: string, s: ProjectSettings): ProjectSettings & { repo?: string } {
+  const p = localProject(slug);
+  if (!p) throw Object.assign(new Error('projeto não está no console'), { code: 404 });
+  const f = join(p.dir, 'yui.json');
+  let cfg: Record<string, unknown> = {};
+  if (existsSync(f)) {
+    try {
+      cfg = JSON.parse(readFileSync(f, 'utf8'));
+    } catch {
+      /* yui.json inválido: recomeça */
+    }
+  }
+  for (const k of ['healthUrl', 'container', 'preview'] as const) {
+    if (s[k]) cfg[k] = s[k];
+    else delete cfg[k];
+  }
+  if (s.name) cfg.name = s.name;
+  if (s.approvalPatterns?.length) cfg.approvalPatterns = s.approvalPatterns;
+  else delete cfg.approvalPatterns;
+  writeFileSync(f, `${JSON.stringify(cfg, null, 2)}\n`);
+  healthCache.delete(slug);
+  return readProjectSettings(slug);
 }

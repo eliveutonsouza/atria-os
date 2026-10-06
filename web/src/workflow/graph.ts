@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/react'
-import type { StepStatus, WorkflowNode, WorkflowRunInfo } from '@shared/protocol'
+import type { MissionStep, StepStatus, WorkflowNode, WorkflowRunInfo } from '@shared/protocol'
 
 // Conversão entre WorkflowNode[] (fonte = markdown) e nós/arestas do @xyflow/react.
 
@@ -135,3 +135,88 @@ export function disconnect(steps: WorkflowNode[], edgeId: string): WorkflowNode[
     return { ...s, next: s.next?.filter((t) => t !== tgt) }
   })
 }
+
+// ---------- missões: dependsOn ⇄ arestas (esquerda → direita, colunas por profundidade) ----------
+
+export interface MissionFlowData extends Record<string, unknown> {
+  mstep: MissionStep
+  n: number // posição na lista (1, 2…)
+  depsLabel: string // "depois de 1 e 2"
+  locked: boolean // etapa que já saiu da fila (não editável)
+}
+
+export type MissionFlowNode = Node<MissionFlowData, 'mission'>
+
+const MCOL = 260
+const MROW = 120
+
+export function missionLayout(steps: MissionStep[]): Record<string, { x: number; y: number }> {
+  const byId = new Map(steps.map((s) => [s.id, s]))
+  const depth = new Map<string, number>()
+  const walk = (id: string, seen: Set<string>): number => {
+    if (depth.has(id)) return depth.get(id)!
+    if (seen.has(id)) return 0
+    seen.add(id)
+    const deps = byId.get(id)?.dependsOn.filter((d) => byId.has(d)) ?? []
+    const d = deps.length ? 1 + Math.max(...deps.map((x) => walk(x, seen))) : 0
+    depth.set(id, d)
+    return d
+  }
+  steps.forEach((s) => walk(s.id, new Set()))
+  const cols = new Map<number, string[]>()
+  for (const s of steps) cols.set(depth.get(s.id)!, [...(cols.get(depth.get(s.id)!) ?? []), s.id])
+  const pos: Record<string, { x: number; y: number }> = {}
+  for (const [d, ids] of cols) ids.forEach((id, i) => (pos[id] = { x: d * MCOL, y: (i - (ids.length - 1) / 2) * MROW }))
+  return pos
+}
+
+export const missionNumbers = (steps: MissionStep[]) => new Map(steps.map((s, i) => [s.id, i + 1]))
+
+export function depsText(step: MissionStep, nums: Map<string, number>): string {
+  const n = step.dependsOn.map((d) => String(nums.get(d) ?? d))
+  return n.length ? `depois de ${n.length > 1 ? `${n.slice(0, -1).join(', ')} e ${n[n.length - 1]}` : n[0]}` : ''
+}
+
+export function missionToFlow(
+  steps: MissionStep[],
+  opts: { selected?: string | null; positions?: Record<string, { x: number; y: number }>; isLocked?: (s: MissionStep) => boolean } = {},
+): { nodes: MissionFlowNode[]; edges: Edge[] } {
+  const auto = missionLayout(steps)
+  const nums = missionNumbers(steps)
+  const nodes: MissionFlowNode[] = steps.map((s) => ({
+    id: s.id,
+    type: 'mission',
+    position: opts.positions?.[s.id] ?? auto[s.id] ?? { x: 0, y: 0 },
+    selected: opts.selected === s.id,
+    data: { mstep: s, n: nums.get(s.id) ?? 0, depsLabel: depsText(s, nums), locked: !!opts.isLocked?.(s) },
+  }))
+  const edges: Edge[] = steps.flatMap((s) =>
+    s.dependsOn.filter((d) => nums.has(d)).map((d) => ({ id: `${d}->${s.id}`, source: d, target: s.id, type: 'smoothstep', animated: s.status === 'running' })),
+  )
+  return { nodes, edges }
+}
+
+// a depende (direta ou indiretamente) de b?
+function reaches(steps: MissionStep[], a: string, b: string, seen = new Set<string>()): boolean {
+  if (a === b) return true
+  if (seen.has(a)) return false
+  seen.add(a)
+  return (steps.find((s) => s.id === a)?.dependsOn ?? []).some((d) => reaches(steps, d, b, seen))
+}
+
+// Ligar a → b = b passa a depender de a. Devolve null se criaria um ciclo.
+export function missionConnect(steps: MissionStep[], a: string, b: string): MissionStep[] | null {
+  if (a === b || reaches(steps, a, b)) return null
+  return steps.map((s) => (s.id === b && !s.dependsOn.includes(a) ? { ...s, dependsOn: [...s.dependsOn, a] } : s))
+}
+
+export function missionDisconnect(steps: MissionStep[], edgeId: string): MissionStep[] {
+  const [src, tgt] = edgeId.split('->')
+  return steps.map((s) => (s.id === tgt ? { ...s, dependsOn: s.dependsOn.filter((d) => d !== src) } : s))
+}
+
+export function missionRemove(steps: MissionStep[], id: string): MissionStep[] {
+  return steps.filter((s) => s.id !== id).map((s) => ({ ...s, dependsOn: s.dependsOn.filter((d) => d !== id) }))
+}
+
+export const missionNextId = (steps: MissionStep[]) => `s${Math.max(0, ...steps.map((s) => Number(s.id.replace(/^s/, '')) || 0)) + 1}`

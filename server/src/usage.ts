@@ -5,6 +5,7 @@ import { costFor, costForSeconds } from './pricing.ts';
 import { claudeLimits, probeClaudeUsage, claudeAccount } from './claudeUsage.ts';
 import { getInit } from './capabilities.ts';
 import { findAgent } from './agents.ts';
+import { registerBrain } from './extensions.ts';
 
 // Consumo de IA: cada chamada à OpenAI vira uma linha aqui (tokens + custo pela tabela de preços);
 // o Claude Code vem da tabela runs (custo/tokens por execução) e dos limites do plano (claudeUsage.ts).
@@ -146,6 +147,51 @@ export function usageReport(days = 7): UsageReport {
     daily,
   };
 }
+
+// Resumo enxuto para a Yui responder por voz: limites com % e reset, OpenAI hoje/7d, Claude no período.
+const usd = (v: number) => `US$ ${v.toFixed(2).replace('.', ',')}`;
+export function usageSummary(days = 7) {
+  const r = usageReport([1, 7, 30].includes(days) ? days : 7);
+  return {
+    periodo_dias: r.days,
+    claude: {
+      plano: r.claude.plan,
+      limites: r.claude.limits.length
+        ? r.claude.limits.map((l) => ({ limite: l.label, uso: l.pct == null ? null : `${Math.round(l.pct)}%`, reinicia: l.resetsAt }))
+        : 'ainda não lidos (botão Atualizar limites em Consumo de IA)',
+      limites_lidos_em: r.claude.limitsAt,
+      execucoes: r.claude.runs,
+      custo_equivalente: usd(r.claude.cost),
+      contexto_ultima_execucao: r.claude.lastContext ? `${Math.round((r.claude.lastContext.used / r.claude.lastContext.window) * 100)}% (${r.claude.lastContext.agent})` : null,
+    },
+    openai: {
+      hoje: usd(r.openai.today),
+      sete_dias: usd(r.openai.d7),
+      trinta_dias: usd(r.openai.d30),
+      sem_preco: r.openai.unpriced.length ? r.openai.unpriced : undefined,
+    },
+  };
+}
+
+registerBrain({
+  name: 'consumo',
+  instructions: '- "Quanto gastei de IA?", "quanto falta do limite do Claude?" => consumo_ia (responda em 1–2 frases; datas de reinício no fuso local).',
+  tools: [
+    {
+      type: 'function', name: 'consumo_ia', strict: true,
+      description: 'Consumo de IA: limites do plano Claude (uso % e quando reinicia), custo do Claude Code e da OpenAI (hoje, 7 e 30 dias).',
+      parameters: { type: 'object', additionalProperties: false, properties: { dias: { type: ['number', 'null'], description: 'período do custo do Claude: 1, 7 ou 30; null = 7' } }, required: ['dias'] },
+    },
+  ],
+  run(tool, args) {
+    if (tool !== 'consumo_ia') return undefined;
+    try {
+      return Promise.resolve(usageSummary(typeof args.dias === 'number' ? args.dias : 7));
+    } catch (e) {
+      return Promise.resolve({ ok: false, error: (e as Error).message });
+    }
+  },
+});
 
 export function register(app: FastifyInstance): void {
   app.get('/api/usage', (req) => {
