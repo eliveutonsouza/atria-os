@@ -34,8 +34,10 @@ COPY shared ./shared
 COPY workspace-seed ./workspace-seed
 COPY docs ./docs
 COPY --from=web /app/web/dist ./web/dist
-# CLI do Claude Code (mesmo binário do SDK) para `docker exec -it … claude` → /login, /plugin, /mcp
-RUN ln -s /app/server/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude /usr/local/bin/claude \
+# CLI do Claude Code (mesmo binário do SDK) para `docker exec -it … claude` → /login, /plugin, /mcp.
+# O npm instala só o pacote da arquitetura da VPS (x64 ou arm64, glibc).
+RUN bin="$(ls -d /app/server/node_modules/@anthropic-ai/claude-agent-sdk-linux-*/claude | grep -v musl | head -1)" \
+  && test -x "$bin" && ln -s "$bin" /usr/local/bin/claude \
   && mkdir -p /data/home /workspace && chown -R node:node /data /workspace
 USER node
 EXPOSE 8080
