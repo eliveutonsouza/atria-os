@@ -1,6 +1,8 @@
-import type { CSSProperties } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
+import { pickPrimary } from '../app/PageFrame'
+import { ActionSheet, type SheetAction } from '../views/Sheet'
 import { AgentsView } from '../views/AgentsView'
 import { ArtifactsView } from '../views/ArtifactsView'
 import { BriefView } from '../views/BriefView'
@@ -63,13 +65,16 @@ export function CanvasPanel() {
       aria-label={header.title || 'Canvas'}
       aria-hidden={isC}
       style={{
-        position: 'absolute', top: `calc(${isF ? 16 : 68}px + env(safe-area-inset-top))`, bottom: `calc(${isF ? 16 : 104}px + env(safe-area-inset-bottom))`, left: isF ? 16 : narrow ? 12 : '24%', right: isF ? 16 : narrow ? 12 : 28,
+        position: 'absolute', top: `calc(${isF ? 16 : 68}px + env(safe-area-inset-top))`, bottom: `calc(${isF ? 16 : 104}px + var(--sab) + var(--kb))`, left: isF ? 'calc(16px + var(--sal))' : narrow ? 'calc(8px + var(--sal))' : '24%', right: isF ? 'calc(16px + var(--sar))' : narrow ? 'calc(8px + var(--sar))' : 28,
         zIndex: 10, opacity: isC ? 0 : 1, transform: isC ? (narrow ? 'scale(.98)' : 'translateX(48px) scale(.98)') : 'none', pointerEvents: isC ? 'none' : 'auto', visibility: isC ? 'hidden' : 'visible',
         transition: 'all .55s cubic-bezier(.2,.8,.2,1)', background: 'linear-gradient(180deg, rgba(20,24,50,.62), rgba(12,14,32,.62))',
         border: '1px solid rgba(160,170,255,.11)', borderRadius: 20, backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
         display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 30px 80px rgba(0,0,0,.4)',
       }}
     >
+      {narrow ? (
+        <PhoneCanvasHeader isF={isF} />
+      ) : (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '16px 20px 16px 24px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: C.cyan, fontWeight: 600 }}>
@@ -80,7 +85,7 @@ export function CanvasPanel() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {header.actions.map((a) => (
-            <button key={a.label} onClick={a.fn} className="hov-bg2" style={{ height: 34, padding: '0 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.03)', color: '#dfe3f3', fontSize: 13, cursor: 'pointer' }}>
+            <button key={a.label} onClick={a.fn} className="hov-bg2" style={{ height: 34, padding: '0 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.03)', color: a.danger ? '#f39aa4' : '#dfe3f3', fontSize: 13, cursor: 'pointer' }}>
               {a.label}
             </button>
           ))}
@@ -92,9 +97,42 @@ export function CanvasPanel() {
           </button>
         </div>
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: 24, minWidth: 0 }}>
+      )}
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', padding: narrow ? 14 : 24, minWidth: 0 }}>
         {nonce > 0 && <ViewBody key={key} />}
       </div>
     </section>
+  )
+}
+
+// Celular: ‹ (fecha), título numa linha, ação principal e ⋯ com o resto (prancha Phone-Acoes).
+function PhoneCanvasHeader({ isF }: { isF: boolean }) {
+  const header = useYui((s) => s.header)
+  const [menu, setMenu] = useState(false)
+  const primary = pickPrimary(header.actions)
+  const rest: SheetAction[] = [
+    ...header.actions.filter((a) => a !== primary).map((a) => ({ label: a.label, fn: a.fn, danger: a.danger })),
+    { label: isF ? 'Sair da tela cheia' : 'Tela cheia', fn: () => useYui.getState().setFocus(!isF) },
+  ]
+  const ib = { width: 44, height: 44, flexShrink: 0, borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer' } as const
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 10px 10px 10px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+      <button aria-label="Voltar" onClick={() => useYui.getState().close()} style={ib}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M15 18l-6-6 6-6" /></svg>
+      </button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', color: C.cyan, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{header.eyebrow}</div>
+        <h1 style={{ margin: 0, fontSize: 17, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{header.title}</h1>
+      </div>
+      {primary && (
+        <button onClick={primary.fn} className="app-btn primary" style={{ height: 44, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 0 }}>
+          {primary.label}
+        </button>
+      )}
+      <button aria-label="Mais ações" onClick={() => setMenu(true)} style={ib}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden><path d="M5 12h.01M12 12h.01M19 12h.01" /></svg>
+      </button>
+      {menu && <ActionSheet title={header.title} actions={rest} onClose={() => setMenu(false)} />}
+    </div>
   )
 }

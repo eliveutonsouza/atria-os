@@ -15,7 +15,8 @@ export function MiniOrb() {
   const yst = useYui((s) => s.yst)
   const inbox = useYui((s) => s.inbox)
   const transcript = useYui((s) => s.liveTranscript)
-  const drawer = useYui((s) => s.sidebarOpen && s.narrow)
+  const drawer = useYui((s) => s.sidebarOpen && s.device !== 'desktop')
+  useYui((s) => s.keyboardOpen) // re-renderiza quando o teclado abre/fecha (orb acompanha)
   const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight })
   const [bubble, setBubble] = useState<string | null>(null)
   const [text, setText] = useState('')
@@ -28,7 +29,11 @@ export function MiniOrb() {
   useEffect(() => {
     const r = () => setSize({ w: window.innerWidth, h: window.innerHeight })
     window.addEventListener('resize', r)
-    return () => window.removeEventListener('resize', r)
+    window.visualViewport?.addEventListener('resize', r)
+    return () => {
+      window.removeEventListener('resize', r)
+      window.visualViewport?.removeEventListener('resize', r)
+    }
   }, [])
 
   // fala nova da Yui com ela minimizada → bolha por ~8 s
@@ -68,7 +73,7 @@ export function MiniOrb() {
           onClick={narrow ? () => exitApp() : undefined}
           style={{
             // celular: bolha acima do orb (não cobre conteúdo nem o campo), toque abre a conversa
-            position: 'absolute', right: narrow ? 14 : right, bottom: narrow ? bottom + 70 : bottom, zIndex: 46, maxWidth: narrow ? '70vw' : 300, padding: '10px 14px',
+            position: 'absolute', right: narrow ? 14 : right, bottom: narrow ? bottom + 70 : bottom, zIndex: 46, maxWidth: narrow ? 'min(300px, calc(100dvw - 40px))' : 300, padding: '10px 14px',
             cursor: narrow ? 'pointer' : undefined,
             borderRadius: narrow ? '14px 14px 4px 14px' : '14px 14px 4px 14px', background: 'rgba(16,20,42,.92)', border: '1px solid rgba(160,170,255,.16)', backdropFilter: 'blur(14px)',
             boxShadow: '0 18px 50px rgba(0,0,0,.4)', fontSize: 12.5, lineHeight: 1.45, color: '#c9cde0', animation: 'yui-pop .28s var(--ease)',
@@ -81,7 +86,7 @@ export function MiniOrb() {
       <div
         style={{
           position: 'absolute', right, bottom: bottom - 4, zIndex: 46, display: 'flex', alignItems: 'center', gap: 6,
-          width: showInput ? (narrow ? 'calc(100vw - 100px)' : 320) : 0, opacity: showInput ? 1 : 0, overflow: 'hidden', transition: 'width .3s var(--ease), opacity .2s',
+          width: showInput ? (narrow ? 'calc(100dvw - 100px)' : 320) : 0, opacity: showInput ? 1 : 0, overflow: 'hidden', transition: 'width .3s var(--ease), opacity .2s',
           padding: showInput ? 6 : 0, borderRadius: 14, background: 'rgba(16,20,42,.94)', border: showInput ? '1px solid rgba(103,216,242,.35)' : 'none',
         }}
       >
@@ -99,16 +104,17 @@ export function MiniOrb() {
             if (e.key === 'Enter') send()
             if (e.key === 'Escape') (e.target as HTMLInputElement).blur()
           }}
-          style={{ flex: 1, minWidth: 0, height: 32, border: 'none', outline: 'none', background: 'transparent', color: C.text, fontSize: 14, fontFamily: 'var(--sans)', padding: '0 6px' }}
+          style={{ flex: 1, minWidth: 0, height: narrow ? 40 : 32, border: 'none', outline: 'none', background: 'transparent', color: C.text, fontSize: 14, fontFamily: 'var(--sans)', padding: '0 6px' }}
         />
-        <button aria-label="Enviar" onClick={send} style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#67d8f2,#a68cf7)', color: '#0a0c1d', fontWeight: 700, cursor: 'pointer' }}>
+        <button aria-label="Enviar" onClick={send} style={{ width: narrow ? 40 : 32, height: narrow ? 40 : 32, flexShrink: 0, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#67d8f2,#a68cf7)', color: '#0a0c1d', fontWeight: 700, cursor: 'pointer' }}>
           ↑
         </button>
       </div>
       <button
         aria-label="Falar com a Yui"
         title="Falar com a Yui (Ctrl+J)"
-        onClick={() => exitApp()}
+        // celular: toque abre o campo de texto da Yui (a bolha ou "Mais › Falar com a Yui" abrem a conversa)
+        onClick={() => (narrow ? dockInput.miniEl?.focus() : exitApp())}
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
         onFocus={() => setHover(true)}

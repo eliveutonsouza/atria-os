@@ -7,6 +7,7 @@ import { resolveApproval } from '../lib/actions'
 import { C, toneColor } from '../lib/colors'
 import { dockInput } from '../shell/parts'
 import { useYui } from '../store/yui'
+import { BottomSheet } from '../views/Sheet'
 
 function openInboxItem(ib: InboxItem) {
   const s = useYui.getState()
@@ -24,7 +25,7 @@ export function Inbox() {
   return (
     <>
       <div onClick={() => useYui.getState().set({ inboxOpen: false })} style={{ position: 'absolute', inset: 0, zIndex: 48 }} />
-      <div role="dialog" aria-label="Pendências" style={{ position: 'absolute', top: 60, right: 20, width: 'min(380px,calc(100% - 40px))', zIndex: 50, padding: 8, borderRadius: 16, background: 'rgba(16,20,42,.94)', border: '1px solid rgba(255,255,255,.1)', backdropFilter: 'blur(16px)', boxShadow: '0 24px 60px rgba(0,0,0,.5)' }}>
+      <div role="dialog" aria-label="Pendências" style={{ position: 'absolute', top: 'calc(60px + var(--sat))', right: 'calc(16px + var(--sar))', width: 'min(380px,calc(100% - 32px))', maxHeight: 'calc(var(--vvh) - 80px - var(--sat))', overflowY: 'auto', zIndex: 50, padding: 8, borderRadius: 16, background: 'rgba(16,20,42,.94)', border: '1px solid rgba(255,255,255,.1)', backdropFilter: 'blur(16px)', boxShadow: '0 24px 60px rgba(0,0,0,.5)' }}>
         <div style={{ padding: '10px 12px 8px', fontSize: 12, color: C.t2 }}>{inbox.length ? `${inbox.length} coisas precisam de você` : 'Nada pendente agora.'}</div>
         {inbox.map((ib) => (
           <button key={ib.id} onClick={() => openInboxItem(ib)} className="hov-item" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 3, padding: 12, border: 'none', borderRadius: 10, background: 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer' }}>
@@ -48,11 +49,11 @@ export function HistoryDrawer() {
     <aside
       aria-label="Conversa"
       aria-hidden={!open}
-      style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 'min(360px,90vw)', zIndex: 52, transform: open ? 'translateX(0)' : 'translateX(-105%)', transition: 'transform .4s cubic-bezier(.2,.8,.2,1)', background: 'rgba(12,14,30,.95)', borderRight: '1px solid rgba(255,255,255,.08)', backdropFilter: 'blur(18px)', display: 'flex', flexDirection: 'column', visibility: open ? 'visible' : 'hidden' }}
+      style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 'min(360px,90dvw)', zIndex: 52, paddingTop: 'var(--sat)', paddingBottom: 'var(--sab)', paddingLeft: 'var(--sal)', boxSizing: 'border-box', transform: open ? 'translateX(0)' : 'translateX(-105%)', transition: 'transform .4s cubic-bezier(.2,.8,.2,1)', background: 'rgba(12,14,30,.95)', borderRight: '1px solid rgba(255,255,255,.08)', backdropFilter: 'blur(18px)', display: 'flex', flexDirection: 'column', visibility: open ? 'visible' : 'hidden' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 20px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
         <span style={{ fontSize: 14, fontWeight: 600 }}>Conversa</span>
-        <button onClick={() => useYui.getState().set({ histOpen: false })} style={{ border: 'none', background: 'transparent', color: C.t2, cursor: 'pointer', fontSize: 13 }}>Fechar</button>
+        <button onClick={() => useYui.getState().set({ histOpen: false })} style={{ minHeight: 44, padding: '0 8px', border: 'none', background: 'transparent', color: C.t2, cursor: 'pointer', fontSize: 14 }}>Fechar</button>
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         {!hist.length && <div style={{ fontSize: 14, color: C.t3 }}>Ainda não conversamos hoje.</div>}
@@ -128,7 +129,7 @@ export function CommandPalette() {
   return (
     <>
       <div onClick={() => useYui.getState().set({ palette: false })} style={{ position: 'absolute', inset: 0, zIndex: 55, background: 'rgba(4,5,12,.55)', backdropFilter: 'blur(4px)' }} />
-      <div role="dialog" aria-label="Comandos" style={{ position: 'absolute', top: '16vh', left: '50%', transform: 'translateX(-50%)', width: 'min(560px,calc(100% - 32px))', zIndex: 56, borderRadius: 18, background: 'rgba(16,20,42,.96)', border: '1px solid rgba(160,170,255,.16)', boxShadow: '0 30px 90px rgba(0,0,0,.6)', overflow: 'hidden' }}>
+      <div role="dialog" aria-label="Comandos" style={{ position: 'absolute', top: 'calc(12dvh + var(--sat))', left: '50%', transform: 'translateX(-50%)', width: 'min(560px,calc(100% - 32px))', zIndex: 56, borderRadius: 18, background: 'rgba(16,20,42,.96)', border: '1px solid rgba(160,170,255,.16)', boxShadow: '0 30px 90px rgba(0,0,0,.6)', overflow: 'hidden' }}>
         <input
           ref={inputRef}
           value={q}
@@ -142,7 +143,7 @@ export function CommandPalette() {
           placeholder="Buscar comando ou view…"
           style={{ width: '100%', height: 56, padding: '0 20px', border: 'none', outline: 'none', borderBottom: '1px solid rgba(255,255,255,.07)', background: 'transparent', color: C.text, fontSize: 16, fontFamily: 'var(--sans)' }}
         />
-        <div role="listbox" style={{ maxHeight: '52vh', overflow: 'auto', padding: 8 }}>
+        <div role="listbox" style={{ maxHeight: 'min(52dvh, calc(var(--vvh) - 12dvh - 140px))', overflow: 'auto', padding: 8 }}>
           {items.map((pi, i) => (
             <button key={pi.label} role="option" aria-selected={i === sel} onClick={pi.fn} onMouseEnter={() => setSel(i)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 12px', border: 'none', borderRadius: 10, background: i === sel ? 'rgba(255,255,255,.06)' : 'transparent', color: C.text, fontSize: 14, textAlign: 'left', cursor: 'pointer' }}>
               <span>{pi.label}</span>
@@ -159,52 +160,72 @@ export function ApprovalModal() {
   const id = useYui((s) => s.approvalOpen)
   const ap = useYui((s) => (s.approvalOpen ? s.approvals[s.approvalOpen] : null))
   const mode = useYui((s) => s.mode)
-  const narrow = useYui((s) => s.narrow)
+  const device = useYui((s) => s.device)
+  const yuiShell = useYui((s) => s.shellMode === 'yui')
   const btnRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (ap) setTimeout(() => btnRef.current?.focus(), 50)
   }, [ap])
   if (!id || !ap) return null
-  const left = mode === 'center' || narrow ? '50%' : '62%'
+  const phone = device === 'phone'
+  // ao lado do Canvas só no modo Yui do desktop; no dashboard e no tablet fica centralizado
+  const left = yuiShell && mode !== 'center' && device === 'desktop' ? '62%' : '50%'
   // Exclusão pedida pela Yui: visual vermelho, foco no "Cancelar" e rótulo explícito no botão destrutivo.
   const danger = ap.kind === 'destructive'
+  const tall = phone ? 52 : 44
+  const review = () => {
+    // aprovação pode ser de um run, de uma etapa de missão, de um passo de workflow ou de uma exclusão pedida à Yui
+    const st = useYui.getState()
+    const [, what, target] = ap.runId.match(/^delete:(workflow|mission):(.+)$/) ?? []
+    if (what === 'workflow') return st.show('workflow', { workflowId: target })
+    if (what === 'mission') return st.show('mission', { missionId: target })
+    const wf = st.workflowRuns[ap.runId]
+    if (wf) return st.show('workflow', { workflowId: wf.workflow, workflowRunId: wf.id })
+    const ms = Object.values(st.missions).find((m) => m.id === ap.runId || m.steps.some((x) => x.runId === ap.runId))
+    if (ms) return st.show('mission', { missionId: ms.id })
+    st.show('runs', { runId: ap.runId })
+  }
+  const content = (
+    <>
+      <div style={{ fontSize: 11, letterSpacing: '.24em', color: danger ? C.crit : C.warn, fontWeight: 700 }}>{danger ? 'AÇÃO DESTRUTIVA · NÃO DÁ PARA DESFAZER' : 'APROVAÇÃO NECESSÁRIA'}</div>
+      <div id="ap-title" style={{ fontSize: phone ? 19 : 22, fontWeight: 400, lineHeight: 1.35, overflowWrap: 'anywhere' }}>{ap.title}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 14 }}>
+        {ap.rows.map((r) => (
+          <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+            <span style={{ color: C.t2, flexShrink: 0 }}>{r.label}</span>
+            <span className={r.label.toLowerCase().includes('comando') ? 'mono' : undefined} style={{ color: toneColor(r.tone), textAlign: 'right', wordBreak: 'break-word', fontSize: r.label.toLowerCase().includes('comando') ? 12 : 14 }}>{r.value}</span>
+          </div>
+        ))}
+      </div>
+      <button ref={danger ? undefined : btnRef} onClick={review} style={{ height: tall - 4, flexShrink: 0, borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.03)', color: '#dfe3f3', fontSize: 14, cursor: 'pointer' }}>{danger ? 'Ver o que será excluído' : 'Revisar alterações'}</button>
+      {/* botões de decisão sempre visíveis no pé (o resto rola se faltar altura) */}
+      <div style={{ display: 'flex', gap: 10, position: 'sticky', bottom: 0, paddingTop: 4, background: phone ? '#0e1022' : 'rgba(14,16,34,.97)', flexShrink: 0 }}>
+        {danger ? (
+          <>
+            <button ref={btnRef} onClick={() => resolveApproval(ap.id, false)} style={{ flex: 1, height: tall, borderRadius: 12, border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.05)', color: '#dfe3f3', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={() => resolveApproval(ap.id, true)} style={{ flex: 1, height: tall, borderRadius: 12, border: 'none', background: '#e2566a', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Excluir definitivamente</button>
+          </>
+        ) : (
+          <>
+            <button onClick={() => resolveApproval(ap.id, false)} style={{ flex: 1, height: tall, borderRadius: 12, border: '1px solid rgba(240,98,114,.35)', background: 'transparent', color: '#f39aa4', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Rejeitar</button>
+            <button onClick={() => resolveApproval(ap.id, true)} style={{ flex: 1, height: tall, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#4fe0b0,#67d8f2)', color: '#06221c', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Aprovar</button>
+          </>
+        )}
+      </div>
+    </>
+  )
+  // celular: folha inferior (prancha Phone-Aprovacao); fechar só esconde, a aprovação continua pendente
+  if (phone)
+    return (
+      <BottomSheet label={ap.title} role="alertdialog" tone={danger ? 'rgba(240,98,114,.5)' : 'rgba(245,181,74,.35)'} onClose={() => useYui.getState().set({ approvalOpen: null })} zIndex={59}>
+        {content}
+      </BottomSheet>
+    )
   return (
     <>
       <div style={{ position: 'absolute', inset: 0, zIndex: 58, background: 'rgba(4,5,12,.6)', backdropFilter: 'blur(6px)' }} />
-      <div role="alertdialog" aria-modal="true" aria-labelledby="ap-title" style={{ position: 'absolute', top: '50%', left, transform: 'translate(-50%,-50%)', width: 'min(460px,calc(100% - 32px))', zIndex: 59, padding: 28, borderRadius: 22, background: 'linear-gradient(180deg,rgba(26,22,52,.97),rgba(14,16,34,.97))', border: `1px solid ${danger ? 'rgba(240,98,114,.5)' : 'rgba(245,181,74,.3)'}`, boxShadow: `0 0 60px ${danger ? 'rgba(240,98,114,.12)' : 'rgba(245,181,74,.08)'}, 0 30px 90px rgba(0,0,0,.6)`, display: 'flex', flexDirection: 'column', gap: 18 }}>
-        <div style={{ fontSize: 11, letterSpacing: '.24em', color: danger ? C.crit : C.warn, fontWeight: 700 }}>{danger ? 'AÇÃO DESTRUTIVA · NÃO DÁ PARA DESFAZER' : 'APROVAÇÃO NECESSÁRIA'}</div>
-        <div id="ap-title" style={{ fontSize: 22, fontWeight: 400, lineHeight: 1.35 }}>{ap.title}</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 14 }}>
-          {ap.rows.map((r) => (
-            <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-              <span style={{ color: C.t2 }}>{r.label}</span>
-              <span className={r.label.toLowerCase().includes('comando') ? 'mono' : undefined} style={{ color: toneColor(r.tone), textAlign: 'right', wordBreak: 'break-word', fontSize: r.label.toLowerCase().includes('comando') ? 12 : 14 }}>{r.value}</span>
-            </div>
-          ))}
-        </div>
-        <button ref={danger ? undefined : btnRef} onClick={() => {
-            // aprovação pode ser de um run, de uma etapa de missão, de um passo de workflow ou de uma exclusão pedida à Yui
-            const st = useYui.getState()
-            const [, what, target] = ap.runId.match(/^delete:(workflow|mission):(.+)$/) ?? []
-            if (what === 'workflow') return st.show('workflow', { workflowId: target })
-            if (what === 'mission') return st.show('mission', { missionId: target })
-            const wf = st.workflowRuns[ap.runId]
-            if (wf) return st.show('workflow', { workflowId: wf.workflow, workflowRunId: wf.id })
-            const ms = Object.values(st.missions).find((m) => m.id === ap.runId || m.steps.some((x) => x.runId === ap.runId))
-            if (ms) return st.show('mission', { missionId: ms.id })
-            st.show('runs', { runId: ap.runId })
-          }} style={{ height: 40, borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.03)', color: '#dfe3f3', fontSize: 14, cursor: 'pointer' }}>{danger ? 'Ver o que será excluído' : 'Revisar alterações'}</button>
-        {danger ? (
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button ref={btnRef} onClick={() => resolveApproval(ap.id, false)} style={{ flex: 1, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.05)', color: '#dfe3f3', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
-            <button onClick={() => resolveApproval(ap.id, true)} style={{ flex: 1, height: 44, borderRadius: 12, border: 'none', background: '#e2566a', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Excluir definitivamente</button>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => resolveApproval(ap.id, false)} style={{ flex: 1, height: 44, borderRadius: 12, border: '1px solid rgba(240,98,114,.35)', background: 'transparent', color: '#f39aa4', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Rejeitar</button>
-            <button onClick={() => resolveApproval(ap.id, true)} style={{ flex: 1, height: 44, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#4fe0b0,#67d8f2)', color: '#06221c', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Aprovar</button>
-          </div>
-        )}
+      <div role="alertdialog" aria-modal="true" aria-labelledby="ap-title" style={{ position: 'absolute', top: '50%', left, transform: 'translate(-50%,-50%)', width: 'min(460px,calc(100% - 32px))', maxHeight: 'calc(var(--vvh) - var(--sat) - var(--sab) - 32px)', overflowY: 'auto', overscrollBehavior: 'contain', boxSizing: 'border-box', zIndex: 59, padding: 28, borderRadius: 22, background: 'linear-gradient(180deg,rgba(26,22,52,.97),rgba(14,16,34,.97))', border: `1px solid ${danger ? 'rgba(240,98,114,.5)' : 'rgba(245,181,74,.3)'}`, boxShadow: `0 0 60px ${danger ? 'rgba(240,98,114,.12)' : 'rgba(245,181,74,.08)'}, 0 30px 90px rgba(0,0,0,.6)`, display: 'flex', flexDirection: 'column', gap: 18 }}>
+        {content}
       </div>
     </>
   )
@@ -222,7 +243,7 @@ export function UpdateToast() {
   const ready = useYui((s) => s.updateReady)
   if (!ready) return null
   return (
-    <div role="status" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 'calc(96px + env(safe-area-inset-bottom))', zIndex: 57, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 10px 10px 16px', borderRadius: 14, background: 'rgba(16,20,42,.94)', border: '1px solid rgba(103,216,242,.3)', backdropFilter: 'blur(16px)', boxShadow: '0 18px 50px rgba(0,0,0,.45)', fontSize: 13, color: C.text, whiteSpace: 'nowrap' }}>
+    <div role="status" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 'calc(96px + var(--sab) + var(--kb))', zIndex: 57, display: 'flex', alignItems: 'center', gap: 12, maxWidth: 'calc(100% - 32px)', padding: '10px 10px 10px 16px', borderRadius: 14, background: 'rgba(16,20,42,.94)', border: '1px solid rgba(103,216,242,.3)', backdropFilter: 'blur(16px)', boxShadow: '0 18px 50px rgba(0,0,0,.45)', fontSize: 13, color: C.text }}>
       Nova versão da Yui disponível
       <button onClick={applyUpdate} style={{ height: 30, padding: '0 12px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#67d8f2,#a68cf7)', color: '#0a0c1d', fontWeight: 700, cursor: 'pointer' }}>Atualizar</button>
     </div>

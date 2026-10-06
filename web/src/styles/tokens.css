@@ -19,6 +19,14 @@
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --mono: 'JetBrains Mono', ui-monospace, monospace;
   --sans: Manrope, system-ui, sans-serif;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --tabbar: calc(58px + var(--sab));
+  --rail: 76px;
+  --kb: 0px;
+  --vvh: 100dvh;
 }
 html { color-scheme: dark; scrollbar-color: rgba(255,255,255,.12) transparent; scrollbar-width: thin; }
 html, body, #root { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; overflow: clip; overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
@@ -65,3 +73,18 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2
   img, video, canvas, svg, table { max-width: 100%; }
   .app-page * { min-width: 0; overflow-wrap: break-word; }
 }
+
+/* Toque: alvos de 44px, sem zoom por duplo toque, sem destaque cinza do iOS. */
+html.is-coarse { -webkit-tap-highlight-color: transparent; }
+html.is-coarse button, html.is-coarse a, html.is-coarse [role='button'], html.is-coarse select, html.is-coarse input[type='checkbox'] { touch-action: manipulation; }
+html.is-coarse .app-btn, html.is-coarse .app-btn.small, html.is-coarse .wf-btn, html.is-coarse .co-icon-btn,
+html.is-coarse .vault-seg button, html.is-coarse .vault-sug-btn, html.is-coarse .kit-tab, html.is-coarse .kit-small { min-height: 44px; }
+html.is-coarse .app-btn.small { padding: 0 14px; font-size: 13px; }
+html.is-coarse .co-icon-btn { min-width: 44px; }
+html.is-coarse select { min-height: 44px; }
+html.is-coarse input[type='checkbox'] { width: 20px; height: 20px; }
+/* faixa rolável na horizontal (chips/abas) sem barra visível */
+.h-scroll { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+.h-scroll::-webkit-scrollbar { display: none; }
+.h-scroll > * { flex-shrink: 0; }
+@keyframes yui-sheet-in { from { transform: translateY(100%); } to { transform: none; } }

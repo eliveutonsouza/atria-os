@@ -16,7 +16,7 @@ export function enterApp(page: AppPage = 'overview', params: Record<string, stri
     palette: false,
     inboxOpen: false,
     histOpen: false,
-    sidebarOpen: s.sidebarPinned && !s.narrow ? s.sidebarOpen : false,
+    sidebarOpen: s.sidebarPinned && s.device === 'desktop' ? s.sidebarOpen : false,
   })
 }
 

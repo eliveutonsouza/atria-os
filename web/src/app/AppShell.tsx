@@ -5,6 +5,8 @@ import { PAGES } from './pages'
 import { PageHeader } from './PageFrame'
 import { MiniOrb } from './MiniOrb'
 import { Sidebar, SIDEBAR_W } from './Sidebar'
+import { BottomTabs } from './BottomTabs'
+import { NavRail, RAIL_W } from './NavRail'
 import './nav'
 import './app.css'
 
@@ -30,6 +32,7 @@ export const PAGE_TITLES: Record<AppPage, [string, string]> = {
   company: ['Conhecimento · empresa', 'Empresa'],
   help: ['Sistema · ajuda', 'Ajuda'],
   brain: ['Vault · universo de conexões', 'Cérebro'],
+  more: ['Menu', 'Mais'],
 }
 
 // Cabeçalho padrão ao trocar de página; a página (ou a view reaproveitada) sobrescreve via useHeader.
@@ -64,7 +67,7 @@ export function AppShell() {
   const page = useYui((s) => s.appPage)
   const idKey = useYui((s) => s.appParams.id ?? '')
   const pinned = useYui((s) => s.sidebarPinned)
-  const narrow = useYui((s) => s.narrow)
+  const device = useYui((s) => s.device)
   // mantém montado durante a animação de saída e desmonta depois (páginas não rodam escondidas)
   const [mounted, setMounted] = useState(app)
   const [shown, setShown] = useState(app)
@@ -80,10 +83,11 @@ export function AppShell() {
   }, [app])
 
   const Page = PAGES[page]
-  const offset = app && pinned && !narrow ? SIDEBAR_W : 0
+  const offset = !app ? 0 : device === 'tablet' ? `calc(${RAIL_W}px + var(--sal))` : device === 'desktop' && pinned ? SIDEBAR_W : 0
   return (
     <>
       <Sidebar />
+      <NavRail />
       {mounted && (
         <div
           aria-hidden={!app}
@@ -98,7 +102,12 @@ export function AppShell() {
             className="app-scroll app-main app-page"
             style={{
               position: 'absolute', inset: 0, overflowY: 'auto', overflowX: 'clip', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
-              padding: narrow ? 'calc(14px + env(safe-area-inset-top)) 14px calc(96px + env(safe-area-inset-bottom))' : '22px 28px 100px',
+              padding:
+                device === 'phone'
+                  ? 'calc(12px + var(--sat)) calc(16px + var(--sar)) calc(var(--tabbar) + 88px) calc(16px + var(--sal))'
+                  : device === 'tablet'
+                    ? 'calc(16px + var(--sat)) calc(24px + var(--sar)) calc(96px + var(--sab)) 24px'
+                    : '22px 28px 100px',
               display: 'flex', flexDirection: 'column', gap: 16,
             }}
           >
@@ -109,6 +118,7 @@ export function AppShell() {
           </main>
         </div>
       )}
+      <BottomTabs />
       <MiniOrb />
     </>
   )

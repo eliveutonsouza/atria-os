@@ -10,9 +10,15 @@ interface Star { x: number; y: number; z: number; p: number }
 interface Wave { r: number; al: number }
 interface Spark { x: number; y: number; vx: number; vy: number; l: number }
 
+// Espaço ocupado embaixo no modo app (barra de abas do celular + safe area, ou o teclado aberto).
+let appBottom = 0
+export function setOrbAppBottom(px: number) {
+  appBottom = px
+}
+
 export function orbTarget(mode: Mode, narrow: boolean, w: number, h: number, app = false) {
-  // modo app (dashboard): Yui minimizada no canto inferior direito
-  if (app) return narrow ? { x: w - 48, y: h - 52, r: 18 } : { x: w - 58, y: h - 58, r: 22 }
+  // modo app (dashboard): Yui minimizada no canto inferior direito, acima da barra de abas no celular
+  if (app) return narrow ? { x: w - 44, y: h - appBottom - 44, r: 18 } : { x: w - 58, y: h - 58, r: 22 }
   if (mode === 'center') {
     const sh = h < 760
     return { x: w / 2, y: sh ? h * 0.24 : h * 0.36, r: sh ? Math.min(56, h * 0.075) : Math.min(76, h * 0.085) }

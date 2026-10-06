@@ -34,9 +34,10 @@
   .app-grid-5, .app-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .app-grid-2 { grid-template-columns: minmax(0, 1fr); }
   .app-span-2 { grid-column: auto; }
-  .app-split { flex-direction: column; }
-  .app-hide-narrow { display: none !important; }
 }
+/* split lista|detalhe: empilha só no celular (tablet fica lado a lado) */
+html.is-phone .app-split { flex-direction: column; }
+html.is-phone .app-hide-narrow { display: none !important; }
 @media (max-width: 480px) {
   .app-grid-3, .app-grid-5 { grid-template-columns: minmax(0, 1fr); }
 }

@@ -195,7 +195,7 @@ export function YuiCenter() {
     <div
       aria-live="polite"
       style={{
-        position: 'absolute', left: 0, right: 0, top: short ? 'calc(24% + 80px)' : 'calc(36% + 104px)', bottom: 104, overflow: 'hidden',
+        position: 'absolute', left: 0, right: 0, top: short ? 'calc(24% + 80px)' : 'calc(36% + 104px)', bottom: 'calc(104px + var(--sab) + var(--kb))', overflow: 'hidden',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: short ? 10 : 16, textAlign: 'center', padding: '0 24px', zIndex: 25,
         transition: 'opacity .3s, transform .55s var(--ease), visibility .3s', opacity: isC ? 1 : 0, transform: isC ? 'none' : app ? 'translateY(14px) scale(.97)' : 'translateX(-80px) scale(.96)', pointerEvents: isC ? 'auto' : 'none', visibility: app ? 'hidden' : 'visible',
       }}
@@ -254,7 +254,7 @@ export function YuiLeft() {
         <span style={{ width: 3, height: 3, borderRadius: '50%', background: C.t4 }} />
         <span style={{ color, letterSpacing: '.18em' }}>{label}</span>
       </div>
-      <div style={{ fontSize: 15, lineHeight: 1.55, color: '#c9cde0', textWrap: 'pretty', maxWidth: 280, maxHeight: '38vh', overflow: 'hidden' }}>{msg}</div>
+      <div style={{ fontSize: 15, lineHeight: 1.55, color: '#c9cde0', textWrap: 'pretty', maxWidth: 280, maxHeight: '38dvh', overflow: 'hidden' }}>{msg}</div>
       {hasPending && (
         <button
           onClick={openPending}
@@ -311,7 +311,7 @@ export function Dock() {
   return (
     <div
       style={{
-        position: 'absolute', bottom: 'calc(22px + env(safe-area-inset-bottom))', left: isC || narrow ? 16 : '24%', right: isC || narrow ? 16 : 28, display: 'flex', justifyContent: 'center', zIndex: 40,
+        position: 'absolute', bottom: 'calc(22px + var(--sab) + var(--kb))', left: isC || narrow ? 'calc(16px + var(--sal))' : '24%', right: isC || narrow ? 'calc(16px + var(--sar))' : 28, display: 'flex', justifyContent: 'center', zIndex: 40,
         transition: 'opacity .3s, transform .5s var(--ease), left .55s var(--ease), right .55s var(--ease), visibility .3s', opacity: hide ? 0 : 1, pointerEvents: hide ? 'none' : 'auto',
         transform: app ? 'translateY(16px)' : 'none', visibility: app ? 'hidden' : 'visible',
       }}

@@ -13,12 +13,17 @@ export interface Pending {
 export interface HeaderAction {
   label: string
   fn: () => void
+  primary?: boolean // celular: fica visível ao lado do título (as demais vão para o menu ⋯)
+  danger?: boolean // destrutiva: vermelha e por último no menu ⋯
 }
+
+export type Device = 'phone' | 'tablet' | 'desktop'
 
 export interface ViewHeader {
   eyebrow: string
   title: string
   actions: HeaderAction[]
+  back?: () => void // celular: ‹ Voltar do detalhe para a lista
 }
 
 export interface YuiStore {
@@ -60,8 +65,11 @@ export interface YuiStore {
   customViews: Record<string, CustomViewInfo>
   liveConnecting: boolean
   liveTranscript: string
-  narrow: boolean
+  narrow: boolean // = device === 'phone'
   short: boolean
+  device: Device
+  coarse: boolean
+  keyboardOpen: boolean
   palette: boolean
   inboxOpen: boolean
   histOpen: boolean
@@ -124,6 +132,9 @@ export const useYui = create<YuiStore>((set, get) => ({
   liveTranscript: '',
   narrow: false,
   short: false,
+  device: 'desktop',
+  coarse: false,
+  keyboardOpen: false,
   palette: false,
   inboxOpen: false,
   histOpen: false,

@@ -1,3 +1,4 @@
+import { trackDevice } from '../lib/device'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import type { Bootstrap, ViewName, ViewParams } from '@shared/protocol'
@@ -68,7 +69,7 @@ function parsePath(path: string): { view: ViewName; params: ViewParams } | null 
 }
 
 // /app/<página>/<id?> = dashboard (Yui minimizada); demais rotas = modo Yui.
-const APP_PAGES = new Set(['overview', 'ops', 'agents', 'runs', 'missions', 'workflows', 'schedule', 'projects', 'browser', 'terminal', 'claude', 'tools', 'inbox', 'infra', 'settings', 'vault', 'brain', 'company', 'help'])
+const APP_PAGES = new Set(['overview', 'ops', 'agents', 'runs', 'missions', 'workflows', 'schedule', 'projects', 'browser', 'terminal', 'claude', 'tools', 'inbox', 'infra', 'settings', 'vault', 'brain', 'company', 'help', 'more'])
 function appPathFor(page: string, p: Record<string, string>) {
   const base = page === 'overview' ? '/app' : `/app/${page}`
   return p.id ? `${base}/${encodeURIComponent(p.id)}` : base
@@ -229,20 +230,16 @@ export function Shell() {
     bootstrap().catch(() => {
       /* 401 já marca authed=false */
     })
-    const onResize = () => {
-      const w = window.innerWidth, h = window.innerHeight
-      setSize({ w, h })
-      const narrow = w < 820, short = h < 760
-      const s = useYui.getState()
-      if (narrow !== s.narrow || short !== s.short) s.set({ narrow, short })
-    }
+    const onResize = () => setSize({ w: window.innerWidth, h: window.innerHeight })
     onResize()
+    const untrack = trackDevice()
     window.addEventListener('resize', onResize)
     window.addEventListener('keydown', onKey)
     window.addEventListener('keydown', onTerminalKey, true)
     window.addEventListener('keyup', onPttUp)
     window.addEventListener('blur', onBlur)
     return () => {
+      untrack()
       window.removeEventListener('resize', onResize)
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('keydown', onTerminalKey, true)

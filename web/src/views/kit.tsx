@@ -38,6 +38,7 @@ export function Tabs<T extends string>({ value, onChange, items }: { value: T; o
           <button
             key={it.id}
             role="tab"
+            className="kit-tab"
             aria-selected={on}
             onClick={() => onChange(it.id)}
             style={{
@@ -75,7 +76,7 @@ export function SmallBtn({ children, onClick, primary, disabled, title }: { chil
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={primary ? undefined : 'hov-bg2'}
+      className={primary ? 'kit-small' : 'hov-bg2 kit-small'}
       style={{
         height: 30, padding: '0 12px', borderRadius: 9, fontSize: 12, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1, whiteSpace: 'nowrap',
         border: primary ? 'none' : '1px solid rgba(255,255,255,.1)',
