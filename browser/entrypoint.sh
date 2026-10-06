@@ -5,6 +5,9 @@
 set -eu
 CHROME=$(ls -d /ms-playwright/chromium-*/chrome-linux64/chrome | head -1)
 mkdir -p /profile /workspace/.yui/browser 2>/dev/null || true
+# Este sidecar roda como root; o console roda como node (uid 1000) e precisa escrever em /workspace/.yui.
+# Em volume novo o mkdir acima criaria tudo como root e o console morreria com EACCES no seed.
+chown 1000:1000 /workspace /workspace/.yui /workspace/.yui/browser 2>/dev/null || true
 rm -f /profile/SingletonLock /profile/SingletonSocket /profile/SingletonCookie
 
 start_chrome() {
