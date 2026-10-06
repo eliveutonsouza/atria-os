@@ -21,6 +21,7 @@ function runLook(r: RunInfo, now: number) {
 }
 
 function TechLines({ run }: { run: RunInfo }) {
+  const phone = useYui((s) => s.device === 'phone')
   const [lines, setLines] = useState<RunEventLine[] | null>(null)
   useEffect(() => {
     let alive = true
@@ -31,7 +32,7 @@ function TechLines({ run }: { run: RunInfo }) {
   const tail = [`tokens: ${fmtTokens(run.tokensIn)} in · ${fmtTokens(run.tokensOut)} out${run.costUsd ? ` · $${run.costUsd.toFixed(2)}` : ''}`]
   const body = (lines ?? []).slice(-40).map((l) => (l.kind === 'tool' ? l.text : l.kind === 'error' ? `! ${l.text}` : l.text))
   return (
-    <div className="mono" style={{ margin: '0 18px 18px 46px', padding: '14px 16px', borderRadius: 12, background: 'rgba(0,0,0,.35)', border: '1px solid rgba(255,255,255,.06)', fontSize: 12, lineHeight: 1.8, color: C.t2, maxHeight: 320, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+    <div className="mono" style={{ margin: phone ? '0 14px 14px' : '0 18px 18px 46px', padding: '14px 16px', borderRadius: 12, background: 'rgba(0,0,0,.35)', border: '1px solid rgba(255,255,255,.06)', fontSize: 12, lineHeight: 1.8, color: C.t2, maxHeight: 320, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
       {[...head, ...(lines === null ? ['carregando…'] : body), ...tail].map((t, i) => <div key={i}>{t}</div>)}
     </div>
   )
@@ -48,6 +49,7 @@ function openResult(id: string) {
 }
 
 export function RunsView() {
+  const phone = useYui((s) => s.device === 'phone')
   const runsMap = useYui((s) => s.runs)
   const expanded = useYui((s) => s.expandedRun)
   const tech = useYui((s) => s.tech)
@@ -91,7 +93,7 @@ export function RunsView() {
   const queued = runs.filter((r) => r.state === 'queued').length
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-      <div style={{ display: 'flex', gap: 36, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: phone ? 24 : 36, flexWrap: 'wrap' }}>
         <div><div className="eyebrow">RUNNING</div><div style={{ fontSize: 36, fontWeight: 300, color: C.cyan }}>{running}</div></div>
         <div><div className="eyebrow">QUEUED</div><div style={{ fontSize: 36, fontWeight: 300 }}>{queued}</div></div>
         <div><div className="eyebrow">BACKGROUND</div><div style={{ fontSize: 36, fontWeight: 300, color: C.t2 }}>{data?.background ?? 0}</div></div>
@@ -106,7 +108,7 @@ export function RunsView() {
               <button
                 aria-expanded={ex}
                 onClick={() => useYui.getState().set({ expandedRun: ex ? null : r.id })}
-                style={{ width: '100%', display: 'grid', gridTemplateColumns: '14px minmax(0,1fr) auto', alignItems: 'center', gap: 14, padding: '16px 18px', border: 'none', background: 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer' }}
+                style={{ width: '100%', display: 'grid', gridTemplateColumns: '14px minmax(0,1fr) auto', alignItems: 'center', gap: phone ? 10 : 14, padding: phone ? 14 : '16px 18px', minHeight: 44, border: 'none', background: 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer' }}
               >
                 <span style={{ width: 9, height: 9, borderRadius: '50%', background: lk.hollow ? 'transparent' : lk.color, border: `1px solid ${lk.color}`, boxShadow: lk.hollow ? 'none' : `0 0 10px ${lk.color}` }} />
                 <span style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
@@ -115,14 +117,14 @@ export function RunsView() {
                 </span>
                 <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
                   <span className="mono" style={{ fontSize: 13, color: lk.color }}>{lk.time}</span>
-                  <span style={{ width: 90, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}>
+                  <span style={{ width: phone ? 60 : 90, height: 3, borderRadius: 2, background: 'rgba(255,255,255,.07)', overflow: 'hidden' }}>
                     <span style={{ display: 'block', height: '100%', width: `${r.state === 'done' ? 100 : Math.round(r.progress)}%`, background: lk.color, transition: 'width .35s' }} />
                   </span>
                 </span>
               </button>
               {ex && (
                 <>
-                  <div style={{ padding: '4px 18px 18px 46px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 20 }}>
+                  <div style={{ padding: phone ? '4px 14px 14px' : '4px 18px 18px 46px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(220px,100%),1fr))', gap: phone ? 16 : 20 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <div className="eyebrow" style={{ letterSpacing: '.16em', fontSize: 11 }}>OPERAÇÃO ATUAL</div>
                       <div className="mono" style={{ fontSize: 13, color: C.lav, wordBreak: 'break-word' }}>{r.currentOp ?? (r.result ? r.result.slice(0, 240) : '—')}</div>
@@ -149,13 +151,13 @@ export function RunsView() {
                     </div>
                   </div>
                   {(r.state === 'done' || r.state === 'failed') && (
-                    <div style={{ padding: '0 18px 18px 46px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ padding: phone ? '0 14px 14px' : '0 18px 18px 46px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {r.result && (
-                        <div style={{ fontSize: 13, color: '#d6d9e8', lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: 220, overflowY: 'auto' }}>{r.result}</div>
+                        <div style={{ fontSize: 13, color: '#d6d9e8', lineHeight: 1.6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 220, overflowY: 'auto' }}>{r.result}</div>
                       )}
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button onClick={() => openResult(r.id)} style={resultBtn}>Ver resultado</button>
-                        {r.missionId && <button onClick={() => useYui.getState().show('mission', { missionId: r.missionId! })} style={resultBtn}>Ver missão</button>}
+                        <button onClick={() => openResult(r.id)} style={phone ? { ...resultBtn, height: 44 } : resultBtn}>Ver resultado</button>
+                        {r.missionId && <button onClick={() => useYui.getState().show('mission', { missionId: r.missionId! })} style={phone ? { ...resultBtn, height: 44 } : resultBtn}>Ver missão</button>}
                       </div>
                     </div>
                   )}

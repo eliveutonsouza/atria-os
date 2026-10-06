@@ -38,11 +38,11 @@ export function PageHeader({ extra }: { extra?: ReactNode }) {
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, flex: 1 }}>
           {header.eyebrow && <div style={{ fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: C.cyan, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{header.eyebrow}</div>}
-          <h1 style={{ margin: 0, fontSize: 21, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{header.title}</h1>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, lineHeight: 1.2, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflowWrap: 'anywhere' }}>{header.title}</h1>
         </div>
         {extra}
         {primary && (
-          <button onClick={primary.fn} className="app-btn primary" style={{ height: 44, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 0 }}>
+          <button onClick={primary.fn} className="app-btn primary" style={{ height: 44, maxWidth: 128, overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 0 }}>
             {primary.label}
           </button>
         )}

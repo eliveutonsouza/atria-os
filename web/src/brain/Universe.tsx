@@ -16,7 +16,9 @@ const dayKey = (ms: number) => new Date(ms).toISOString().slice(0, 10)
 // Universo: todas as notas como estrelas, pastas como galáxias, links como rotas de luz.
 export function Universe({ graph }: { graph: VaultGraphPayload }) {
   const narrow = useYui((s) => s.narrow)
-  const set = useYui((s) => s.set)
+  const tablet = useYui((s) => s.device === 'tablet')
+  const coarse = useYui((s) => s.coarse)
+  const zoomSize = narrow || coarse ? 44 : 36
   const cvRef = useRef<HTMLCanvasElement>(null)
   const engRef = useRef<BrainEngine | null>(null)
   const nodesRef = useRef(new Map<string, ENode>())
@@ -219,11 +221,6 @@ export function Universe({ graph }: { graph: VaultGraphPayload }) {
       >
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, pointerEvents: 'auto' }}>
-            {narrow && (
-              <IconBtn label="Abrir menu" size={44} onClick={() => set({ sidebarOpen: true })}>
-                {Icon.menu}
-              </IconBtn>
-            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               <div style={{ fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: '#67d8f2', fontWeight: 600 }}>Vault · yui-console</div>
               <h1 style={{ margin: 0, fontSize: narrow ? 20 : 26, fontWeight: 600 }}>Cérebro</h1>
@@ -274,8 +271,9 @@ export function Universe({ graph }: { graph: VaultGraphPayload }) {
       )}
 
       {/* linha do tempo + opções */}
-      {!narrow && (
-        <div style={{ ...glass, position: 'absolute', left: 24, bottom: 22, width: 390, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, borderRadius: 16 }}>
+      {/* tablet: com a nota aberta a linha do tempo sai para o zoom ocupar o canto oposto ao painel */}
+      {!narrow && !(tablet && sel) && (
+        <div style={{ ...glass, position: 'absolute', left: 24, bottom: 22, width: tablet ? 300 : 390, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, borderRadius: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12.5 }}>
             <span style={{ fontWeight: 600 }}>Linha do tempo do cérebro</span>
             <span style={{ ...mono, fontSize: 10.5, color: '#8c92ad' }}>{cut === null ? 'hoje' : `até ${days[cutIdx]?.key.split('-').reverse().slice(0, 2).join('/')}`}</span>
@@ -327,11 +325,13 @@ export function Universe({ graph }: { graph: VaultGraphPayload }) {
       )}
 
       {/* zoom */}
-      <div style={{ position: 'absolute', ...(narrow ? { left: 14 } : { right: 370 }), bottom: narrow ? (sel ? 'calc(58% + 12px)' : 'calc(24px + env(safe-area-inset-bottom))') : 22, display: 'flex', flexDirection: 'column', gap: 6, zIndex: 2 }}>
-        <IconBtn label="Aproximar" size={narrow ? 44 : 36} onClick={() => engRef.current?.zoomBy(1.4)}>{Icon.plus}</IconBtn>
-        <IconBtn label="Afastar" size={narrow ? 44 : 36} onClick={() => engRef.current?.zoomBy(1 / 1.4)}>{Icon.minus}</IconBtn>
-        <IconBtn label="Centralizar" size={narrow ? 44 : 36} onClick={() => engRef.current?.fit(narrow ? { l: 16, r: 16, t: 150, b: 40 } : { l: 40, r: 380, t: 150, b: 180 })}>{Icon.center}</IconBtn>
+      {!(narrow && sel) && (
+      <div style={{ position: 'absolute', ...(narrow ? { left: 14 } : tablet ? (sel ? { left: 24 } : { right: 24 }) : { right: 370 }), bottom: narrow ? 'calc(24px + var(--tabbar))' : 22, display: 'flex', flexDirection: 'column', gap: 6, zIndex: 2 }}>
+        <IconBtn label="Aproximar" size={zoomSize} onClick={() => engRef.current?.zoomBy(1.4)}>{Icon.plus}</IconBtn>
+        <IconBtn label="Afastar" size={zoomSize} onClick={() => engRef.current?.zoomBy(1 / 1.4)}>{Icon.minus}</IconBtn>
+        <IconBtn label="Centralizar" size={zoomSize} onClick={() => engRef.current?.fit(narrow ? { l: 16, r: 16, t: 150, b: 40 } : { l: 40, r: 380, t: 150, b: 180 })}>{Icon.center}</IconBtn>
       </div>
+      )}
     </div>
   )
 }

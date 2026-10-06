@@ -111,6 +111,7 @@ function CommandsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Ag
   const [mode, setMode] = useState<Mode>('bg')
   const [extra, setExtra] = useState('')
   const [sent, setSent] = useState<{ ok: boolean; text: string; runId?: string } | null>(null)
+  const phone = useYui((s) => s.device === 'phone')
   useEffect(() => {
     api.get<RepoInfo[]>('/api/repos').then((r) => setRepos(r.filter((x) => x.cloned))).catch(() => {})
   }, [])
@@ -140,7 +141,7 @@ function CommandsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Ag
       type="button"
       onClick={() => setMode(m)}
       aria-pressed={mode === m}
-      style={{ height: 32, padding: '0 12px', borderRadius: 9, cursor: 'pointer', fontSize: 12.5, fontFamily: 'inherit', border: `1px solid ${mode === m ? 'rgba(103,216,242,.3)' : 'rgba(255,255,255,.08)'}`, background: mode === m ? 'rgba(103,216,242,.12)' : 'transparent', color: mode === m ? '#a9e9f8' : C.t2 }}
+      style={{ height: phone ? 40 : 32, flex: phone ? '1 1 0' : undefined, minWidth: 0, padding: '0 12px', borderRadius: 9, cursor: 'pointer', fontSize: 12.5, fontFamily: 'inherit', border: `1px solid ${mode === m ? 'rgba(103,216,242,.3)' : 'rgba(255,255,255,.08)'}`, background: mode === m ? 'rgba(103,216,242,.12)' : 'transparent', color: mode === m ? '#a9e9f8' : C.t2 }}
     >
       {label}
     </button>
@@ -149,17 +150,17 @@ function CommandsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Ag
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <section style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '12px 16px', borderRadius: 16, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: C.t2 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: C.t2, flex: phone ? '1 1 100%' : undefined, minWidth: 0 }}>
           Projeto
-          <select value={project} onChange={(e) => setProject(e.target.value)} style={{ ...input, width: 'auto', minWidth: 180, padding: '7px 10px', fontWeight: 600 }}>
+          <select value={project} onChange={(e) => setProject(e.target.value)} style={{ ...input, width: phone ? '100%' : 'auto', minWidth: phone ? 0 : 180, flex: phone ? 1 : undefined, padding: '7px 10px', fontWeight: 600 }}>
             <option value="">workspace (sem projeto)</option>
             {repos.map((r) => <option key={r.slug} value={r.slug}>{r.slug}</option>)}
           </select>
         </label>
-        <span style={{ fontSize: 12, color: C.t2, marginLeft: 6 }}>Executar como</span>
-        {seg('bg', 'Agente em segundo plano')}
-        {seg('tty', 'Terminal interativo')}
-        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: 12, color: C.t2, marginLeft: phone ? 0 : 6, flexBasis: phone ? '100%' : undefined }}>Executar como</span>
+        {seg('bg', phone ? 'Segundo plano' : 'Agente em segundo plano')}
+        {seg('tty', phone ? 'Terminal' : 'Terminal interativo')}
+        {!phone && <span style={{ flex: 1 }} />}
         <span style={{ fontSize: 12, color: C.t3 }}>{mode === 'bg' ? 'Resultado volta para a Yui e para Execuções' : 'Abre o Claude do projeto com o comando digitado'}</span>
       </section>
       <input value={extra} onChange={(e) => setExtra(e.target.value)} placeholder="Detalhes opcionais (ex.: “só a pasta src/auth”, “tema: vendas de setembro”, URL do site…)" aria-label="Detalhes do pedido" style={input} />
@@ -169,7 +170,7 @@ function CommandsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Ag
           {sent.runId && <SmallBtn onClick={() => useYui.getState().set({ shellMode: 'app', appPage: 'runs', appParams: { id: sent.runId! } })}>Acompanhar</SmallBtn>}
         </div>
       )}
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 12 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: phone ? 'minmax(0,1fr)' : 'repeat(auto-fit,minmax(300px,1fr))', gap: 12 }}>
         {CATS.map((cat) => (
           <div key={cat.title} style={{ padding: 16, borderRadius: 16, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -204,6 +205,7 @@ function CommandsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Ag
 }
 
 function SkillsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: AgentInfo[] }) {
+  const phone = useYui((s) => s.device === 'phone')
   const [q, setQ] = useState('')
   const [note, setNote] = useState('')
   const active = useYui((s) => s.activeProject)
@@ -225,7 +227,7 @@ function SkillsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Agen
         <span style={{ fontSize: 12, color: C.t3 }}>{caps ? `${caps.skills.length} skills instaladas` : 'Capacidades ainda não lidas — Configurações › Sistema › Atualizar.'}</span>
         {note && <span role="status" style={{ fontSize: 12.5, color: C.ok }}>{note}</span>}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: phone ? 'minmax(0,1fr)' : 'repeat(auto-fill,minmax(260px,1fr))', gap: 8 }}>
         {skills.map((s) => (
           <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
             <span className="mono" style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: '#cbbcff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s}>{s}</span>
@@ -239,6 +241,7 @@ function SkillsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Agen
 }
 
 function SessionsTab() {
+  const phone = useYui((s) => s.device === 'phone')
   const [list, setList] = useState<{ name: string; created: string; attached: boolean }[] | null>(null)
   const load = useCallback(() => api.get<{ name: string; created: string; attached: boolean }[]>('/api/terminal/sessions').then(setList).catch(() => setList([])), [])
   useEffect(() => {
@@ -253,9 +256,9 @@ function SessionsTab() {
         const kind = (m?.[1] ?? 'shell') as 'claude' | 'shell'
         const slug = m?.[2] === 'workspace' ? null : m?.[2] ?? null
         return (
-          <div key={s.name} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto auto', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
-            <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontSize: 13.5, fontWeight: 600 }}>{kind === 'claude' ? 'Claude' : 'Shell'} · {slug ?? 'workspace'}</span>
+          <div key={s.name} style={{ display: 'grid', gridTemplateColumns: phone ? '1fr 1fr' : 'minmax(0,1fr) auto auto', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
+            <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, gridColumn: phone ? '1 / -1' : undefined }}>
+              <span style={{ fontSize: 13.5, fontWeight: 600, overflowWrap: 'anywhere' }}>{kind === 'claude' ? 'Claude' : 'Shell'} · {slug ?? 'workspace'}</span>
               <span style={{ fontSize: 12, color: C.t3 }}>aberta {new Date(s.created).toLocaleString('pt-BR')}{s.attached ? ' · em uso agora' : ''}</span>
             </span>
             <SmallBtn onClick={() => openTerminal(kind, slug)}>Reconectar</SmallBtn>
@@ -275,19 +278,22 @@ export function ClaudePage() {
     api.get<ClaudeInitInfo & { tools?: string[] }>('/api/capabilities').then((c) => setCaps(c.tools ? c : null)).catch(() => {})
     api.get<AgentInfo[]>('/api/agents').then(setAgents).catch(() => {})
   }, [])
+  const phone = useYui((s) => s.device === 'phone')
   useHeader('Claude Code · central de comandos', 'Um clique, o Claude faz', [], [tab])
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <Tabs
-        value={tab}
-        onChange={setTab}
-        items={[
-          { id: 'cmds', label: 'Comandos' },
-          { id: 'guide', label: 'Guia' },
-          { id: 'skills', label: 'Skills', count: caps?.skills.length },
-          { id: 'sessions', label: 'Sessões' },
-        ]}
-      />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
+      <div className={phone ? 'h-scroll' : undefined}>
+        <Tabs
+          value={tab}
+          onChange={setTab}
+          items={[
+            { id: 'cmds', label: 'Comandos' },
+            { id: 'guide', label: 'Guia' },
+            { id: 'skills', label: 'Skills', count: caps?.skills.length },
+            { id: 'sessions', label: 'Sessões' },
+          ]}
+        />
+      </div>
       {tab === 'cmds' && <CommandsTab caps={caps} agents={agents} />}
       {tab === 'guide' && <GuideTab />}
       {tab === 'skills' && <SkillsTab caps={caps} agents={agents} />}

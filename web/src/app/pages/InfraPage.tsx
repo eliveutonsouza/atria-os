@@ -17,7 +17,8 @@ export function InfraPage() {
   const projects = ov.data?.projects ?? []
   const slug = sel ?? null
   const logs = useApi<LogsPayload>(slug ? `/api/projects/${encodeURIComponent(slug)}/logs` : null, [slug], 15000)
-  useHeader('Infra & logs', 'Minha VPS', [{ label: 'Terminal', fn: () => openApp('terminal') }])
+  useHeader('Infra & logs', 'Minha VPS', [{ label: 'Terminal', primary: true, fn: () => openApp('terminal') }])
+  const phone = useYui((s) => s.device === 'phone')
   const hasErr = !!logs.data?.lines.some((l) => l.level === 'ERROR')
   return (
     <>
@@ -29,7 +30,7 @@ export function InfraPage() {
             aria-label="Projeto"
             value={slug ?? ''}
             onChange={(e) => openApp('infra', e.target.value || undefined)}
-            style={{ height: 30, borderRadius: 8, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)', color: C.text, padding: '0 8px', fontSize: 12 }}
+            style={{ height: 30, borderRadius: 8, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)', color: C.text, padding: '0 8px', fontSize: 12, maxWidth: phone ? '52vw' : undefined }}
           >
             <option value="">Escolha um projeto…</option>
             {projects.map((p) => <option key={p.slug} value={p.slug}>{p.name}</option>)}
@@ -44,7 +45,7 @@ export function InfraPage() {
           </div>
         )}
         {slug && (logs.data?.lines.length ?? 0) > 0 && (
-          <div className="app-mono" style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(0,0,0,.4)', border: '1px solid rgba(255,255,255,.06)', fontSize: 12, lineHeight: 1.8, overflowX: 'auto', maxHeight: 460, overflowY: 'auto' }}>
+          <div className="app-mono" data-own-scroll style={{ padding: phone ? '12px' : '14px 16px', borderRadius: 12, background: 'rgba(0,0,0,.4)', border: '1px solid rgba(255,255,255,.06)', fontSize: 12, lineHeight: 1.8, overflowX: 'auto', maxHeight: phone ? 'calc(var(--vvh, 100dvh) * 0.6)' : 460, overflowY: 'auto', overscrollBehavior: 'contain' }}>
             {logs.data!.lines.map((ln, i) => (
               <div key={i} style={{ display: 'flex', gap: 14, whiteSpace: 'nowrap' }}>
                 <span style={{ color: C.t4 }}>{ln.t}</span>

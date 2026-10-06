@@ -11,7 +11,8 @@ export function LogsView() {
   const slug = useYui((s) => s.viewParams.project ?? s.activeProject)
   const { data, loading, error } = useApi<LogsPayload>(slug ? `/api/projects/${encodeURIComponent(slug)}/logs` : null, [], 15000)
   const hasErr = !!data?.lines.some((l) => l.level === 'ERROR')
-  useHeader('Logs · produção', data?.source ?? slug ?? 'Logs', hasErr && slug ? [{ label: 'Pedir correção', fn: () => startRun('backend', slug, `Analise os erros recentes nos logs de ${data?.source} e corrija a causa.`) }] : [], [data])
+  useHeader('Logs · produção', data?.source ?? slug ?? 'Logs', hasErr && slug ? [{ label: 'Pedir correção', primary: true, fn: () => startRun('backend', slug, `Analise os erros recentes nos logs de ${data?.source} e corrija a causa.`) }] : [], [data])
+  const phone = useYui((s) => s.device === 'phone')
   if (!slug) return <Empty text="Qual projeto? Diga: “Mostra os erros do Stoqmate.”" />
   if (loading && !data) return <Skeleton kpis={0} rows={8} />
   if (error || !data) return <ErrorNote text="Não consegui ler os logs desse projeto." />
@@ -21,7 +22,7 @@ export function LogsView() {
       {data.lines.length === 0 ? (
         <Empty text="Nenhuma linha de log recente." />
       ) : (
-        <div className="mono" style={{ padding: '16px 18px', borderRadius: 14, background: 'rgba(0,0,0,.4)', border: '1px solid rgba(255,255,255,.06)', fontSize: 12.5, lineHeight: 1.85, overflowX: 'auto' }}>
+        <div className="mono" data-own-scroll style={{ padding: phone ? '12px' : '16px 18px', borderRadius: 14, background: 'rgba(0,0,0,.4)', border: '1px solid rgba(255,255,255,.06)', fontSize: 12.5, lineHeight: 1.85, overflowX: 'auto', ...(phone ? { maxHeight: 'calc(var(--vvh, 100dvh) * 0.7)', overflowY: 'auto', overscrollBehavior: 'contain' } : null) }}>
           {data.lines.map((ln, i) => (
             <div key={i} style={{ display: 'flex', gap: 14, whiteSpace: 'nowrap' }}>
               <span style={{ color: C.t4 }}>{ln.t}</span>

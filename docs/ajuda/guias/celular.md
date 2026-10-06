@@ -29,9 +29,15 @@ O Yui Console é um app instalável (PWA). No celular ele mostra versões compac
 2. **Instale o app.** Configurações › Notificações › **Instalar app** (ou ⌘K › "Instalar app (celular/desktop)"). No iPhone: Safari › Compartilhar › Adicionar à Tela de Início.
 3. **Ative os avisos.** Na mesma seção, toque em **Ativar notificações** e depois em **Enviar teste**.
 4. **Responda pelos avisos.** Tocar numa notificação de aprovação abre a tela Aprovações; tocar numa de execução abre o detalhe dela.
-5. **Navegue pelo menu.** No celular, o dashboard abre pelo botão de menu; a Yui continua disponível por texto e voz.
+5. **Navegue pelas abas.** Embaixo ficam Início, Execuções, Workflows, Aprovações (com contador) e **Mais**, que mostra todas as telas em grade. No tablet, as mesmas telas ficam num trilho de ícones à esquerda.
+6. **Use o ⋯ do topo.** Cada tela mostra a ação principal (ex.: Rodar, + Nova missão) e guarda o resto no **⋯**: salvar, agendar, ajuda e excluir (em vermelho, sempre com confirmação).
+7. **Fale com a Yui.** Toque no orb (acima das abas) para digitar, ou em Mais › Falar com a Yui para a conversa por voz.
 
 ## O que você vê na tela
+- Listas em cartões (missões, agentes, projetos, execuções); tocar abre o detalhe em tela cheia, com **‹** no topo para voltar (o gesto de voltar do celular também funciona).
+- Aprovações e confirmações de exclusão sobem como uma folha da parte de baixo da tela, com os botões sempre visíveis.
+- Terminal com uma faixa de teclas especiais (Esc, Tab, Ctrl, setas) acima do teclado; a tela encolhe junto com o teclado.
+- Editor de workflow em abas (Fluxo, Passos, Markdown, Execuções); tocar num passo abre as propriedades embaixo.
 - Execuções em cartões de três linhas (agente e estado, tarefa, projeto e tempo).
 - Agendamentos como agenda do dia, com os 7 dias da semana em botões.
 - Vault em lista › leitura, com botão Editar para ajustes simples (sem VS Code).

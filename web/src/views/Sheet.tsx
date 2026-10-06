@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { C } from '../lib/colors'
 
 // Folha inferior (celular): alça, conteúdo e respiro da safe area. ESC e toque fora fecham.
@@ -11,7 +12,8 @@ export function BottomSheet({ label, onClose, children, tone, role = 'dialog', z
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
   }, [onClose])
-  return (
+  // portal no <body>: fica acima da barra de abas, do orb e de qualquer contexto de empilhamento da página
+  return createPortal(
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex, background: 'rgba(4,5,12,.62)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)', display: 'flex', alignItems: 'flex-end' }}>
       <section
         role={role}
@@ -28,7 +30,8 @@ export function BottomSheet({ label, onClose, children, tone, role = 'dialog', z
         <div aria-hidden style={{ width: 40, height: 5, borderRadius: 3, background: 'rgba(255,255,255,.2)', alignSelf: 'center', flexShrink: 0 }} />
         {children}
       </section>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

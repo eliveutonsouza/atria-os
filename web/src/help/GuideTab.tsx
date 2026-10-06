@@ -30,6 +30,8 @@ function Feedback({ id }: { id: string }) {
 
 export function GuideTab({ id }: { id: string | null }) {
   const narrow = useYui((s) => s.narrow)
+  // celular e tablet: índice vira <select>
+  const compact = useYui((s) => s.device !== 'desktop')
   const { index, error } = useHelpIndex()
   const guides = [...(index?.guias ?? [])].sort((a, b) => {
     const ga = GROUP_ORDER.indexOf(a.grupo)
@@ -71,7 +73,7 @@ export function GuideTab({ id }: { id: string | null }) {
   const usar = asText(m.usar_quando)
   const naoUsar = asText(m.nao_usar_quando)
 
-  const toc = narrow ? (
+  const toc = compact ? (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, color: C.t2 }}>
       Guia
       <select className="hp-input" value={current ?? ''} onChange={(e) => goHelp(`guia:${e.target.value}`)} style={{ height: 46 }}>

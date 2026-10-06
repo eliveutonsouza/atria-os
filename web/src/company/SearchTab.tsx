@@ -4,7 +4,7 @@ import { api } from '../api/client'
 import { onCompanyEvent } from '../api/events'
 import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
-import { fmtNum, goTab } from './api'
+import { fmtNum, goTab, useStacked } from './api'
 
 // Pipeline & busca (Pipeline.dc.html): o fluxo com números reais e o "Perguntar à base",
 // que usa a mesma busca da ferramenta empresa_consultar.
@@ -94,6 +94,7 @@ function Answer({ text }: { text: string }) {
 
 export function SearchTab() {
   const narrow = useYui((s) => s.narrow)
+  const stacked = useStacked()
   const [stats, setStats] = useState<CompanyStats | null>(null)
   const [q, setQ] = useState('')
   const [res, setRes] = useState<CompanySearchResult | null>(null)
@@ -143,7 +144,7 @@ export function SearchTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <Pipeline stats={stats} narrow={narrow} />
-      <section style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'minmax(0, 1fr) 330px', gap: 16, alignItems: 'start' }}>
+      <section style={{ display: 'grid', gridTemplateColumns: stacked ? 'minmax(0,1fr)' : 'minmax(0, 1fr) 330px', gap: 16, alignItems: 'start' }}>
         <div className="co-card" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 14, fontWeight: 600 }}>Perguntar à base</span>

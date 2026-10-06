@@ -32,6 +32,8 @@ export function WebsiteView() {
   const [reload, setReload] = useState(0)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const project = params.project ?? (params.artifactId ? null : activeProject)
+  const phone = useYui((s) => s.device === 'phone')
+  const coarse = useYui((s) => s.coarse)
 
   useEffect(() => {
     let alive = true
@@ -63,7 +65,7 @@ export function WebsiteView() {
   useHeader('Live preview', target?.title ?? 'Preview', target
     ? [
         { label: 'Recarregar', fn: () => setReload((n) => n + 1) },
-        { label: 'Deploy', fn: () => submitText('Faça o deploy deste site.') },
+        { label: 'Deploy', primary: true, fn: () => submitText('Faça o deploy deste site.') },
       ]
     : [], [target])
 
@@ -72,13 +74,13 @@ export function WebsiteView() {
   const mock = target.url.startsWith('mock:')
   const host = mock ? 'clinica-sorriso.preview.yui' : target.url.replace(/^https?:\/\//, '').replace(/^\//, location.host + '/')
   return (
-    <div style={{ height: '100%', minHeight: 460, display: 'flex', flexDirection: 'column', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,.1)', background: '#f6f4ef' }}>
-      <div style={{ height: 38, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px', background: '#14172c', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-        <div style={{ display: 'flex', gap: 6 }}>
+    <div style={{ height: '100%', minHeight: phone ? 'max(320px, calc(var(--vvh, 100dvh) - var(--tabbar, 0px) - 200px))' : 460, display: 'flex', flexDirection: 'column', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,.1)', background: '#f6f4ef' }}>
+      <div style={{ height: 38, flexShrink: 0, display: 'flex', alignItems: 'center', gap: phone ? 8 : 12, padding: phone ? '0 10px' : '0 14px', background: '#14172c', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+        <div style={{ display: phone ? 'none' : 'flex', gap: 6 }}>
           {[0, 1, 2].map((i) => <span key={i} style={{ width: 9, height: 9, borderRadius: '50%', background: '#3a3f5c' }} />)}
         </div>
-        <div className="mono" style={{ flex: 1, maxWidth: 420, height: 24, borderRadius: 7, background: 'rgba(255,255,255,.05)', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 11, color: C.t2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{host}</div>
-        <div style={{ fontSize: 11, color: C.cyan, whiteSpace: 'nowrap' }}>{selEl ? `${selEl} selecionado` : 'clique para selecionar'}</div>
+        <div className="mono" style={{ flex: 1, minWidth: 0, maxWidth: phone ? 'none' : 420, height: 24, borderRadius: 7, background: 'rgba(255,255,255,.05)', display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 11, color: C.t2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{host}</div>
+        <div style={{ fontSize: 11, color: C.cyan, whiteSpace: 'nowrap', ...(phone ? { flexShrink: 1, minWidth: 0, maxWidth: '45%', overflow: 'hidden', textOverflow: 'ellipsis' } : null) }}>{selEl ? `${selEl} selecionado` : coarse ? 'toque para selecionar' : 'clique para selecionar'}</div>
       </div>
       <iframe
         key={reload}

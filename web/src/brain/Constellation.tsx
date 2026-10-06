@@ -15,7 +15,9 @@ const DIR_LABEL = { out: 'link', in: 'backlink', both: 'link mútuo' } as const
 // Constelação: a nota no centro (orb da Yui), vizinhos em anéis de 1º, 2º e 3º grau, sugestões em âmbar.
 export function Constellation({ path, graph }: { path: string; graph: VaultGraphPayload }) {
   const narrow = useYui((s) => s.narrow)
-  const set = useYui((s) => s.set)
+  const tablet = useYui((s) => s.device === 'tablet')
+  const coarse = useYui((s) => s.coarse)
+  const panelW = tablet ? 300 : 330
   const cvRef = useRef<HTMLCanvasElement>(null)
   const engRef = useRef<BrainEngine | null>(null)
   const [depth, setDepth] = useState(2)
@@ -194,11 +196,6 @@ export function Constellation({ path, graph }: { path: string; graph: VaultGraph
 
       <header style={{ position: 'absolute', left: 0, right: 0, top: 0, padding: narrow ? 'calc(12px + env(safe-area-inset-top)) 14px 0' : '20px 28px 0', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', pointerEvents: 'none' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, pointerEvents: 'auto', minWidth: 0 }}>
-          {narrow && (
-            <IconBtn label="Abrir menu" size={44} onClick={() => set({ sidebarOpen: true })}>
-              {Icon.menu}
-            </IconBtn>
-          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
             <nav aria-label="Trilha" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#9aa0bb', minWidth: 0 }}>
               <button onClick={() => openConstellation(null)} style={{ border: 'none', background: 'transparent', padding: 0, color: '#7fdcf5', fontSize: 12, cursor: 'pointer' }}>Cérebro</button>
@@ -237,8 +234,8 @@ export function Constellation({ path, graph }: { path: string; graph: VaultGraph
         className="app-scroll"
         style={
           narrow
-            ? { position: 'absolute', left: 12, right: 12, bottom: 'calc(12px + env(safe-area-inset-bottom))', maxHeight: '34%', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, zIndex: 3 }
-            : { position: 'absolute', left: 24, top: 104, width: 330, bottom: 24, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, zIndex: 3 }
+            ? { position: 'absolute', left: 12, right: 12, bottom: 'calc(12px + var(--tabbar))', maxHeight: 'min(55dvh, calc(100% - var(--tabbar) - 170px))', overflowY: 'auto', overscrollBehavior: 'contain', display: 'flex', flexDirection: 'column', gap: 10, zIndex: 3 }
+            : { position: 'absolute', left: 24, top: 104, width: panelW, bottom: 24, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, zIndex: 3 }
         }
       >
         <div style={{ ...glass, borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -298,7 +295,7 @@ export function Constellation({ path, graph }: { path: string; graph: VaultGraph
 
       {/* caminho entre notas */}
       {!narrow && (
-        <div style={{ position: 'absolute', left: 378, right: 24, bottom: 22, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', left: panelW + 48, right: 24, bottom: 22, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
           <div style={{ ...glass, borderRadius: 14, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', pointerEvents: 'auto', maxWidth: '100%' }}>
             <span style={{ fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: '#8c92ad', fontWeight: 600, marginRight: 4 }}>Caminho até</span>
             <form
@@ -343,10 +340,10 @@ export function Constellation({ path, graph }: { path: string; graph: VaultGraph
         </div>
       )}
 
-      <div style={{ position: 'absolute', ...(narrow ? { right: 14, top: 150 } : { right: 24, bottom: 90 }), display: 'flex', flexDirection: 'column', gap: 6, zIndex: 2 }}>
-        <IconBtn label="Aproximar" size={narrow ? 44 : 36} onClick={() => engRef.current?.zoomBy(1.4)}>{Icon.plus}</IconBtn>
-        <IconBtn label="Afastar" size={narrow ? 44 : 36} onClick={() => engRef.current?.zoomBy(1 / 1.4)}>{Icon.minus}</IconBtn>
-        <IconBtn label="Centralizar" size={narrow ? 44 : 36} onClick={() => engRef.current?.fit(narrow ? { l: 12, r: 12, t: 150, b: 120 } : { l: 380, r: 40, t: 110, b: 90 })}>{Icon.center}</IconBtn>
+      <div style={{ position: 'absolute', ...(narrow ? { right: 14, top: 150 } : { right: 24, bottom: tablet ? 110 : 90 }), display: 'flex', flexDirection: 'column', gap: 6, zIndex: 2 }}>
+        <IconBtn label="Aproximar" size={narrow || coarse ? 44 : 36} onClick={() => engRef.current?.zoomBy(1.4)}>{Icon.plus}</IconBtn>
+        <IconBtn label="Afastar" size={narrow || coarse ? 44 : 36} onClick={() => engRef.current?.zoomBy(1 / 1.4)}>{Icon.minus}</IconBtn>
+        <IconBtn label="Centralizar" size={narrow || coarse ? 44 : 36} onClick={() => engRef.current?.fit(narrow ? { l: 12, r: 12, t: 150, b: 120 } : { l: 380, r: 40, t: 110, b: 90 })}>{Icon.center}</IconBtn>
       </div>
     </div>
   )

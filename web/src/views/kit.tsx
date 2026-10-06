@@ -58,7 +58,7 @@ export function Tabs<T extends string>({ value, onChange, items }: { value: T; o
 
 export function Chip({ children, on, onClick, title }: { children: ReactNode; on?: boolean; onClick?: () => void; title?: string }) {
   const style: CSSProperties = {
-    fontSize: 12, padding: '4px 10px', borderRadius: 8, cursor: onClick ? 'pointer' : 'default', whiteSpace: 'nowrap',
+    fontSize: 12, padding: '4px 10px', borderRadius: 8, cursor: onClick ? 'pointer' : 'default', whiteSpace: 'nowrap', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis',
     border: `1px solid ${on ? 'rgba(103,216,242,.35)' : 'rgba(255,255,255,.08)'}`,
     background: on ? 'rgba(103,216,242,.1)' : 'rgba(255,255,255,.02)', color: on ? '#a9e9f8' : C.t2,
   }
@@ -105,5 +105,5 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 }
 
 export function SearchBox({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
-  return <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={placeholder} style={{ ...input, maxWidth: 320 }} />
+  return <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={placeholder} style={{ ...input, maxWidth: 'min(320px, 100%)' }} />
 }

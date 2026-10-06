@@ -68,11 +68,11 @@ export function AgentDetailView() {
     draft?.group ? `Agente · ${draft.group}` : 'Agente',
     draft?.name ?? id ?? 'Agente',
     [
-      { label: saving ? 'Salvando…' : dirty ? 'Salvar' : 'Salvo', fn: () => void save() },
-      { label: 'Testar', fn: () => id && void startRun(id, null, 'Apresente-se em 2 frases: quem você é, o que faz e quais ferramentas/conectores você tem disponíveis agora. Não altere nada.') },
+      { label: saving ? 'Salvando…' : dirty ? 'Salvar' : 'Salvo', fn: () => void save(), primary: dirty },
+      { label: 'Testar', primary: !dirty, fn: () => id && void startRun(id, null, 'Apresente-se em 2 frases: quem você é, o que faz e quais ferramentas/conectores você tem disponíveis agora. Não altere nada.') },
       { label: 'Abrir no terminal', fn: () => useYui.getState().show('terminal', { kind: 'shell', cmd: `claude --agent ${JSON.stringify(draft?.name ?? id)}` }) },
       { label: 'Duplicar', fn: () => void duplicate() },
-      { label: draft?.archived ? 'Reativar' : 'Arquivar', fn: () => void archive() },
+      { label: draft?.archived ? 'Reativar' : 'Arquivar', fn: () => void archive(), danger: !draft?.archived },
     ],
     [saving, dirty, draft?.name, draft?.archived, draft?.group],
   )
@@ -91,7 +91,7 @@ export function AgentDetailView() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22, maxWidth: 1100 }}>
       {draft.archived && <div style={{ ...card, borderColor: 'rgba(245,181,74,.25)', color: '#f5c97a', fontSize: 14 }}>Agente arquivado — não recebe tarefas. Use “Reativar”.</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(220px,100%),1fr))', gap: 14 }}>
         <Field label="Nome">
           <input style={input} value={draft.name} onChange={(e) => set({ name: e.target.value })} />
         </Field>
@@ -199,11 +199,11 @@ export function AgentDetailView() {
               key={r.id}
               onClick={() => useYui.getState().show('runs', { runId: r.id })}
               className="hov-row"
-              style={{ display: 'grid', gridTemplateColumns: '14px minmax(0,1fr) auto', gap: 12, alignItems: 'center', padding: '11px 8px', margin: '0 -8px', border: 'none', borderBottom: '1px solid rgba(255,255,255,.05)', background: 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer', borderRadius: 8, fontSize: 14 }}
+              style={{ display: 'grid', gridTemplateColumns: '14px minmax(0,1fr) auto', gap: 12, alignItems: 'center', padding: '11px 8px', minHeight: 44, margin: '0 -8px', border: 'none', borderBottom: '1px solid rgba(255,255,255,.05)', background: 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer', borderRadius: 8, fontSize: 14 }}
             >
               <StatusPill label="" color={RUN_COLOR[r.state] ?? C.t3} />
               <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.task}</span>
-              <span style={{ fontSize: 12, color: C.t3 }}>{ago(r.finishedAt ?? r.startedAt)}</span>
+              <span style={{ fontSize: 12, color: C.t3, whiteSpace: 'nowrap' }}>{ago(r.finishedAt ?? r.startedAt)}</span>
             </button>
           ))
         ) : (

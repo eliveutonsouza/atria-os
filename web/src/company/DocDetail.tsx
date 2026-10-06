@@ -8,7 +8,7 @@ import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
 import { renderNote } from '../vault/markdown'
 import '../vault/vault.css'
-import { CAT_COLORS, fmtDate, fmtSize, goTab, isImage, isPdf, noExt, statusOf, Icon } from './api'
+import { CAT_COLORS, fmtDate, fmtSize, goTab, isImage, isPdf, noExt, statusOf, Icon, useStacked } from './api'
 import { DeleteModal, PipeBar, Svg, TypeBadge } from './ui'
 
 // Detalhe do documento (DocDetail.dc.html): página com as caixas do Docling, dados extraídos,
@@ -86,6 +86,7 @@ function PdfViewer({ url, pageNo, width, onPages }: { url: string; pageNo: numbe
 
 export function DocDetail({ id }: { id: string }) {
   const narrow = useYui((s) => s.narrow)
+  const stacked = useStacked()
   const [doc, setDoc] = useState<CompanyDoc | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [pages, setPages] = useState<CompanyDocPage[]>([])
@@ -162,7 +163,7 @@ export function DocDetail({ id }: { id: string }) {
   const [cbg, cfg] = CAT_COLORS[doc.category] ?? CAT_COLORS.Outros
 
   const viewer = (
-    <div className="co-card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: narrow ? 0 : 560 }}>
+    <div className="co-card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: stacked ? 0 : 560 }}>
       <div style={{ minHeight: 42, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '6px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 12.5, color: C.t2, flexWrap: 'wrap' }}>
         <span>{totalPages ? `Página ${pageNo} de ${totalPages}` : 'Sem páginas'}</span>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
@@ -173,7 +174,7 @@ export function DocDetail({ id }: { id: string }) {
           tabela
         </label>
       </div>
-      <div ref={viewerRef} data-own-scroll style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 16, background: '#070814', overflow: 'auto', minHeight: 300 }}>
+      <div ref={viewerRef} data-own-scroll style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 16, background: '#070814', overflow: 'auto', minHeight: narrow ? 160 : 300 }}>
         {pdf ? (
           <div style={{ position: 'relative' }}>
             <PdfViewer url={fileUrl} pageNo={pageNo} width={vw} onPages={setPdfPages} />
@@ -224,9 +225,14 @@ export function DocDetail({ id }: { id: string }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {narrow && (
+        <button className="app-btn" style={{ height: 44, alignSelf: 'flex-start' }} onClick={() => goTab('documentos')}>
+          ‹ Documentos
+        </button>
+      )}
       <header style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0, flex: '1 1 360px' }}>
-          <nav aria-label="Trilha" style={{ display: 'flex', gap: 8, fontSize: 12, color: C.t2, minWidth: 0 }}>
+          <nav aria-label="Trilha" style={{ display: narrow ? 'none' : 'flex', gap: 8, fontSize: 12, color: C.t2, minWidth: 0 }}>
             <button className="vault-link-btn" style={{ padding: 0 }} onClick={() => goTab('perfil')}>Empresa</button>
             <span>›</span>
             <button className="vault-link-btn" style={{ padding: 0 }} onClick={() => goTab('documentos')}>Documentos</button>
@@ -275,7 +281,7 @@ export function DocDetail({ id }: { id: string }) {
         </div>
       )}
 
-      <section style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'minmax(320px, 420px) minmax(0, 1fr)', gap: 16, alignItems: 'start' }}>
+      <section style={{ display: 'grid', gridTemplateColumns: stacked ? 'minmax(0,1fr)' : 'minmax(320px, 420px) minmax(0, 1fr)', gap: 16, alignItems: 'start' }}>
         {viewer}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
           <div role="tablist" aria-label="Seções do documento" className="co-seg">
@@ -408,6 +414,7 @@ function DataTab({ doc, narrow, onSave }: { doc: CompanyDoc; narrow: boolean; on
 }
 
 function TextTab({ id }: { id: string }) {
+  const narrow = useYui((s) => s.narrow)
   const [md, setMd] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   useEffect(() => {
@@ -418,7 +425,7 @@ function TextTab({ id }: { id: string }) {
   if (md === null) return <div style={{ color: C.t2, fontSize: 13 }}>Carregando…</div>
   if (!md.trim()) return <div style={{ color: C.t2, fontSize: 13 }}>Ainda sem texto — a leitura não terminou.</div>
   return (
-    <div className="co-card" style={{ display: 'flex', overflow: 'hidden', maxHeight: 'calc(100dvh - 300px)', minHeight: 300 }}>
+    <div className="co-card" style={{ display: 'flex', overflow: 'hidden', maxHeight: narrow ? 'calc(var(--vvh) - var(--tabbar) - 120px)' : 'calc(100dvh - 300px)', minHeight: narrow ? 200 : 300 }}>
       <article className="vault-read app-scroll" style={{ background: 'transparent' }} dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   )
@@ -451,6 +458,7 @@ function ChunksTab({ id }: { id: string }) {
 }
 
 function UsesTab({ id }: { id: string }) {
+  const narrow = useYui((s) => s.narrow)
   const [uses, setUses] = useState<CompanyUse[] | null>(null)
   useEffect(() => {
     api.get<CompanyUse[]>(`/api/company/documents/${id}/uses`).then(setUses).catch(() => setUses([]))
@@ -462,12 +470,26 @@ function UsesTab({ id }: { id: string }) {
       {!uses.length && <span style={{ fontSize: 13, color: C.t3 }}>Ninguém consultou este documento ainda.</span>}
       {uses.map((u, i) => {
         const c = u.who === 'Yui' ? C.cyan : u.who === 'Painel' ? C.t2 : C.violet
+        const score = u.score == null ? '' : `score ${u.score.toFixed(2).replace('.', ',')}`
+        // celular: cartão empilhado (quem · quando · score em cima, pergunta embaixo)
+        if (narrow)
+          return (
+            <div key={i} className="co-card" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 14px', fontSize: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <span style={{ color: c, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{u.who}</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: '#8c92ad', flexShrink: 0 }}>{fmtDate(u.at)}</span>
+                <span style={{ flex: 1 }} />
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: C.t2, flexShrink: 0 }}>{score}</span>
+              </div>
+              <span style={{ color: '#dfe3f3', overflowWrap: 'anywhere', lineHeight: 1.45 }}>{u.query}</span>
+            </div>
+          )
         return (
           <div key={i} className="co-card" style={{ display: 'grid', gridTemplateColumns: 'minmax(70px, 90px) minmax(80px, 120px) minmax(0, 1fr) 80px', gap: 12, alignItems: 'center', padding: '12px 14px', fontSize: 13 }}>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: '#8c92ad' }}>{fmtDate(u.at)}</span>
             <span style={{ color: c, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.who}</span>
             <span style={{ color: '#dfe3f3', overflowWrap: 'anywhere' }}>{u.query}</span>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: C.t2, textAlign: 'right' }}>{u.score == null ? '' : `score ${u.score.toFixed(2).replace('.', ',')}`}</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: C.t2, textAlign: 'right' }}>{score}</span>
           </div>
         )
       })}

@@ -7,6 +7,7 @@
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone"],
   "orientation": "any",
   "background_color": "#06070d",
   "theme_color": "#06070d",
@@ -19,6 +20,7 @@
   ],
   "shortcuts": [
     { "name": "Falar com a Yui", "short_name": "Falar", "url": "/?voice=1", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Aprovações", "url": "/app/inbox", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
     { "name": "Terminal", "url": "/terminal", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
     { "name": "Execuções", "url": "/runs", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
     { "name": "Workflows", "url": "/workflows", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }

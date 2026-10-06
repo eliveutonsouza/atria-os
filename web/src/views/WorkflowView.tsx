@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   Background,
   BackgroundVariant,
   Controls,
   MiniMap,
+  Panel,
   ReactFlow,
   ReactFlowProvider,
+  useReactFlow,
   type Connection,
   type Edge,
   type NodeChange,
@@ -24,6 +26,7 @@ import { connect, disconnect, nextId, removeStep, toFlow, type FlowNode } from '
 import { nodeTypes, TYPE_META } from '../workflow/StepNode'
 import { DeleteWorkflowModal } from '../workflow/DeleteWorkflow'
 import { CRON_PRESETS, describeCron, send } from '../workflow/http'
+import { ActionSheet, BottomSheet } from './Sheet'
 import { ErrorNote, Skeleton, useHeader } from './ui'
 
 // Editor de workflow: fluxograma (@xyflow/react) ⇄ markdown canônico, com execução ao vivo.
@@ -69,6 +72,14 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
   const [runId, setRunId] = useState<string | null>(runParam)
   const [schedOpen, setSchedOpen] = useState(false)
   const [delOpen, setDelOpen] = useState(false)
+  const device = useYui((s) => s.device)
+  const coarse = useYui((s) => s.coarse)
+  const phone = device === 'phone'
+  const tablet = device === 'tablet'
+  // celular: abas Fluxo · Passos · Markdown · Execuções; propriedades do passo numa folha inferior
+  const [ptab, setPtab] = useState<'flow' | 'steps' | 'md' | 'runs'>('flow')
+  const [sheet, setSheet] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
   const agents = useApi<AgentInfo[]>('/api/agents').data ?? []
   const agentNames = useMemo(() => Object.fromEntries(agents.map((a) => [a.id, a.name])), [agents])
   const liveRun = useYui((s) => (runId ? s.workflowRuns[runId] : undefined))
@@ -79,6 +90,14 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
   const dirty = md !== savedMd
   const errors = useMemo(() => validateWorkflow(draft), [draft])
   const mdFocus = useRef(false)
+  const goTab = (t: 'props' | 'md' | 'mmd' | 'runs') => {
+    setTab(t)
+    if (t === 'md' || t === 'runs') setPtab(t)
+  }
+  const openStep = (id: string) => {
+    setSelected(id)
+    setSheet(true)
+  }
 
   // markdown acompanha o grafo (exceto enquanto o usuário edita o texto)
   useEffect(() => {
@@ -138,6 +157,7 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
     })
     setSelected(id)
     setTab('props')
+    if (phone) setSheet(true)
   }
 
   const applyMarkdown = (text: string, adopt = true) => {
@@ -180,7 +200,7 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
       const r = await send<WorkflowRunInfo>('POST', `/api/workflows/${encodeURIComponent(s)}/run`, {})
       useYui.getState().set({ workflowRuns: { ...useYui.getState().workflowRuns, [r.id]: r } })
       setRunId(r.id)
-      setTab('runs')
+      goTab('runs')
       say(`Rodando "${draft.name}". Acompanhe os passos acendendo no fluxograma.`)
     } catch (e) {
       say(`Não consegui rodar: ${(e as Error).message}.`)
@@ -206,7 +226,7 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
       await navigator.clipboard.writeText(md)
       say('Markdown copiado.')
     } catch {
-      setTab('md')
+      goTab('md')
       say('Não consegui acessar a área de transferência — o markdown está na aba Markdown para copiar.')
     }
   }
@@ -215,9 +235,9 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
       const t = await navigator.clipboard.readText()
       setMdText(t)
       if (applyMarkdown(t)) say('Workflow colado. Confira o fluxograma e salve.')
-      setTab('md')
+      goTab('md')
     } catch {
-      setTab('md')
+      goTab('md')
       say('Cole o markdown na aba Markdown (Ctrl+V) — o fluxograma atualiza sozinho.')
     }
   }
@@ -233,29 +253,236 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
     draft.name,
     [
       { label: busy ? 'Salvando…' : dirty || isNew ? 'Salvar' : 'Salvo', fn: () => void save() },
-      running ? { label: 'Parar execução', fn: () => void cancelRun() } : { label: 'Rodar agora', fn: () => void runNow() },
+      running ? { label: 'Parar execução', fn: () => void cancelRun(), primary: true } : { label: 'Rodar agora', fn: () => void runNow(), primary: true },
       { label: 'Agendar', fn: () => setSchedOpen((o) => !o) },
       { label: 'Todos os workflows', fn: () => useYui.getState().show('workflows') },
-      ...(isNew ? [] : [{ label: 'Excluir workflow', fn: () => setDelOpen(true) }]),
+      ...(isNew ? [] : [{ label: 'Excluir workflow', fn: () => setDelOpen(true), danger: true }]),
     ],
     [busy, dirty, isNew, running, draft.name, draft.trigger.cron, errors.length],
   )
 
   const sel = draft.nodes.find((n) => n.id === selected) ?? null
+  const removeSel = () => {
+    if (!sel) return
+    update((ns) => removeStep(ns, sel.id))
+    setSelected(null)
+    setSheet(false)
+  }
+  const PALETTE: WorkflowNodeType[] = ['task', 'decision', 'approval', 'parallel', 'end']
+
+  const canvas = (
+    <ReactFlow
+      nodes={flow.nodes}
+      edges={flow.edges}
+      nodeTypes={nodeTypes}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      onConnect={onConnect}
+      onNodeClick={phone ? (_, n) => openStep(n.id) : undefined}
+      onPaneClick={() => setSelected(null)}
+      colorMode="dark"
+      fitView
+      fitViewOptions={{ padding: 0.25 }}
+      deleteKeyCode={['Delete', 'Backspace']}
+      proOptions={{ hideAttribution: true }}
+      minZoom={0.3}
+      panOnDrag
+      zoomOnPinch
+      preventScrolling
+      connectionRadius={coarse ? 32 : 20}
+    >
+      <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(160,170,255,.18)" />
+      {coarse ? <TouchControls /> : <Controls showInteractive={false} />}
+      {!phone && draft.nodes.length > 8 && <MiniMap pannable zoomable style={{ width: 150, height: 96 }} nodeColor={(n) => TYPE_META[(n as FlowNode).data.step.type].color} maskColor="rgba(6,7,13,.6)" />}
+    </ReactFlow>
+  )
+
+  const schedPanel = schedOpen && (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', padding: '10px 12px', borderRadius: 14, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)' }}>
+      <span className="wf-label" style={{ margin: '0 6px 0 0' }}>Agendar</span>
+      {CRON_PRESETS.map((p) => (
+        <button key={p.label} className="wf-btn" onClick={() => void schedule(p.cron)} aria-pressed={draft.trigger.cron === p.cron}>
+          {p.label}
+        </button>
+      ))}
+      <CustomCron initial={draft.trigger.cron ?? ''} onApply={(c) => void schedule(c)} />
+    </div>
+  )
+
+  const errorsBox = errors.length > 0 && (
+    <div style={{ fontSize: 12.5, color: '#f5c97a', padding: '8px 12px', borderRadius: 10, background: 'rgba(245,181,74,.06)', border: '1px solid rgba(245,181,74,.2)' }}>
+      {errors.slice(0, 3).join(' · ')}
+    </div>
+  )
+
+  const mdPane = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: phone ? undefined : '100%' }}>
+      <div style={{ fontSize: 12, color: C.t3 }}>Edite ou cole o markdown — o fluxograma atualiza. É o mesmo texto que os agentes leem.</div>
+      {phone && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <button className="wf-btn" onClick={() => void copyMd()}>Copiar markdown</button>
+          <button className="wf-btn" onClick={() => void pasteMd()}>Colar markdown</button>
+        </div>
+      )}
+      <textarea
+        className="wf-input wf-mono"
+        aria-label="Markdown do workflow"
+        spellCheck={false}
+        value={mdText}
+        onFocus={() => (mdFocus.current = true)}
+        onBlur={() => {
+          mdFocus.current = false
+          if (mdText !== md) applyMarkdown(mdText)
+        }}
+        onChange={(e) => {
+          setMdText(e.target.value)
+          applyMarkdown(e.target.value)
+        }}
+        style={{ flex: 1, minHeight: phone ? 320 : 360 }}
+      />
+      {mdError && <div style={{ fontSize: 12, color: C.crit }}>{mdError}</div>}
+    </div>
+  )
+
+  const deleteModal = delOpen && initial && (
+    <DeleteWorkflowModal
+      slug={initial.slug}
+      name={initial.name}
+      rows={[
+        { label: 'Passos', value: String(initial.nodes.length) },
+        { label: 'Gatilho', value: describeCron(initial.trigger.type === 'cron' ? initial.trigger.cron : null) },
+        ...(running ? [{ label: 'Em execução agora', value: 'será interrompida' }] : []),
+      ]}
+      onClose={() => setDelOpen(false)}
+      onDeleted={() => useYui.getState().show('workflows')}
+    />
+  )
+
+  if (phone) {
+    const PTABS = [
+      ['flow', 'Fluxo'],
+      ['steps', 'Passos'],
+      ['md', 'Markdown'],
+      ['runs', 'Execuções'],
+    ] as const
+    const toolbar = (
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="wf-btn" onClick={() => setAddOpen(true)} style={{ flex: 1 }}>+ Passo</button>
+        {(dirty || isNew) && (
+          <button className="wf-btn primary" disabled={busy} onClick={() => void save()} style={{ flex: 1 }}>
+            {busy ? 'Salvando…' : 'Salvar'}
+          </button>
+        )}
+      </div>
+    )
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <input className="wf-input" aria-label="Nome do workflow" value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} style={{ width: '100%', fontWeight: 600 }} />
+        <div role="tablist" aria-label="Seções do workflow" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 4, padding: 4, borderRadius: 14, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)' }}>
+          {PTABS.map(([id, label]) => (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={ptab === id}
+              onClick={() => setPtab(id)}
+              style={{
+                minHeight: 40, padding: '0 2px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'Manrope, sans-serif',
+                background: ptab === id ? 'rgba(103,216,242,.16)' : 'transparent', color: ptab === id ? C.text : C.t3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {schedPanel}
+        {errorsBox}
+        {ptab === 'flow' && (
+          <>
+            {toolbar}
+            <div className="wf-canvas" style={{ height: 'calc(var(--vvh) - 300px)', minHeight: 320, borderRadius: 16, border: '1px solid rgba(255,255,255,.06)', background: 'rgba(0,0,0,.22)', overflow: 'hidden' }}>
+              {canvas}
+            </div>
+            <div style={{ fontSize: 12, color: C.t3 }}>Toque num passo para editar. Arraste do ponto de baixo de um passo até outro para ligar.</div>
+          </>
+        )}
+        {ptab === 'steps' && (
+          <>
+            {toolbar}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {draft.nodes.map((n) => {
+                const meta = TYPE_META[n.type]
+                const st = run?.nodes[n.id]?.status
+                return (
+                  <button
+                    key={n.id}
+                    onClick={() => openStep(n.id)}
+                    style={{
+                      minHeight: 56, padding: '10px 14px', borderRadius: 14, border: `1px solid ${selected === n.id ? meta.color : 'rgba(255,255,255,.07)'}`, background: 'rgba(255,255,255,.03)',
+                      color: C.text, textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12,
+                    }}
+                  >
+                    <span style={{ color: meta.color, width: 18, textAlign: 'center', flexShrink: 0 }}>{meta.icon}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 15, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {n.id}. {n.title}
+                      </span>
+                      <span style={{ display: 'block', fontSize: 12, color: n.type === 'task' && !n.agent ? C.crit : C.t3, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {meta.label}
+                        {n.type === 'task' ? ` · ${n.agent ? (agentNames[n.agent] ?? n.agent) : 'sem agente'}` : ''}
+                        {st && st !== 'pending' ? ` · ${st}` : ''}
+                      </span>
+                    </span>
+                    <span aria-hidden style={{ color: C.t3 }}>›</span>
+                  </button>
+                )
+              })}
+            </div>
+            <div style={{ marginTop: 6, padding: 16, borderRadius: 16, border: '1px solid rgba(255,255,255,.06)', background: 'rgba(255,255,255,.02)' }}>
+              <WorkflowProps draft={draft} setDraft={setDraft} />
+            </div>
+          </>
+        )}
+        {ptab === 'md' && (
+          <>
+            {mdPane}
+            <details>
+              <summary style={{ minHeight: 44, display: 'flex', alignItems: 'center', fontSize: 13, color: C.t2, cursor: 'pointer' }}>Ver em Mermaid</summary>
+              <MermaidTab draft={draft} run={run} />
+            </details>
+          </>
+        )}
+        {ptab === 'runs' && <RunsPanel runs={runs.data ?? []} current={run} onPick={(id) => setRunId(id)} steps={draft.nodes} />}
+        {sheet && sel && (
+          <BottomSheet label={`Passo ${sel.id}: ${sel.title}`} onClose={() => setSheet(false)}>
+            <StepProps step={sel} steps={draft.nodes} agents={agents} touch onChange={(p) => patchStep(sel.id, p)} onDelete={removeSel} />
+            <button className="wf-btn primary" onClick={() => setSheet(false)} style={{ height: 48, flexShrink: 0 }}>Pronto</button>
+          </BottomSheet>
+        )}
+        {addOpen && (
+          <ActionSheet
+            title={sel ? `Novo passo depois de ${sel.id}. ${sel.title}` : 'Novo passo'}
+            actions={PALETTE.map((t) => ({ label: `${TYPE_META[t].icon}  ${TYPE_META[t].label}`, fn: () => addStep(t) }))}
+            onClose={() => setAddOpen(false)}
+          />
+        )}
+        {deleteModal}
+      </div>
+    )
+  }
 
   return (
-    <div style={{ height: '100%', minHeight: 540, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* barra: nome, paleta de nós, markdown */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+    <div style={{ height: '100%', minHeight: tablet ? 460 : 540, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* barra: nome, paleta de nós, markdown (tablet: uma linha rolável) */}
+      <div className={tablet ? 'h-scroll' : undefined} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: tablet ? 'nowrap' : 'wrap' }}>
         <input
           className="wf-input"
           aria-label="Nome do workflow"
           value={draft.name}
           onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-          style={{ maxWidth: 260, fontWeight: 600 }}
+          style={tablet ? { width: 200, fontWeight: 600 } : { maxWidth: 260, fontWeight: 600 }}
         />
         <span style={{ width: 1, height: 22, background: 'rgba(255,255,255,.08)', margin: '0 4px' }} />
-        {(['task', 'decision', 'approval', 'parallel', 'end'] as WorkflowNodeType[]).map((t) => (
+        {PALETTE.map((t) => (
           <button key={t} className="wf-btn" onClick={() => addStep(t)} title={`Adicionar ${TYPE_META[t].label.toLowerCase()}${selected ? ' depois do passo selecionado' : ''}`}>
             <span style={{ color: TYPE_META[t].color, marginRight: 6 }}>{TYPE_META[t].icon}</span>
             {TYPE_META[t].label}
@@ -266,97 +493,45 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
         <button className="wf-btn ghost" onClick={() => void pasteMd()}>Colar markdown</button>
       </div>
 
-      {schedOpen && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', padding: '10px 12px', borderRadius: 14, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)' }}>
-          <span className="wf-label" style={{ margin: '0 6px 0 0' }}>Agendar</span>
-          {CRON_PRESETS.map((p) => (
-            <button key={p.label} className="wf-btn" onClick={() => void schedule(p.cron)} aria-pressed={draft.trigger.cron === p.cron}>
-              {p.label}
-            </button>
-          ))}
-          <CustomCron initial={draft.trigger.cron ?? ''} onApply={(c) => void schedule(c)} />
-        </div>
-      )}
+      {schedPanel}
+      {errorsBox}
 
-      {errors.length > 0 && (
-        <div style={{ fontSize: 12.5, color: '#f5c97a', padding: '8px 12px', borderRadius: 10, background: 'rgba(245,181,74,.06)', border: '1px solid rgba(245,181,74,.2)' }}>
-          {errors.slice(0, 3).join(' · ')}
-        </div>
-      )}
-
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <div className="wf-canvas" style={{ flex: '1 1 480px', minHeight: 440, borderRadius: 16, border: '1px solid rgba(255,255,255,.06)', background: 'rgba(0,0,0,.22)', overflow: 'hidden' }}>
-          <ReactFlow
-            nodes={flow.nodes}
-            edges={flow.edges}
-            nodeTypes={nodeTypes}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onPaneClick={() => setSelected(null)}
-            colorMode="dark"
-            fitView
-            fitViewOptions={{ padding: 0.25 }}
-            deleteKeyCode={['Delete', 'Backspace']}
-            proOptions={{ hideAttribution: true }}
-            minZoom={0.3}
-          >
-            <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="rgba(160,170,255,.18)" />
-            <Controls showInteractive={false} />
-            {draft.nodes.length > 8 && <MiniMap pannable zoomable style={{ width: 150, height: 96 }} nodeColor={(n) => TYPE_META[(n as FlowNode).data.step.type].color} maskColor="rgba(6,7,13,.6)" />}
-          </ReactFlow>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 12, flexWrap: tablet ? 'nowrap' : 'wrap' }}>
+        <div className="wf-canvas" style={{ flex: tablet ? '1 1 0' : '1 1 480px', minWidth: tablet ? 0 : undefined, minHeight: tablet ? 360 : 440, borderRadius: 16, border: '1px solid rgba(255,255,255,.06)', background: 'rgba(0,0,0,.22)', overflow: 'hidden' }}>
+          {canvas}
         </div>
 
-        <aside style={{ flex: '0 1 340px', minWidth: 280, display: 'flex', flexDirection: 'column', borderRadius: 16, border: '1px solid rgba(255,255,255,.06)', background: 'rgba(255,255,255,.02)', minHeight: 440 }}>
-          <div role="tablist" style={{ display: 'flex', gap: 16, padding: '10px 16px 0', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+        <aside style={{ flex: tablet ? '0 0 330px' : '0 1 340px', minWidth: tablet ? 0 : 280, display: 'flex', flexDirection: 'column', borderRadius: 16, border: '1px solid rgba(255,255,255,.06)', background: 'rgba(255,255,255,.02)', minHeight: tablet ? 360 : 440 }}>
+          {/* abas roláveis: as 4 não cabem em ~300px com folga */}
+          <div role="tablist" className="h-scroll" style={{ display: 'flex', gap: tablet ? 12 : 16, padding: tablet ? '10px 14px 0' : '10px 16px 0', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
             <button role="tab" className="wf-tab" aria-selected={tab === 'props'} onClick={() => setTab('props')}>Propriedades</button>
             <button role="tab" className="wf-tab" aria-selected={tab === 'md'} onClick={() => setTab('md')}>Markdown</button>
             <button role="tab" className="wf-tab" aria-selected={tab === 'mmd'} onClick={() => setTab('mmd')}>Mermaid</button>
             <button role="tab" className="wf-tab" aria-selected={tab === 'runs'} onClick={() => setTab('runs')}>Execuções</button>
           </div>
           <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 16 }}>
-            {tab === 'props' && (sel ? <StepProps step={sel} steps={draft.nodes} agents={agents} onChange={(p) => patchStep(sel.id, p)} onDelete={() => { update((ns) => removeStep(ns, sel.id)); setSelected(null) }} /> : <WorkflowProps draft={draft} setDraft={setDraft} />)}
-            {tab === 'md' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: '100%' }}>
-                <div style={{ fontSize: 12, color: C.t3 }}>Edite ou cole o markdown — o fluxograma atualiza. É o mesmo texto que os agentes leem.</div>
-                <textarea
-                  className="wf-input wf-mono"
-                  aria-label="Markdown do workflow"
-                  spellCheck={false}
-                  value={mdText}
-                  onFocus={() => (mdFocus.current = true)}
-                  onBlur={() => {
-                    mdFocus.current = false
-                    if (mdText !== md) applyMarkdown(mdText)
-                  }}
-                  onChange={(e) => {
-                    setMdText(e.target.value)
-                    applyMarkdown(e.target.value)
-                  }}
-                  style={{ flex: 1, minHeight: 360 }}
-                />
-                {mdError && <div style={{ fontSize: 12, color: C.crit }}>{mdError}</div>}
-              </div>
-            )}
+            {tab === 'props' && (sel ? <StepProps step={sel} steps={draft.nodes} agents={agents} touch={coarse} onChange={(p) => patchStep(sel.id, p)} onDelete={removeSel} /> : <WorkflowProps draft={draft} setDraft={setDraft} />)}
+            {tab === 'md' && mdPane}
             {tab === 'mmd' && <MermaidTab draft={draft} run={run} />}
             {tab === 'runs' && <RunsPanel runs={runs.data ?? []} current={run} onPick={(id) => setRunId(id)} steps={draft.nodes} />}
           </div>
         </aside>
       </div>
-      {delOpen && initial && (
-        <DeleteWorkflowModal
-          slug={initial.slug}
-          name={initial.name}
-          rows={[
-            { label: 'Passos', value: String(initial.nodes.length) },
-            { label: 'Gatilho', value: describeCron(initial.trigger.type === 'cron' ? initial.trigger.cron : null) },
-            ...(running ? [{ label: 'Em execução agora', value: 'será interrompida' }] : []),
-          ]}
-          onClose={() => setDelOpen(false)}
-          onDeleted={() => useYui.getState().show('workflows')}
-        />
-      )}
+      {deleteModal}
     </div>
+  )
+}
+
+// Zoom/encaixe com alvos de 44px para toque (os Controls do xyflow são pequenos demais).
+function TouchControls() {
+  const rf = useReactFlow()
+  const btn: CSSProperties = { width: 44, height: 44, border: 'none', background: 'rgba(16,20,42,.92)', color: '#dfe3f3', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }
+  return (
+    <Panel position="bottom-left" style={{ display: 'flex', flexDirection: 'column', gap: 1, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.08)' }}>
+      <button aria-label="Aproximar" style={btn} onClick={() => void rf.zoomIn()}>+</button>
+      <button aria-label="Afastar" style={btn} onClick={() => void rf.zoomOut()}>−</button>
+      <button aria-label="Encaixar fluxo na tela" style={{ ...btn, fontSize: 16 }} onClick={() => void rf.fitView({ padding: 0.25 })}>⤢</button>
+    </Panel>
   )
 }
 
@@ -424,7 +599,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const listText = (xs?: string[]) => (xs ?? []).join(', ')
 const textList = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean)
 
-function StepProps({ step, steps, agents, onChange, onDelete }: { step: WorkflowNode; steps: WorkflowNode[]; agents: AgentInfo[]; onChange: (p: Partial<WorkflowNode>) => void; onDelete: () => void }) {
+// touch: sem tecla Delete, as ligações que saem do passo ganham botão de excluir.
+function StepProps({ step, steps, agents, touch, onChange, onDelete }: { step: WorkflowNode; steps: WorkflowNode[]; agents: AgentInfo[]; touch?: boolean; onChange: (p: Partial<WorkflowNode>) => void; onDelete: () => void }) {
   const others = steps.filter((s) => s.id !== step.id)
   return (
     <div>
@@ -438,7 +614,7 @@ function StepProps({ step, steps, agents, onChange, onDelete }: { step: Workflow
           ))}
         </select>
         <span style={{ flex: 1 }} />
-        <button className="wf-btn ghost" onClick={onDelete} style={{ color: '#f39aa4' }}>Excluir</button>
+        <button className="wf-btn ghost" onClick={onDelete} style={{ color: '#f39aa4' }}>{touch ? 'Excluir passo' : 'Excluir'}</button>
       </div>
       <Field label="Título">
         <input className="wf-input" value={step.title} onChange={(e) => onChange({ title: e.target.value })} />
@@ -508,7 +684,7 @@ function StepProps({ step, steps, agents, onChange, onDelete }: { step: Workflow
                   <option key={s.id} value={s.id}>{s.id}. {s.title}</option>
                 ))}
               </select>
-              <button className="wf-btn ghost" aria-label="Remover ramo" onClick={() => onChange({ branches: (step.branches ?? []).filter((_, j) => j !== i) })}>×</button>
+              <button className="wf-btn ghost" aria-label="Remover ramo" onClick={() => onChange({ branches: (step.branches ?? []).filter((_, j) => j !== i) })} style={touch ? { minWidth: 44, color: '#f39aa4' } : undefined}>×</button>
             </div>
           ))}
           <button
@@ -538,6 +714,21 @@ function StepProps({ step, steps, agents, onChange, onDelete }: { step: Workflow
             ))}
           </select>
         </Field>
+      )}
+      {touch && step.type !== 'decision' && (step.next ?? []).length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <span className="wf-label">Ligações que saem deste passo</span>
+          {(step.next ?? []).map((id) => (
+            <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.t2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                → {id}. {steps.find((s) => s.id === id)?.title ?? '?'}
+              </span>
+              <button className="wf-btn ghost" style={{ color: '#f39aa4' }} onClick={() => onChange({ next: (step.next ?? []).filter((x) => x !== id) })}>
+                Excluir ligação
+              </button>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )

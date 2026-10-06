@@ -125,3 +125,11 @@ select.hp-input { padding: 0 10px; }
   .hp-results { grid-template-columns: minmax(0, 1fr) !important; }
   .hp-card { break-inside: avoid; }
 }
+
+/* tablet: faq e guia em 1 coluna; receitas com lista estreita */
+html.is-tablet .hp-faq, html.is-tablet .hp-guide { grid-template-columns: minmax(0, 1fr); }
+html.is-tablet .hp-guide > aside { grid-column: auto; }
+html.is-tablet .hp-recipes { grid-template-columns: 280px minmax(0, 1fr); }
+html.is-phone .hp-toast { bottom: calc(28px + var(--tabbar)); }
+html.is-coarse .hp-tab { height: 44px; }
+html.is-coarse .hp-chip, html.is-coarse .hp-mini, html.is-coarse .hp-toc-item, html.is-coarse .hp-seg button, html.is-coarse .hp-link-row { min-height: 44px; }

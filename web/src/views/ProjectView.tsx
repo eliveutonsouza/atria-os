@@ -11,7 +11,7 @@ export function ProjectView() {
   const actions: HeaderAction[] = []
   if (data?.hasPreview) actions.push({ label: 'Live preview', fn: () => useYui.getState().show('website', { project: data.slug }) })
   if (data?.hasLogs) actions.push({ label: 'Ver logs', fn: () => useYui.getState().show('logs', { project: data.slug }) })
-  if (data?.issue) actions.push({ label: 'Pedir correção', fn: () => startRun('backend', data.slug, `Investigue e corrija o problema: ${data.issue}`) })
+  if (data?.issue) actions.push({ label: 'Pedir correção', primary: true, fn: () => startRun('backend', data.slug, `Investigue e corrija o problema: ${data.issue}`) })
   useHeader('Projeto', data?.name ?? slug ?? 'Projeto', actions, [data])
   if (!slug) return <Empty text="Nenhum projeto ativo." hint="Diga: “Abre o Stoqmate.”" />
   if (loading && !data) return <Skeleton rows={4} />
@@ -21,7 +21,7 @@ export function ProjectView() {
       {data.issue && (
         <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderRadius: 14, background: 'rgba(245,181,74,.07)', border: '1px solid rgba(245,181,74,.25)', color: '#f5c97a', fontSize: 14 }}>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.warn, boxShadow: `0 0 10px ${C.warn}`, flexShrink: 0 }} />
-          <span style={{ flex: 1 }}>{data.issue}</span>
+          <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{data.issue}</span>
         </div>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14 }}>
@@ -39,7 +39,7 @@ export function ProjectView() {
           <div key={i} style={{ display: 'grid', gridTemplateColumns: '64px 14px minmax(0,1fr)', gap: 12, alignItems: 'center', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,.05)', fontSize: 14 }}>
             <span className="mono" style={{ fontSize: 12, color: C.t3 }}>{ac.t}</span>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: toneColor(ac.tone) }} />
-            <span>{ac.label}</span>
+            <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{ac.label}</span>
           </div>
         ))}
       </div>

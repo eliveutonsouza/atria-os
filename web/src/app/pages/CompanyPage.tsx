@@ -20,8 +20,9 @@ export function CompanyPage() {
   const docId = id.startsWith('doc:') ? id.slice(4) : null
   const tab: CompanyTab = docId ? 'documentos' : id === 'documentos' || id === 'busca' ? id : 'perfil'
   const [docs, setDocs] = useState<number | null>(null)
+  const narrow = useYui((s) => s.narrow)
 
-  useHeader('Conhecimento · empresa', 'Empresa', tab === 'documentos' && !docId ? [] : [{ label: '+ Enviar documentos', fn: () => goTab('documentos') }], [tab, docId])
+  useHeader('Conhecimento · empresa', 'Empresa', tab === 'documentos' && !docId ? [] : [{ label: '+ Enviar documentos', primary: true, fn: () => goTab('documentos') }], [tab, docId])
 
   useEffect(() => {
     const load = () => api.get<CompanyStats>('/api/company/stats').then((s) => setDocs(s.docs)).catch(() => {})
@@ -40,7 +41,8 @@ export function CompanyPage() {
 
   return (
     <div className="co-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
-      <Tabs active={tab} docs={docs} />
+      {/* celular: detalhe do documento em tela cheia, sem as abas */}
+      {!(narrow && docId) && <Tabs active={tab} docs={docs} />}
       {docId ? <DocDetail key={docId} id={docId} /> : tab === 'documentos' ? <DocsTab /> : tab === 'busca' ? <SearchTab /> : <ProfileTab />}
     </div>
   )

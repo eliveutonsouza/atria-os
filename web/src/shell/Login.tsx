@@ -10,6 +10,14 @@ const field = { flex: 1, minWidth: 0, height: 40, border: 'none', outline: 'none
 const box = (err: boolean) =>
   ({ width: 'min(420px,100%)', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 7px 7px 16px', background: 'rgba(16,20,42,.78)', border: `1px solid ${err ? 'rgba(240,98,114,.45)' : 'rgba(160,170,255,.14)'}`, borderRadius: 18, backdropFilter: 'blur(16px)' }) as const
 
+// Posição do formulário: ~36% + offset abaixo do orbe, mas sobe (sem passar da safe area) quando a altura
+// visível encolhe (celular deitado, teclado aberto — o main termina em var(--kb)). h = altura aproximada do form.
+const formBox = (offset: number, h: number) => {
+  const top = `max(calc(12px + var(--sat, 0px)), min(calc(36% + ${offset}px), calc(100% - ${h}px - var(--sab, 0px))))`
+  return { top, maxHeight: `calc(100% - ${top})`, overflowY: 'auto', padding: '0 calc(24px + var(--sar, 0px)) calc(8px + var(--sab, 0px)) calc(24px + var(--sal, 0px))' } as const
+}
+const mainBox = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 'var(--kb, 0px)', overflow: 'hidden', background: 'radial-gradient(120% 90% at 50% 28%, #0f1533 0%, #0a0c1d 45%, #06070d 100%)' } as const
+
 // Instalação nova: ninguém tem senha ainda — quem abre o painel cria o acesso.
 function CreateAccess() {
   const [name, setName] = useState('')
@@ -39,7 +47,7 @@ function CreateAccess() {
     }
   }
   return (
-    <form onSubmit={submit} style={{ position: 'absolute', left: 0, right: 0, top: 'calc(36% + 96px)', zIndex: 25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '0 24px', textAlign: 'center' }}>
+    <form onSubmit={submit} style={{ position: 'absolute', left: 0, right: 0, ...formBox(96, 400), zIndex: 25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center' }}>
       <div style={{ fontSize: 11, letterSpacing: '.32em', color: C.t2, fontWeight: 600 }}>YUI CONSOLE · PRIMEIRO ACESSO</div>
       <div style={{ fontSize: 28, fontWeight: 300, lineHeight: 1.3 }}>Olá. Vamos criar o seu acesso.</div>
       <div style={{ fontSize: 14, color: C.t2, maxWidth: 420, marginBottom: 6 }}>Depois eu te guio para conectar sua conta Claude, o GitHub e a OpenAI aqui mesmo no painel.</div>
@@ -63,7 +71,7 @@ export function Login() {
   if (needsPassword === null) return <main style={{ position: 'fixed', inset: 0, background: '#06070d' }} />
   if (needsPassword)
     return (
-      <main style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: 'radial-gradient(120% 90% at 50% 28%, #0f1533 0%, #0a0c1d 45%, #06070d 100%)' }}>
+      <main style={mainBox}>
         <OrbLayer />
         <CreateAccess />
       </main>
@@ -100,11 +108,11 @@ function PasswordLogin() {
     }
   }
   return (
-    <main style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: 'radial-gradient(120% 90% at 50% 28%, #0f1533 0%, #0a0c1d 45%, #06070d 100%)' }}>
+    <main style={mainBox}>
       <OrbLayer />
       <form
         onSubmit={submit}
-        style={{ position: 'absolute', left: 0, right: 0, top: 'calc(36% + 104px)', zIndex: 25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '0 24px', textAlign: 'center' }}
+        style={{ position: 'absolute', left: 0, right: 0, ...formBox(104, 210), zIndex: 25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center' }}
       >
         <div style={{ fontSize: 11, letterSpacing: '.32em', color: C.t2, fontWeight: 600 }}>YUI CONSOLE</div>
         <div style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.3 }}>{greeting()} Quem é você?</div>

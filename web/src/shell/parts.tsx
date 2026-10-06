@@ -103,7 +103,9 @@ export function TopBar() {
   const inbox = useYui((s) => s.inbox)
   const status = useYui((s) => s.status)
   const narrow = useYui((s) => s.narrow)
+  const coarse = useYui((s) => s.coarse)
   const app = useYui((s) => s.shellMode === 'app')
+  const bh = coarse ? 44 : 32 // alvos de toque ≥44px
   const name = projects.find((p) => p.slug === activeProject)?.name ?? activeProject ?? 'Nenhum'
   const set = useYui((s) => s.set)
   return (
@@ -120,7 +122,7 @@ export function TopBar() {
           onClick={() => set({ palette: true, inboxOpen: false })}
           className="hov-bg"
           aria-label="Abrir comandos (Ctrl K)"
-          style={{ display: 'flex', alignItems: 'center', gap: 10, height: 36, padding: '0 12px 0 10px', borderRadius: 12, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.03)', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 600, letterSpacing: '.14em' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, height: coarse ? 44 : 36, padding: '0 12px 0 10px', borderRadius: 12, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.03)', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 600, letterSpacing: '.14em' }}
         >
           <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, #fff, #67d8f2 45%, #a68cf7)' }} />
           <span>YUI</span>
@@ -146,7 +148,7 @@ export function TopBar() {
         {inbox.length > 0 && (
           <button
             onClick={() => set({ inboxOpen: !useYui.getState().inboxOpen })}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(245,181,74,.25)', background: 'rgba(245,181,74,.06)', color: '#f5c97a', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, height: bh, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(245,181,74,.25)', background: 'rgba(245,181,74,.06)', color: '#f5c97a', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
           >
             <span>{inbox.length}</span>
             {!narrow && <span style={{ fontWeight: 500 }}>pendências</span>}
@@ -160,7 +162,7 @@ export function TopBar() {
           }}
           className="hov-txt"
           title="Terminal (Ctrl+`)"
-          style={{ height: 32, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.03)', color: C.t2, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+          style={{ height: bh, minWidth: coarse ? 44 : undefined, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.03)', color: C.t2, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
         >
           <span className="mono" style={{ fontSize: 11, color: C.cyan }}>&gt;_</span>
           {!narrow && 'Terminal'}
@@ -169,7 +171,7 @@ export function TopBar() {
           onClick={() => set({ histOpen: !useYui.getState().histOpen, inboxOpen: false })}
           className="hov-txt"
           title="Conversa"
-          style={{ height: 32, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.03)', color: C.t2, fontSize: 12, cursor: 'pointer' }}
+          style={{ height: bh, minWidth: coarse ? 44 : undefined, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.03)', color: C.t2, fontSize: 12, cursor: 'pointer' }}
         >
           {narrow ? '≡' : 'Histórico'}
         </button>
@@ -188,6 +190,7 @@ export function YuiCenter() {
   const brief = useYui((s) => s.brief)
   const liveTranscript = useYui((s) => s.liveTranscript)
   const app = useYui((s) => s.shellMode === 'app')
+  const coarse = useYui((s) => s.coarse)
   const isC = mode === 'center' && !app
   const [label, color] = STATE_META[yst] ?? STATE_META.idle
   const showSugg = !(short && showLines)
@@ -196,7 +199,7 @@ export function YuiCenter() {
       aria-live="polite"
       style={{
         position: 'absolute', left: 0, right: 0, top: short ? 'calc(24% + 80px)' : 'calc(36% + 104px)', bottom: 'calc(104px + var(--sab) + var(--kb))', overflow: 'hidden',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: short ? 10 : 16, textAlign: 'center', padding: '0 24px', zIndex: 25,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: short ? 10 : 16, textAlign: 'center', padding: '0 calc(24px + var(--sar, 0px)) 0 calc(24px + var(--sal, 0px))', zIndex: 25,
         transition: 'opacity .3s, transform .55s var(--ease), visibility .3s', opacity: isC ? 1 : 0, transform: isC ? 'none' : app ? 'translateY(14px) scale(.97)' : 'translateX(-80px) scale(.96)', pointerEvents: isC ? 'auto' : 'none', visibility: app ? 'hidden' : 'visible',
       }}
     >
@@ -220,7 +223,7 @@ export function YuiCenter() {
       {showSugg && (
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 18px', marginTop: short ? 8 : 22, maxWidth: 720, fontSize: 13 }}>
           {SUGGESTIONS.map((t) => (
-            <button key={t} onClick={() => submitText(t)} className="hov-sugg" style={{ border: 'none', background: 'transparent', color: C.t3, cursor: 'pointer', padding: '4px 2px', fontSize: 13 }}>
+            <button key={t} onClick={() => submitText(t)} className="hov-sugg" style={{ border: 'none', background: 'transparent', color: C.t3, cursor: 'pointer', padding: '4px 2px', fontSize: 13, minHeight: coarse ? 44 : undefined }}>
               “{t}”
             </button>
           ))}
@@ -238,6 +241,7 @@ export function YuiLeft() {
   const pending = useYui((s) => s.pending)
   const view = useYui((s) => s.view)
   const app = useYui((s) => s.shellMode === 'app')
+  const coarse = useYui((s) => s.coarse)
   const isC = mode === 'center', isF = mode === 'focus'
   const vis = !isC && !isF && !narrow && !app
   const [label, color] = STATE_META[yst] ?? STATE_META.idle
@@ -245,7 +249,7 @@ export function YuiLeft() {
   return (
     <div
       style={{
-        position: 'absolute', left: 0, width: '24%', top: 'calc(34% + 72px)', padding: '0 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+        position: 'absolute', left: 0, width: '24%', top: 'calc(34% + 72px)', padding: '0 28px 0 calc(28px + var(--sal, 0px))', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
         textAlign: 'center', zIndex: 25, transition: 'opacity .45s, transform .55s', opacity: vis ? 1 : 0, transform: isC ? 'translateX(30%)' : 'none', pointerEvents: vis ? 'auto' : 'none',
       }}
     >
@@ -258,7 +262,7 @@ export function YuiLeft() {
       {hasPending && (
         <button
           onClick={openPending}
-          style={{ marginTop: 4, height: 32, padding: '0 14px', borderRadius: 999, border: '1px solid rgba(103,216,242,.3)', background: 'rgba(103,216,242,.08)', color: '#a9e9f8', fontSize: 12, cursor: 'pointer' }}
+          style={{ marginTop: 4, height: coarse ? 44 : 32, padding: '0 14px', borderRadius: 999, border: '1px solid rgba(103,216,242,.3)', background: 'rgba(103,216,242,.08)', color: '#a9e9f8', fontSize: 12, cursor: 'pointer' }}
         >
           {pending?.label || PEND_LABELS[pending!.view] || 'Mostrar'}
         </button>

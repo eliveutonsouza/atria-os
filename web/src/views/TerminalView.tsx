@@ -6,6 +6,7 @@ import '@xterm/xterm/css/xterm.css'
 import { api } from '../api/client'
 import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
+import { TermKeys, useCtrlLatch } from './TermKeys'
 import { useHeader } from './ui'
 
 // Terminal no container: aba Claude (Claude Code interativo no projeto) e aba Shell (bash).
@@ -34,6 +35,13 @@ export function TerminalView() {
   const [status, setStatus] = useState<'connecting' | 'open' | 'closed'>('connecting')
   const [gen, setGen] = useState(0) // força reconexão
   const hostRef = useRef<HTMLDivElement>(null)
+  const phone = useYui((s) => s.device === 'phone')
+  const coarse = useYui((s) => s.coarse)
+  const ctrl = useCtrlLatch()
+  const applyCtrl = ctrl.apply
+  // teclas da barra de toque vão pelo mesmo caminho do input do xterm
+  const sendRef = useRef<(d: string) => void>(() => {})
+  const appCursorRef = useRef<() => boolean>(() => false)
 
   useHeader(
     kind === 'claude' ? 'Terminal · Claude Code' : 'Terminal · Shell',
@@ -60,7 +68,7 @@ export function TerminalView() {
     if (!host) return
     const term = new Terminal({
       fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-      fontSize: 13,
+      fontSize: useYui.getState().device === 'phone' ? 12 : 13,
       lineHeight: 1.25,
       cursorBlink: true,
       allowTransparency: true,
@@ -97,8 +105,12 @@ export function TerminalView() {
       setStatus('closed')
       term.write(`\r\n\x1b[90m— desconectado${e.reason ? ` (${e.reason})` : ''}. Use Reconectar; a sessão continua no servidor. —\x1b[0m\r\n`)
     }
-    const data = term.onData((d) => {
+    sendRef.current = (d) => {
       if (ws.readyState === WebSocket.OPEN) ws.send(d)
+    }
+    appCursorRef.current = () => term.modes.applicationCursorKeysMode
+    const data = term.onData((d) => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(applyCtrl(d))
     })
     const ro = new ResizeObserver(() => {
       try {
@@ -115,14 +127,14 @@ export function TerminalView() {
       ws.close()
       term.dispose()
     }
-  }, [kind, slug, gen, paramCmd])
+  }, [kind, slug, gen, paramCmd, applyCtrl])
 
   const tab = (k: Kind, label: string) => (
     <button
       onClick={() => setKind(k)}
       aria-pressed={kind === k}
       style={{
-        height: 30, padding: '0 14px', borderRadius: 9, cursor: 'pointer', fontSize: 13,
+        height: coarse ? 40 : 30, padding: '0 14px', borderRadius: 9, cursor: 'pointer', fontSize: phone ? 12 : 13, flexShrink: 0, whiteSpace: 'nowrap',
         border: `1px solid ${kind === k ? 'rgba(103,216,242,.35)' : 'rgba(255,255,255,.08)'}`,
         background: kind === k ? 'rgba(103,216,242,.1)' : 'transparent', color: kind === k ? '#a9e9f8' : C.t2,
       }}
@@ -132,21 +144,24 @@ export function TerminalView() {
   )
 
   return (
-    <div style={{ height: '100%', minHeight: 420, display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ height: '100%', minHeight: phone ? 0 : 420, display: 'flex', flexDirection: 'column', gap: phone ? 8 : 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        {tab('claude', `Claude · ${slug ?? 'workspace'}`)}
-        {tab('shell', 'Shell')}
-        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.t3 }}>
+        <div className="h-scroll" style={{ minWidth: 0, flex: '0 1 auto' }}>
+          {tab('claude', `Claude · ${slug ?? 'workspace'}`)}
+          {tab('shell', 'Shell')}
+        </div>
+        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.t3, flexShrink: 0, whiteSpace: 'nowrap' }}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: status === 'open' ? C.ok : status === 'connecting' ? C.warn : C.crit }} />
           {status === 'open' ? 'conectado' : status === 'connecting' ? 'conectando…' : 'desconectado'}
         </span>
       </div>
       <div
         className="yui-terminal"
-        style={{ flex: 1, minHeight: 0, padding: '12px 14px', borderRadius: 14, background: 'rgba(0,0,0,.45)', border: '1px solid rgba(255,255,255,.06)', overflow: 'hidden' }}
+        style={{ flex: 1, minHeight: 0, padding: phone ? '8px 8px' : '12px 14px', borderRadius: 14, background: 'rgba(0,0,0,.45)', border: '1px solid rgba(255,255,255,.06)', overflow: 'hidden' }}
       >
         <div ref={hostRef} style={{ width: '100%', height: '100%' }} />
       </div>
+      {coarse && <TermKeys send={(d) => sendRef.current(d)} ctrl={ctrl} appCursor={() => appCursorRef.current()} />}
     </div>
   )
 }

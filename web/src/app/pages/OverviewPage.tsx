@@ -15,11 +15,16 @@ function greeting(name: string) {
   return name ? `${g}, ${name}` : g
 }
 
+const dayTip = (d: { date: string; done: number; routine: number; failed: number }) =>
+  `${d.date.slice(8)}/${d.date.slice(5, 7)} — ${d.done} concluídas, ${d.routine} rotinas, ${d.failed} falhas`
+
 const linkBtn = { border: 'none', background: 'transparent', color: '#7fdcf5', fontSize: 12, cursor: 'pointer' } as const
 
 export function OverviewPage() {
   const userName = useYui((s) => s.userName)
   const [days, setDays] = useState<7 | 30>(7)
+  const coarse = useYui((s) => s.coarse)
+  const [selDay, setSelDay] = useState<string | null>(null) // no toque: barra tocada mostra o valor
   const stats = useApi<StatsOverview>(`/api/stats/overview?days=${days}`, [days], 30000)
   const board = useApi<OpsBoard>('/api/ops/board', [], 8000)
   const [from] = useState(() => new Date())
@@ -37,6 +42,7 @@ export function OverviewPage() {
       { label: `Últimos ${days} dias`, fn: () => setDays(days === 7 ? 30 : 7) },
       {
         label: '+ Nova missão',
+        primary: true,
         fn: () => {
           useYui.getState().say('Qual é a missão? Descreva o objetivo e eu monto o plano com os agentes certos.')
           setTimeout(() => dockInput.el?.focus(), 30)
@@ -74,8 +80,9 @@ export function OverviewPage() {
               return (
                 <div
                   key={d.date}
-                  title={`${d.date.slice(8)}/${d.date.slice(5, 7)} — ${d.done} concluídas, ${d.routine} rotinas, ${d.failed} falhas`}
-                  style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: total ? 2 : 0, minWidth: 0 }}
+                  title={dayTip(d)}
+                  onClick={coarse ? () => setSelDay(selDay === d.date ? null : d.date) : undefined}
+                  style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: total ? 2 : 0, minWidth: 0, ...(coarse ? { cursor: 'pointer', opacity: selDay && selDay !== d.date ? 0.45 : 1 } : null) }}
                 >
                   {d.failed > 0 && <div style={{ height: h(d.failed), background: C.warn, borderRadius: 2, opacity: 0.85 }} />}
                   {d.routine > 0 && <div style={{ height: h(d.routine), background: C.violet, borderRadius: 2, opacity: 0.7 }} />}
@@ -97,6 +104,14 @@ export function OverviewPage() {
             ))}
             <span>hoje</span>
           </div>
+          {coarse && (
+            <div role="status" style={{ fontSize: 12.5, color: selDay ? '#c9cde0' : C.t3, minHeight: 18 }}>
+              {(() => {
+                const d = daily.find((x) => x.date === selDay)
+                return d ? dayTip(d) : 'Toque numa barra para ver o dia.'
+              })()}
+            </div>
+          )}
         </Card>
 
         <Card title="Sucesso por agente" right={`${days} dias`}>

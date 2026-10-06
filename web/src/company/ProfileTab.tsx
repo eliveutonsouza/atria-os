@@ -4,7 +4,7 @@ import { api } from '../api/client'
 import { onCompanyEvent } from '../api/events'
 import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
-import { fmtNum, goTab, initials, uploadLogo, Icon } from './api'
+import { fmtNum, goTab, initials, uploadLogo, Icon, useStacked } from './api'
 import { Svg } from './ui'
 
 // Perfil da empresa (Main.dc.html): o que entra no prompt de todo agente e da Yui.
@@ -33,6 +33,7 @@ function localPreview(f: CompanyProfileInput, stats: CompanyStats | null) {
 
 export function ProfileTab() {
   const narrow = useYui((s) => s.narrow)
+  const stacked = useStacked()
   const [profile, setProfile] = useState<CompanyProfile | null>(null)
   const [form, setForm] = useState<CompanyProfileInput>(EMPTY)
   const [stats, setStats] = useState<CompanyStats | null>(null)
@@ -106,7 +107,7 @@ export function ProfileTab() {
         </button>
       </div>
 
-      <section style={{ display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : 'minmax(0, 1fr) 360px', gap: 16, alignItems: 'start' }}>
+      <section style={{ display: 'grid', gridTemplateColumns: stacked ? 'minmax(0,1fr)' : 'minmax(0, 1fr) 360px', gap: 16, alignItems: 'start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
           <div className="co-card" style={{ padding: 18, display: 'grid', gridTemplateColumns: narrow ? 'minmax(0,1fr)' : '140px minmax(0, 1fr)', gap: 20 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import type { OpsBoard, OpsCard } from '@shared/protocol'
 import { useApi } from '../../api/useApi'
 import { C } from '../../lib/colors'
@@ -33,8 +33,12 @@ export function OpsPage() {
   const board = useApi<OpsBoard>('/api/ops/board', [], 5000)
   const runs = useYui((s) => s.runs)
   const inbox = useYui((s) => s.inbox)
+  const phone = useYui((s) => s.device === 'phone')
+  const coarse = useYui((s) => s.coarse)
+  // no toque: trecho tocado na linha do tempo fica marcado e o texto aparece abaixo do gráfico
+  const [selSpan, setSelSpan] = useState<{ agentId: string; i: number } | null>(null)
   useHeader('Operações · metodologia de execução', 'Quem está fazendo o quê', [
-    { label: 'Execuções', fn: () => openApp('runs') },
+    { label: 'Execuções', primary: true, fn: () => openApp('runs') },
     { label: 'Agentes', fn: () => openApp('agents') },
   ])
 
@@ -61,6 +65,23 @@ export function OpsPage() {
   const now = Date.now()
   const span0 = now - 86400_000
   const pos = (iso: string) => Math.max(0, Math.min(100, ((new Date(iso).getTime() - span0) / 86400_000) * 100))
+  const spanTip = (sp: { task: string; start: string }) => `${sp.task} — ${new Date(sp.start).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+  // trechos são finos demais para o dedo: pega o mais próximo do ponto tocado na linha
+  const pickSpan = (g: NonNullable<typeof d>['gantt'][number], e: MouseEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    const at = ((e.clientX - r.left) / r.width) * 100
+    let best = -1
+    let bestDist = Infinity
+    g.spans.forEach((sp, i) => {
+      const a = pos(sp.start)
+      const b = pos(sp.end ?? new Date().toISOString())
+      const dist = at < a ? a - at : at > b ? at - b : 0
+      if (dist < bestDist) { best = i; bestDist = dist }
+    })
+    if (best < 0 || bestDist > 8) return setSelSpan(null)
+    setSelSpan(selSpan?.agentId === g.agentId && selSpan.i === best ? null : { agentId: g.agentId, i: best })
+  }
+  const selected = selSpan ? d?.gantt.find((g) => g.agentId === selSpan.agentId)?.spans[selSpan.i] : undefined
 
   return (
     <>
@@ -134,31 +155,42 @@ export function OpsPage() {
         })}
       </section>
 
-      <Card title="Linha do tempo · 24h" right={<span className="app-mono" style={{ fontSize: 10 }}>−24h · −18h · −12h · −6h · agora</span>}>
+      <Card title="Linha do tempo · 24h" right={phone ? undefined : <span className="app-mono" style={{ fontSize: 10, whiteSpace: 'normal', textAlign: 'right' }}>−24h · −18h · −12h · −6h · agora</span>}>
         {(d?.gantt ?? []).length === 0 && <span className="app-muted">Nenhuma execução nas últimas 24 horas.</span>}
         {(d?.gantt ?? []).map((g) => (
-          <div key={g.agentId} style={{ display: 'grid', gridTemplateColumns: '100px minmax(0,1fr)', alignItems: 'center', gap: 10, fontSize: 12 }}>
-            <button onClick={() => openApp('agents', g.agentId)} style={{ border: 'none', background: 'transparent', color: '#c9cde0', textAlign: 'left', cursor: 'pointer', padding: 0, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div key={g.agentId} style={{ display: 'grid', gridTemplateColumns: phone ? '76px minmax(0,1fr)' : '100px minmax(0,1fr)', alignItems: 'center', gap: 10, fontSize: 12 }}>
+            <button onClick={() => openApp('agents', g.agentId)} style={{ border: 'none', background: 'transparent', color: '#c9cde0', textAlign: 'left', cursor: 'pointer', padding: 0, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', ...(coarse ? { minHeight: 44 } : null) }}>
               {g.agent}
             </button>
-            <div style={{ position: 'relative', height: 14, borderRadius: 4, background: 'rgba(255,255,255,.03)' }}>
+            <div onClick={coarse ? (e) => pickSpan(g, e) : undefined} style={{ position: 'relative', height: 14, borderRadius: 4, background: 'rgba(255,255,255,.03)', ...(coarse ? { cursor: 'pointer' } : null) }}>
               {[25, 50, 75].map((x) => <span key={x} style={{ position: 'absolute', left: `${x}%`, top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,.05)' }} />)}
               {g.spans.map((sp, i) => {
                 const x = pos(sp.start)
                 const w = Math.max(0.6, pos(sp.end ?? new Date().toISOString()) - x)
                 const color = sp.state === 'failed' ? C.crit : sp.state === 'running' ? C.cyan : sp.state === 'waiting_approval' ? C.warn : agentColor(g.agentId)
+                const on = selSpan?.agentId === g.agentId && selSpan.i === i
                 return (
                   <span
                     key={i}
-                    title={`${sp.task} — ${new Date(sp.start).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
+                    title={spanTip(sp)}
                     className={sp.state === 'running' ? 'app-pulse' : undefined}
-                    style={{ position: 'absolute', top: 2, height: 10, left: `${x}%`, width: `${w}%`, borderRadius: 3, background: color, opacity: sp.state === 'done' ? 0.8 : 1 }}
+                    style={{ position: 'absolute', top: 2, height: 10, left: `${x}%`, width: `${w}%`, borderRadius: 3, background: color, opacity: sp.state === 'done' ? 0.8 : 1, ...(on ? { outline: '2px solid #fff', outlineOffset: 1 } : null) }}
                   />
                 )
               })}
             </div>
           </div>
         ))}
+        {phone && (d?.gantt ?? []).length > 0 && (
+          <div className="app-mono" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.t3, paddingLeft: 86 }}>
+            <span>−24h</span><span>−12h</span><span>agora</span>
+          </div>
+        )}
+        {coarse && (d?.gantt ?? []).length > 0 && (
+          <div role="status" style={{ fontSize: 12.5, color: selected ? '#c9cde0' : C.t3, minHeight: 18 }}>
+            {selected ? spanTip(selected) : 'Toque na linha de um agente para ver a execução.'}
+          </div>
+        )}
       </Card>
     </>
   )

@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react'
 import type { CompanyCategory, CompanyDoc } from '@shared/protocol'
 import { useYui } from '../store/yui'
 
@@ -153,4 +154,17 @@ export const Icon = {
   search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5',
   camera: 'M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
   download: 'M12 4v12M7 11l5 5 5-5M4 20h16',
+}
+
+// Splits viram 1 coluna no celular e no tablet com menos de ~1000px úteis (largura − rail − margens).
+const WIDE = '(min-width: 1130px)'
+const subWide = (cb: () => void) => {
+  const m = window.matchMedia(WIDE)
+  m.addEventListener('change', cb)
+  return () => m.removeEventListener('change', cb)
+}
+export function useStacked() {
+  const device = useYui((s) => s.device)
+  const wide = useSyncExternalStore(subWide, () => window.matchMedia(WIDE).matches)
+  return device === 'phone' || (device === 'tablet' && !wide)
 }

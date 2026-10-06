@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import type { AgentConfig, ClaudeInitInfo, ToolboxItem } from '@shared/protocol'
 import { api } from '../api/client'
 import { useApi } from '../api/useApi'
@@ -35,6 +35,7 @@ export function ToolsView() {
   const [tab, setTab] = useState<Tab>(paramTab && TABS.includes(paramTab) ? paramTab : 'connectors')
   const [q, setQ] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+  const phone = useYui((s) => s.device === 'phone')
   const toolbox = useApi<ToolboxItem[]>('/api/toolbox', [], 60000)
   const caps = useApi<ClaudeInitInfo | { at?: string }>('/api/capabilities')
   const agents = useApi<AgentConfig[]>('/api/agents/all')
@@ -57,7 +58,7 @@ export function ToolsView() {
     'Ferramentas · capacidades',
     'Conectores, MCP, skills e plugins',
     [
-      { label: refreshing ? 'Atualizando…' : 'Atualizar capacidades', fn: () => void refresh() },
+      { label: refreshing ? 'Atualizando…' : 'Atualizar capacidades', fn: () => void refresh(), primary: true },
       { label: 'Mapa do Claude Code', fn: () => useYui.getState().show('claude') },
     ],
     [refreshing],
@@ -88,16 +89,18 @@ export function ToolsView() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: phone ? 'repeat(4,minmax(0,1fr))' : 'repeat(auto-fit,minmax(150px,1fr))', gap: phone ? 8 : 14 }}>
         {kpis.map((k) => (
-          <div key={k.l} style={card}>
-            <div style={{ fontSize: 12, color: C.t2, marginBottom: 8 }}>{k.l}</div>
-            <div style={{ fontSize: 40, fontWeight: 300, lineHeight: 1, letterSpacing: '-.02em', color: k.c }}>{k.v}</div>
+          <div key={k.l} style={phone ? { ...card, padding: '10px 8px', minWidth: 0 } : card}>
+            <div style={{ fontSize: phone ? 11 : 12, color: C.t2, marginBottom: phone ? 6 : 8, lineHeight: 1.2, overflowWrap: 'anywhere' }}>{k.l}</div>
+            <div style={{ fontSize: phone ? 24 : 40, fontWeight: 300, lineHeight: 1, letterSpacing: '-.02em', color: k.c }}>{k.v}</div>
           </div>
         ))}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <Tabs value={tab} onChange={setTab} items={TABS.map((id) => ({ id, label: labels[id], count: counts[id] }))} />
+        <div className={phone ? 'h-scroll' : undefined} style={phone ? { width: '100%', minWidth: 0 } : undefined}>
+          <Tabs value={tab} onChange={setTab} items={TABS.map((id) => ({ id, label: labels[id], count: counts[id] }))} />
+        </div>
         <SearchBox value={q} onChange={setQ} placeholder="Filtrar…" />
       </div>
       {init?.at && (
@@ -117,22 +120,30 @@ export function ToolsView() {
               const tools = (init?.tools ?? []).filter((t) => t.startsWith(prefix)).length
               const users = agentsUsingMcp(m.name, activeAgents)
               const short = m.name.replace(/^claude\.ai /, '')
+              const source = m.name.startsWith('claude.ai') ? 'claude.ai' : m.source ?? 'local'
+              const usedBy = activeAgents.length && users.length === activeAgents.length ? 'todos os agentes' : users.join(', ') || 'nenhum agente'
+              const action =
+                m.status === 'needs-auth' ? (
+                  <SmallBtn onClick={() => window.open(CONNECTORS_URL, '_blank', 'noopener')}>Autorizar</SmallBtn>
+                ) : (
+                  <SmallBtn onClick={() => submitText(`Testa o conector ${short} com uma consulta rápida somente leitura.`)}>Pedir à Yui</SmallBtn>
+                )
+              if (phone)
+                return (
+                  <PhoneRow key={m.name} name={short} pill={<StatusPill {...meta} />} desc={`${source}${tools ? ` · ${tools} ferramentas` : ''}`} agents={usedBy} action={action} />
+                )
               return (
                 <div key={m.name} style={{ display: 'grid', gridTemplateColumns: 'minmax(140px,1.2fr) 150px minmax(0,2fr) auto', gap: 14, alignItems: 'center', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,.05)', fontSize: 14 }}>
                   <span style={{ fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {short}
-                    <span style={{ fontSize: 11, color: C.t3, fontWeight: 400, marginLeft: 8 }}>{m.name.startsWith('claude.ai') ? 'claude.ai' : m.source ?? 'local'}</span>
+                    <span style={{ fontSize: 11, color: C.t3, fontWeight: 400, marginLeft: 8 }}>{source}</span>
                   </span>
                   <StatusPill {...meta} />
                   <span style={{ fontSize: 12, color: C.t3, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {tools ? `${tools} ferramentas · ` : ''}
-                    {activeAgents.length && users.length === activeAgents.length ? 'todos os agentes' : users.join(', ') || 'nenhum agente'}
+                    {usedBy}
                   </span>
-                  {m.status === 'needs-auth' ? (
-                    <SmallBtn onClick={() => window.open(CONNECTORS_URL, '_blank', 'noopener')}>Autorizar</SmallBtn>
-                  ) : (
-                    <SmallBtn onClick={() => submitText(`Testa o conector ${short} com uma consulta rápida somente leitura.`)}>Pedir à Yui</SmallBtn>
-                  )}
+                  {action}
                 </div>
               )
             })}
@@ -145,14 +156,14 @@ export function ToolsView() {
 
       {tab === 'plugins' &&
         (plugins.length ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: phone ? 'minmax(0,1fr)' : 'repeat(auto-fit,minmax(240px,1fr))', gap: 12 }}>
             {plugins.map((p) => {
               const sk = (init?.skills ?? []).filter((s) => s.startsWith(`${p.name}:`))
               const users = activeAgents.filter((a) => a.plugins.includes(p.name)).map((a) => a.name)
               return (
                 <div key={p.name} style={{ ...card, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <span style={{ fontWeight: 600 }}>{p.name}</span>
+                    <span style={{ fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere' }}>{p.name}</span>
                     <StatusPill label="ativo" color={C.ok} />
                   </div>
                   <div style={{ fontSize: 12, color: C.t3 }}>
@@ -177,7 +188,26 @@ export function ToolsView() {
   )
 }
 
+// Linha de ferramenta no celular: cartão em 3 linhas (nome + estado · descrição · agentes + ação).
+function PhoneRow({ name, pill, desc, agents, action, children }: { name: string; pill: ReactNode; desc: ReactNode; agents: ReactNode; action: ReactNode; children?: ReactNode }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,.05)', minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+        {pill}
+      </div>
+      <div style={{ fontSize: 13, color: C.t2, overflowWrap: 'anywhere' }}>{desc}</div>
+      {children}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.cyan, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>→ {agents}</span>
+        {action}
+      </div>
+    </div>
+  )
+}
+
 function ToolList({ items }: { items: ToolboxItem[] }) {
+  const phone = useYui((s) => s.device === 'phone')
   const cats = useMemo(() => [...new Set(items.map((t) => t.category))], [items])
   if (!items.length) return <Empty text="Nada por aqui com esse filtro." />
   return (
@@ -189,6 +219,29 @@ function ToolList({ items }: { items: ToolboxItem[] }) {
             .filter((t) => t.category === cat)
             .map((t) => {
               const meta = STATUS_META[t.status]
+              const action =
+                t.status === 'needs-auth' && t.access.type === 'mcp' ? (
+                  <SmallBtn onClick={() => window.open(CONNECTORS_URL, '_blank', 'noopener')}>Autorizar</SmallBtn>
+                ) : (
+                  <SmallBtn onClick={() => testTool(t)} title="Run curta somente leitura">
+                    Testar
+                  </SmallBtn>
+                )
+              if (phone)
+                return (
+                  <PhoneRow key={t.id} name={t.name} pill={<StatusPill {...meta} />} desc={t.purpose} agents={`${t.agent ?? 'qualquer agente'} · ${t.access.type}`} action={action}>
+                    {t.note && <span style={{ fontSize: 12, color: t.status === 'ok' ? C.t3 : meta.color, overflowWrap: 'anywhere' }}>{t.note}</span>}
+                    {t.examples.length > 0 && (
+                      <div className="h-scroll" style={{ gap: 6 }}>
+                        {t.examples.slice(0, 3).map((ex) => (
+                          <Chip key={ex} onClick={() => submitText(ex)} title="Pedir à Yui">
+                            “{ex}”
+                          </Chip>
+                        ))}
+                      </div>
+                    )}
+                  </PhoneRow>
+                )
               return (
                 <div key={t.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 140px auto', gap: 14, alignItems: 'center', padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,.04)' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
@@ -210,15 +263,7 @@ function ToolList({ items }: { items: ToolboxItem[] }) {
                     )}
                   </div>
                   <StatusPill {...meta} />
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {t.status === 'needs-auth' && t.access.type === 'mcp' ? (
-                      <SmallBtn onClick={() => window.open(CONNECTORS_URL, '_blank', 'noopener')}>Autorizar</SmallBtn>
-                    ) : (
-                      <SmallBtn onClick={() => testTool(t)} title="Run curta somente leitura">
-                        Testar
-                      </SmallBtn>
-                    )}
-                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>{action}</div>
                 </div>
               )
             })}

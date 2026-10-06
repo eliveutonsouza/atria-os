@@ -22,7 +22,9 @@ const origin = (r: RunInfo) => (r.missionId ? 'missão' : r.workflowRunId ? 'wor
 const sortKey = (r: RunInfo) => (r.state === 'running' || r.state === 'queued' || r.state === 'waiting_approval' ? '9' : '1') + (r.finishedAt ?? r.startedAt ?? '')
 
 export function RunsPage() {
-  const narrow = useYui((s) => s.narrow)
+  const device = useYui((s) => s.device)
+  const narrow = device === 'phone'
+  const tablet = device === 'tablet'
   const sel = useYui((s) => s.appParams.id)
   const live = useYui((s) => s.runs)
   const { data } = useApi<{ runs: RunInfo[] }>('/api/runs', [], 20000)
@@ -57,6 +59,8 @@ export function RunsPage() {
   const current = runs.find((r) => r.id === sel) ?? null
 
   const selectStyle = { ...input, height: 34, padding: '0 10px', width: 'auto', minWidth: 120 } as const
+  // celular: execução aberta ocupa a tela toda (sem filtros nem lista)
+  if (narrow && current) return <RunDetail run={current} full />
   return (
     <>
       <section className={narrow ? 'app-filters-narrow' : undefined} style={narrow ? undefined : { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -81,8 +85,8 @@ export function RunsPage() {
         </select>
       </section>
       <div className="app-split" style={{ alignItems: 'flex-start' }}>
-        <section className="app-card" style={{ flex: 1, minWidth: 0, padding: 6, width: '100%' }}>
-          <div className="app-hide-narrow" style={{ display: 'grid', gridTemplateColumns: '14px 110px minmax(0,1fr) 110px 100px 70px', gap: 12, padding: '8px 10px', fontSize: 10.5, letterSpacing: '.14em', textTransform: 'uppercase', color: C.t3, fontWeight: 600 }}>
+        <section className={narrow ? undefined : 'app-card'} style={{ flex: 1, minWidth: 0, padding: narrow ? 0 : 6, width: '100%' }}>
+          <div className="app-hide-narrow" style={{ display: tablet ? 'none' : 'grid', gridTemplateColumns: '14px 110px minmax(0,1fr) 110px 100px 70px', gap: 12, padding: '8px 10px', fontSize: 10.5, letterSpacing: '.14em', textTransform: 'uppercase', color: C.t3, fontWeight: 600 }}>
             <span />
             <span>Agente</span>
             <span>Tarefa</span>
@@ -96,20 +100,39 @@ export function RunsPage() {
             const on = r.id === sel
             return (
               narrow ? (
-                // Celular: cartão em 3 linhas (agente + estado · tarefa · projeto e tempo), sem colunas fixas.
+                // Celular: cartão compacto em 2 linhas (estado + tarefa · agente e tempo) com chevron, sem colunas fixas.
+                <button
+                  key={r.id}
+                  onClick={() => openApp('runs', r.id)}
+                  className="app-row"
+                  style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 12px', alignItems: 'center', gap: 10, width: '100%', minHeight: 44, padding: 14, marginBottom: 8, border: '1px solid rgba(255,255,255,.07)', borderRadius: 16, background: 'rgba(255,255,255,.035)', color: C.text, textAlign: 'left', cursor: 'pointer' }}
+                >
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Dot c={c} size={7} pulse={r.state === 'running'} />
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.task}</span>
+                      <span style={{ fontSize: 12, color: c, whiteSpace: 'nowrap' }}>{r.state === 'running' ? `${l} ${r.progress}%` : l}</span>
+                    </span>
+                    <span className="app-mono" style={{ fontSize: 11.5, color: C.t3, paddingLeft: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {r.agent}{r.project ? ` · ${r.project}` : ''} · {r.state === 'running' ? elapsed(r.startedAt) : relTime(r.finishedAt ?? r.startedAt)}
+                    </span>
+                  </span>
+                  <span aria-hidden style={{ fontSize: 22, color: C.t3, lineHeight: 1 }}>›</span>
+                </button>
+              ) : tablet ? (
+                // Tablet: só ponto, tarefa e estado (o detalhe fica ao lado)
                 <button
                   key={r.id}
                   onClick={() => openApp('runs', r.id)}
                   className={on ? undefined : 'app-row'}
-                  style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%', padding: '12px 10px', border: 'none', borderBottom: '1px solid rgba(255,255,255,.05)', borderRadius: 10, background: on ? 'rgba(103,216,242,.07)' : 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer' }}
+                  style={{ display: 'grid', gridTemplateColumns: '14px minmax(0,1fr) auto', alignItems: 'center', gap: 10, width: '100%', minHeight: 44, padding: '10px', border: 'none', borderRadius: 10, background: on ? 'rgba(103,216,242,.07)' : 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer', fontSize: 13 }}
                 >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600 }}>
-                    <Dot c={c} size={7} pulse={r.state === 'running'} />
-                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.agent}</span>
-                    <span style={{ fontSize: 12, fontWeight: 500, color: c, whiteSpace: 'nowrap' }}>{r.state === 'running' ? `${l} ${r.progress}%` : l}</span>
+                  <Dot c={c} size={7} pulse={r.state === 'running'} />
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                    <span style={{ color: '#c9cde0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.task}</span>
+                    <span className="app-mono" style={{ fontSize: 11, color: C.t3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.agent} · {r.state === 'running' ? elapsed(r.startedAt) : relTime(r.finishedAt ?? r.startedAt)}</span>
                   </span>
-                  <span style={{ fontSize: 13, color: '#c9cde0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.task}</span>
-                  <span className="app-mono" style={{ fontSize: 11.5, color: C.t3 }}>{r.project ?? 'sem projeto'} · {r.state === 'running' ? elapsed(r.startedAt) : relTime(r.finishedAt ?? r.startedAt)}</span>
+                  <span style={{ fontSize: 12, color: c, whiteSpace: 'nowrap' }}>{r.state === 'running' ? `${l} ${r.progress}%` : l}</span>
                 </button>
               ) : (
                 <button
@@ -138,7 +161,8 @@ export function RunsPage() {
   )
 }
 
-function RunDetail({ run }: { run: RunInfo }) {
+function RunDetail({ run, full = false }: { run: RunInfo; full?: boolean }) {
+  const tablet = useYui((s) => s.device === 'tablet')
   const [lines, setLines] = useState<RunEventLine[] | null>(null)
   const [tech, setTech] = useState(false)
   useEffect(() => {
@@ -154,10 +178,10 @@ function RunDetail({ run }: { run: RunInfo }) {
       .catch(() => useYui.getState().say('Essa execução não deixou uma tela para mostrar.'))
   const dur = run.startedAt ? (run.finishedAt ? new Date(run.finishedAt).getTime() : Date.now()) - new Date(run.startedAt).getTime() : null
   return (
-    <aside style={{ width: 420, maxWidth: '100%', flexShrink: 0, padding: '18px 20px', borderRadius: 18, background: 'linear-gradient(180deg, rgba(20,24,50,.62), rgba(12,14,32,.62))', border: '1px solid rgba(160,170,255,.11)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <aside style={{ width: full ? '100%' : tablet ? 340 : 420, maxWidth: '100%', flexShrink: 0, minWidth: 0, padding: full ? 14 : '18px 20px', borderRadius: 18, background: 'linear-gradient(180deg, rgba(20,24,50,.62), rgba(12,14,32,.62))', border: '1px solid rgba(160,170,255,.11)', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <span style={{ fontSize: 11, letterSpacing: '.16em', color: c, fontWeight: 600 }}>{l.toUpperCase()}</span>
-        <span style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.35 }}>{run.task}</span>
+        <span style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.35, overflowWrap: 'anywhere' }}>{run.task}</span>
         <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <Tag>{run.agent}</Tag>
           {run.project && <Tag color={C.t2} bg="rgba(255,255,255,.05)">{run.project}</Tag>}
@@ -201,10 +225,10 @@ function RunDetail({ run }: { run: RunInfo }) {
       {run.result && (
         <div>
           <div className="eyebrow" style={{ marginBottom: 6 }}>Resultado</div>
-          <div style={{ fontSize: 13, color: '#d6d9e8', lineHeight: 1.55, whiteSpace: 'pre-wrap', maxHeight: 260, overflowY: 'auto' }}>{run.result}</div>
+          <div style={{ fontSize: 13, color: '#d6d9e8', lineHeight: 1.55, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: full ? undefined : 260, overflowY: 'auto' }}>{run.result}</div>
         </div>
       )}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div style={full ? { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8 } : { display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {run.state === 'done' && <button className="app-btn small" onClick={() => void openResult()}>Ver resultado</button>}
         {run.missionId && <button className="app-btn small" onClick={() => openApp('missions', run.missionId!)}>Ver missão</button>}
         <button className="app-btn small" onClick={() => setTech(!tech)}>{tech ? 'Ocultar detalhes técnicos' : 'Detalhes técnicos'}</button>
@@ -215,7 +239,7 @@ function RunDetail({ run }: { run: RunInfo }) {
         )}
       </div>
       {tech && (
-        <div className="app-mono" style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(0,0,0,.35)', border: '1px solid rgba(255,255,255,.06)', fontSize: 11.5, lineHeight: 1.7, color: C.t2, maxHeight: 320, overflowY: 'auto' }}>
+        <div className="app-mono" style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(0,0,0,.35)', border: '1px solid rgba(255,255,255,.06)', fontSize: 11.5, lineHeight: 1.7, color: C.t2, maxHeight: 320, overflowY: 'auto', overflowWrap: 'anywhere' }}>
           <div>session {run.sessionId ?? '—'}</div>
           {(lines ?? []).slice(-60).map((ln, i) => (
             <div key={i} style={{ color: ln.kind === 'error' ? '#f6b3ba' : ln.kind === 'tool' ? '#c9cde0' : C.t2 }}>

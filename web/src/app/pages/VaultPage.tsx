@@ -74,7 +74,7 @@ function makeResolver(tree: VaultTreeEntry[]) {
   }
 }
 
-const iconBtn: CSSProperties = { width: 28, height: 28, borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'transparent', color: C.t2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
+const iconBtn: CSSProperties = { width: 'var(--vault-ib, 28px)', height: 'var(--vault-ib, 28px)', borderRadius: 8, border: '1px solid rgba(255,255,255,.08)', background: 'transparent', color: C.t2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
 const label: CSSProperties = { fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', fontWeight: 600 }
 
 function Explorer({ tree, selected, onPick, onCreate, narrow }: { tree: VaultTreeEntry[]; selected: string; onPick: (p: string) => void; onCreate: (folder: string) => void; narrow: boolean }) {
@@ -378,6 +378,8 @@ function MobileEditor({ file, onSaved }: { file: VaultFile; onSaved: () => void 
 
 export function VaultPage() {
   const narrow = useYui((s) => s.narrow)
+  const tablet = useYui((s) => s.device === 'tablet')
+  const [ctxOpen, setCtxOpen] = useState(false)
   const [initial] = useState(() => useYui.getState().appParams.id)
   const [selected, setSelected] = useState<string>(() => initial || store.get('yui.vault.note') || DEFAULT_NOTE)
   const [mode, setMode] = useState<Mode>(() => (store.get('yui.vault.mode') as Mode) || 'edit')
@@ -395,7 +397,7 @@ export function VaultPage() {
 
   useHeader('Conhecimento · vault Obsidian', 'Vault', [
     { label: 'Ver no Cérebro', fn: () => useYui.getState().set({ appPage: 'brain', appParams: {} }) },
-    { label: '+ Nova nota', fn: () => setCreating((selected.includes('/') ? selected.split('/')[0] : '') || '00-Inbox') },
+    { label: '+ Nova nota', primary: true, fn: () => setCreating((selected.includes('/') ? selected.split('/')[0] : '') || '00-Inbox') },
   ], [selected])
 
   const loadFile = useCallback(() => {
@@ -432,6 +434,7 @@ export function VaultPage() {
       setSelected(p)
       setMobileView('note')
       setMobileEdit(false)
+      setCtxOpen(false)
       if (!narrow) api.post('/api/vault/open', { path: p, line }).catch(() => {})
     },
     [narrow],
@@ -460,6 +463,13 @@ export function VaultPage() {
     }, 2000)
     return () => clearInterval(t)
   }, [showEditor])
+
+  useEffect(() => {
+    if (!ctxOpen) return
+    const k = (e: KeyboardEvent) => e.key === 'Escape' && setCtxOpen(false)
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [ctxOpen])
 
   const setM = (m: Mode) => {
     setMode(m)
@@ -503,7 +513,7 @@ export function VaultPage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {createBox}
         {mobileView === 'list' ? (
-          <div style={{ height: 'calc(100dvh - 200px)', minHeight: 420, display: 'flex' }}>
+          <div style={{ height: 'calc(var(--vvh) - var(--tabbar) - 190px)', minHeight: 280, display: 'flex' }}>
             <Explorer tree={tree} selected={selected} onPick={pick} onCreate={setCreating} narrow />
           </div>
         ) : (
@@ -536,11 +546,18 @@ export function VaultPage() {
     )
   }
 
-  // ---------- desktop ----------
+  const connections = file ? <Connections path={selected} text={file.text} resolve={resolve} onOpen={pick} status={status} onCommit={commit} /> : <div className="vault-card" />
+
+  // ---------- desktop (tablet: árvore estreita + conteúdo; conexões numa gaveta) ----------
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {createBox}
-      <section className="vault-grid" style={{ height: 'calc(100dvh - 158px)', minHeight: 520 }}>
+      {tablet && showEditor && (
+        <div role="note" style={{ fontSize: 12.5, color: C.t2, padding: '8px 12px', borderRadius: 10, background: 'rgba(245,181,74,.06)', border: '1px solid rgba(245,181,74,.18)' }}>
+          O editor VS Code funciona melhor no computador. No tablet, o modo Leitura é mais confortável.
+        </div>
+      )}
+      <section className="vault-grid" style={tablet ? { height: 'calc(var(--vvh) - var(--sat) - 150px)', minHeight: 360 } : { height: 'calc(100dvh - 158px)', minHeight: 520 }}>
         <Explorer tree={tree} selected={selected} onPick={pick} onCreate={setCreating} narrow={false} />
         <div className="vault-center">
           <div className="vault-bar">
@@ -559,6 +576,11 @@ export function VaultPage() {
               {status?.editor === false ? 'VS Code iniciando' : 'VS Code'}
             </span>
             <a className="vault-link-btn" href="/code/" target="_blank" rel="noopener">Abrir em aba ↗</a>
+            {tablet && (
+              <button className="app-btn small" aria-expanded={ctxOpen} onClick={() => setCtxOpen(true)}>
+                Contexto
+              </button>
+            )}
           </div>
           <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: mode === 'split' ? 'minmax(0,1fr) minmax(0,1fr)' : 'minmax(0,1fr)' }}>
             {/* o iframe fica montado (escondido no modo Leitura) para não recarregar o VS Code */}
@@ -570,8 +592,21 @@ export function VaultPage() {
             )}
           </div>
         </div>
-        {file ? <Connections path={selected} text={file.text} resolve={resolve} onOpen={pick} status={status} onCommit={commit} /> : <div className="vault-card" />}
+        {!tablet && connections}
       </section>
+      {tablet && ctxOpen && (
+        <div onClick={() => setCtxOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(4,5,12,.5)' }}>
+          <div
+            role="dialog"
+            aria-label="Contexto da nota"
+            onClick={(e) => e.stopPropagation()}
+            style={{ position: 'absolute', top: 'calc(12px + var(--sat))', right: 'calc(12px + var(--sar))', bottom: 'calc(12px + var(--sab))', width: 320, display: 'flex', flexDirection: 'column', gap: 8, background: '#0e1022', borderRadius: 18, padding: 8, boxShadow: '0 24px 70px rgba(0,0,0,.6)', border: '1px solid rgba(255,255,255,.08)' }}
+          >
+            <button className="app-btn small" style={{ alignSelf: 'flex-end' }} onClick={() => setCtxOpen(false)}>Fechar</button>
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>{connections}</div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

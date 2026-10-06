@@ -40,7 +40,7 @@ export function DashboardView() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 14 }}>
         {kpis.map((k) => <KpiTile key={k.l} label={k.l} value={k.v} color={k.color} />)}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(300px,100%),1fr))', gap: 14 }}>
         <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ fontWeight: 600 }}>Atividade dos agentes</span><span style={{ color: C.t3 }}>últimas 24h</span></div>
           <Bars values={data.bars24h} tips={data.bars24h.map((b) => `${b} execuções`)} label="Execuções por hora nas últimas 24 horas" />

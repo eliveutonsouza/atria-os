@@ -1,4 +1,5 @@
 import { useEffect, type CSSProperties, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { C, glow } from '../lib/colors'
 import { useYui, type HeaderAction } from '../store/yui'
 import { BottomSheet } from './Sheet'
@@ -105,11 +106,12 @@ export function ConfirmDeleteModal({ title, text, rows = [], busy, onCancel, onC
         {body}
       </BottomSheet>
     )
-  return (
+  return createPortal(
     <div onClick={busy ? undefined : onCancel} style={{ position: 'fixed', inset: 0, background: 'rgba(4,5,10,.66)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: 16 }}>
       <div role="alertdialog" aria-modal="true" aria-labelledby="cdm-title" onClick={(e) => e.stopPropagation()} style={{ width: 460, maxWidth: '100%', maxHeight: 'calc(var(--vvh) - 32px)', overflowY: 'auto', boxSizing: 'border-box', padding: 22, borderRadius: 18, background: '#10132a', border: '1px solid rgba(240,98,114,.35)', boxShadow: '0 30px 80px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 14 }}>
         {body}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

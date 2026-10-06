@@ -22,6 +22,7 @@ export function InboxPage() {
   useHeader('Aprovações', inbox.length ? `${inbox.length} coisa${inbox.length > 1 ? 's' : ''} precisa${inbox.length > 1 ? 'm' : ''} de você` : 'Nada pendente')
   const list = approvals.data ?? []
   const others = inbox.filter((i) => i.action.type !== 'approval')
+  const phone = useYui((s) => s.device === 'phone')
 
   const decide = async (id: string, ok: boolean) => {
     await resolveApproval(id, ok)
@@ -33,25 +34,26 @@ export function InboxPage() {
       {list.map((a) => {
         const danger = a.kind === 'destructive'
         return (
-        <section key={a.id} style={{ padding: '18px 20px', borderRadius: 18, background: 'linear-gradient(180deg,rgba(26,22,52,.6),rgba(14,16,34,.6))', border: `1px solid ${danger ? 'rgba(240,98,114,.45)' : 'rgba(245,181,74,.3)'}`, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-            <span style={{ fontSize: 11, letterSpacing: '.22em', color: danger ? C.crit : C.warn, fontWeight: 700 }}>{danger ? 'AÇÃO DESTRUTIVA · NÃO DÁ PARA DESFAZER' : 'APROVAÇÃO NECESSÁRIA'}</span>
+        <section key={a.id} style={{ minWidth: 0, padding: phone ? '16px 14px' : '18px 20px', borderRadius: 18, background: 'linear-gradient(180deg,rgba(26,22,52,.6),rgba(14,16,34,.6))', border: `1px solid ${danger ? 'rgba(240,98,114,.45)' : 'rgba(245,181,74,.3)'}`, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, ...(phone ? { flexWrap: 'wrap', rowGap: 4 } : null) }}>
+            <span style={{ fontSize: 11, letterSpacing: phone ? '.14em' : '.22em', color: danger ? C.crit : C.warn, fontWeight: 700 }}>{danger ? 'AÇÃO DESTRUTIVA · NÃO DÁ PARA DESFAZER' : 'APROVAÇÃO NECESSÁRIA'}</span>
             <span className="app-mono" style={{ fontSize: 11, color: C.t3 }}>{relTime(a.createdAt)}</span>
           </div>
-          <div style={{ fontSize: 17, lineHeight: 1.4 }}>{a.title}</div>
+          <div style={{ fontSize: 17, lineHeight: 1.4, overflowWrap: 'anywhere' }}>{a.title}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {a.rows.map((r) => (
               <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,.06)', fontSize: 13 }}>
-                <span style={{ color: C.t2 }}>{r.label}</span>
-                <span className="app-mono" style={{ color: toneColor(r.tone), fontSize: 12, textAlign: 'right', wordBreak: 'break-word' }}>{r.value}</span>
+                <span style={{ color: C.t2, flexShrink: 0 }}>{r.label}</span>
+                <span className="app-mono" style={{ color: toneColor(r.tone), fontSize: 12, textAlign: 'right', wordBreak: 'break-word', minWidth: 0 }}>{r.value}</span>
               </div>
             ))}
           </div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button className="app-btn" onClick={() => review(a.runId)}>Revisar</button>
-            <span style={{ flex: 1 }} />
-            <button className={danger ? 'app-btn' : 'app-btn danger'} style={{ minWidth: 120, height: 42 }} onClick={() => void decide(a.id, false)}>{danger ? 'Cancelar' : 'Rejeitar'}</button>
-            <button style={{ minWidth: 140, height: 42, borderRadius: 12, border: 'none', background: danger ? '#e2566a' : 'linear-gradient(135deg,#4fe0b0,#67d8f2)', color: danger ? '#fff' : '#06221c', fontSize: 14, fontWeight: 700, cursor: 'pointer' }} onClick={() => void decide(a.id, true)}>
+          {/* celular: Revisar em cima; Rejeitar | Aprovar em grade de 2 colunas, 50px */}
+          <div style={phone ? { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 10 } : { display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button className="app-btn" style={phone ? { gridColumn: '1 / -1', height: 44 } : undefined} onClick={() => review(a.runId)}>Revisar</button>
+            {!phone && <span style={{ flex: 1 }} />}
+            <button className={danger ? 'app-btn' : 'app-btn danger'} style={phone ? { height: 50, justifyContent: 'center' } : { minWidth: 120, height: 42 }} onClick={() => void decide(a.id, false)}>{danger ? 'Cancelar' : 'Rejeitar'}</button>
+            <button style={{ ...(phone ? { height: 50, padding: '0 8px', lineHeight: 1.2 } : { minWidth: 140, height: 42 }), borderRadius: 12, border: 'none', background: danger ? '#e2566a' : 'linear-gradient(135deg,#4fe0b0,#67d8f2)', color: danger ? '#fff' : '#06221c', fontSize: 14, fontWeight: 700, cursor: 'pointer' }} onClick={() => void decide(a.id, true)}>
               {danger ? 'Excluir definitivamente' : 'Aprovar'}
             </button>
           </div>

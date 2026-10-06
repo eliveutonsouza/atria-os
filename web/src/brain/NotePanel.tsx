@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { VaultBacklink, VaultFile, VaultGraphPayload, VaultSuggestion } from '@shared/protocol'
 import { api } from '../api/client'
+import { useYui } from '../store/yui'
 import { askYui, excerpt, nodeColors, openConstellation, openInEditor } from './data'
 import { Star } from './ui'
 import { Icon, eyebrow, ghostBtn, glass, mono, primaryBtn } from './styles'
@@ -17,6 +18,8 @@ export function NotePanel({
   onClose: () => void
 }) {
   const node = graph.nodes.find((n) => n.id === path)
+  const tablet = useYui((s) => s.device === 'tablet')
+  const coarse = useYui((s) => s.coarse)
   const [file, setFile] = useState<VaultFile | null>(null)
   const [backs, setBacks] = useState<VaultBacklink[]>([])
   const [sugs, setSugs] = useState<VaultSuggestion[]>([])
@@ -81,8 +84,9 @@ export function NotePanel({
       style={{
         ...glass,
         ...(sheet
-          ? { position: 'absolute', left: 0, right: 0, bottom: 0, borderRadius: '22px 22px 0 0', maxHeight: '58%', padding: '10px 16px calc(20px + env(safe-area-inset-bottom))' }
-          : { position: 'absolute', right: 24, top: 104, bottom: 112, width: 330, padding: 18 }),
+          ? // celular: folha fixa acima da barra de abas (--tabbar já inclui a safe area)
+            { position: 'absolute', left: 0, right: 0, bottom: 'var(--tabbar)', borderRadius: '22px 22px 0 0', maxHeight: 'min(55dvh, calc(100% - var(--tabbar) - 140px))', padding: '10px calc(16px + var(--sar)) 16px calc(16px + var(--sal))' }
+          : { position: 'absolute', right: 24, top: 104, bottom: 112, width: tablet ? 300 : 330, padding: 18 }),
         display: 'flex', flexDirection: 'column', gap: 12, overflow: 'hidden', zIndex: 3,
       }}
     >
@@ -93,7 +97,7 @@ export function NotePanel({
           <span style={{ ...eyebrow, color: col.c }}>{col.name}</span>
           <span style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis' }}>{node.title}</span>
         </div>
-        <button aria-label="Fechar" onClick={onClose} style={{ width: 36, height: 36, flex: 'none', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: '#9aa0bb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+        <button aria-label="Fechar" onClick={onClose} style={{ width: coarse ? 44 : 36, height: coarse ? 44 : 36, flex: 'none', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: '#9aa0bb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
           {Icon.close}
         </button>
       </div>

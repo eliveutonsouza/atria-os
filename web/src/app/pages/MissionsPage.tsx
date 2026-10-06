@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { MissionInfo } from '@shared/protocol'
 import { useApi } from '../../api/useApi'
 import { C } from '../../lib/colors'
 import { dockInput } from '../../shell/parts'
 import { useYui } from '../../store/yui'
 import { DeleteMissionModal, MissionView } from '../../views/MissionView'
-import { Empty, useHeader } from '../../views/ui'
+import { Empty } from '../../views/ui'
 import { Dot, openApp, relTime, Tag, useViewParams } from './common'
 
 // Missões: planos de execução multi-agente. Lista à esquerda, plano (MissionView) à direita.
@@ -28,8 +28,14 @@ export function MissionsPage() {
   const id = useYui((s) => s.appParams.id)
   const live = useYui((s) => s.missions)
   const { data, reload } = useApi<MissionInfo[]>('/api/missions', [], 15000)
+  const device = useYui((s) => s.device)
+  const phone = device === 'phone'
   const [del, setDel] = useState<MissionInfo | null>(null)
-  useHeader('Missões', 'Planos de execução', [{ label: '+ Nova missão', fn: newMission }])
+  // no celular com missão aberta o cabeçalho é do MissionView (‹ Voltar + ações da missão)
+  useEffect(() => {
+    if (id && phone) return
+    useYui.getState().setHeader({ eyebrow: 'Missões', title: 'Planos de execução', actions: [{ label: '+ Nova missão', fn: newMission, primary: true }] })
+  }, [id, phone])
   const list = useMemo(() => {
     const m = new Map<string, MissionInfo>()
     for (const x of data ?? []) m.set(x.id, x)
@@ -38,9 +44,12 @@ export function MissionsPage() {
   }, [data, live])
   useViewParams(id ? { missionId: id } : {})
 
+  // celular: missão aberta ocupa a tela toda (sem a lista)
+  if (phone && id) return <MissionView />
+
   return (
     <div className="app-split" style={{ alignItems: 'flex-start' }}>
-      <section style={{ width: id ? 340 : '100%', maxWidth: '100%', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <section style={{ width: id ? (device === 'tablet' ? 280 : 340) : '100%', maxWidth: '100%', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {list.length === 0 && <Empty text="Nenhuma missão ainda." hint="Peça algo grande para a Yui: “cria uma landing page para uma clínica”." />}
         {list.map((m) => {
           const [l, c] = STATUS[m.status]
@@ -52,8 +61,8 @@ export function MissionsPage() {
               onClick={() => openApp('missions', m.id)}
               className={on ? undefined : 'app-row'}
               style={{
-                width: '100%', padding: '12px 48px 12px 14px', borderRadius: 14, textAlign: 'left', cursor: 'pointer', color: C.text, display: 'flex', flexDirection: 'column', gap: 8,
-                background: on ? 'rgba(103,216,242,.07)' : 'rgba(255,255,255,.025)', border: `1px solid ${on ? 'rgba(103,216,242,.25)' : 'rgba(255,255,255,.06)'}`,
+                width: '100%', padding: phone ? '14px 34px 14px 14px' : '12px 48px 12px 14px', borderRadius: phone ? 16 : 14, minHeight: 44, textAlign: 'left', cursor: 'pointer', color: C.text, display: 'flex', flexDirection: 'column', gap: 8,
+                background: on ? 'rgba(103,216,242,.07)' : phone ? 'rgba(255,255,255,.035)' : 'rgba(255,255,255,.025)', border: `1px solid ${on ? 'rgba(103,216,242,.25)' : phone ? 'rgba(255,255,255,.07)' : 'rgba(255,255,255,.06)'}`,
               }}
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
@@ -71,8 +80,10 @@ export function MissionsPage() {
               <span className="app-muted">
                 {done}/{m.steps.length} etapas{m.project ? ` · ${m.project}` : ''} · {relTime(m.createdAt)}
               </span>
+              {phone && <span aria-hidden style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 22, color: C.t3 }}>›</span>}
             </button>
-            <button
+            {/* celular: excluir fica no ⋯ do detalhe */}
+            {!phone && <button
               onClick={() => setDel(m)}
               aria-label={`Excluir missão ${m.title}`}
               title="Excluir missão"
@@ -81,7 +92,7 @@ export function MissionsPage() {
               <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" />
               </svg>
-            </button>
+            </button>}
             </div>
           )
         })}

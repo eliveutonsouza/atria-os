@@ -42,3 +42,10 @@ select.co-input { padding: 0 10px; }
   .co-chip { height: 36px; }
 }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* tablet: coluna de ações da tabela fixa à direita (a tabela rola por baixo) */
+html.is-tablet .co-grid-row { grid-template-columns: 40px minmax(240px, 2.4fr) 130px 200px 60px 70px 96px 152px; }
+html.is-tablet .co-grid-row > :last-child { position: sticky; right: 0; align-self: stretch; display: flex; align-items: center; justify-content: flex-end; margin-right: -14px; padding: 0 14px 0 8px; background: #0e1023; box-shadow: -10px 0 14px -10px rgba(0,0,0,.6); }
+html.is-coarse .co-check { width: 24px; height: 24px; line-height: 22px; }
+html.is-coarse .co-tab { height: 44px; }
+html.is-coarse .co-seg button { height: 40px; }

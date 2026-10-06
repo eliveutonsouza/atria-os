@@ -53,3 +53,6 @@ textarea.wf-input { resize: vertical; line-height: 1.5; }
 .wf-label { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #6f7590; font-weight: 600; margin-bottom: 6px; display: block; }
 .wf-tab { border: none; background: transparent; color: #6f7590; font-size: 12.5px; padding: 6px 2px; cursor: pointer; border-bottom: 1px solid transparent; font-family: Manrope, sans-serif; }
 .wf-tab[aria-selected='true'] { color: #e8eaf4; border-bottom-color: #67d8f2; }
+
+/* Toque: alças de conexão com área de toque de ~22px (o ponto visível segue pequeno). */
+html.is-coarse .wf-canvas .react-flow__handle::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import type { SettingsPayload, SetupStatus } from '@shared/protocol'
 import { api, ApiError } from '../../../api/client'
 import { C } from '../../../lib/colors'
@@ -46,8 +46,9 @@ export function useSetupStatus() {
 export const panel = { padding: '16px 18px', borderRadius: 16, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' } as const
 
 export function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+  const coarse = useYui((s) => s.coarse)
   return (
-    <section style={{ ...panel, display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <section style={{ ...panel, display: 'flex', flexDirection: 'column', gap: 14, ...(coarse ? ({ '--big-btn-h': '44px' } as CSSProperties) : null) }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         <span style={{ fontSize: 14.5, fontWeight: 600 }}>{title}</span>
         {hint && <span style={{ fontSize: 12.5, color: C.t2 }}>{hint}</span>}
@@ -67,8 +68,10 @@ export function SaveMsg({ msg }: { msg: { ok: boolean; text: string } | null }) 
 }
 
 function ConnRow({ letter, color, name, ok, status, desc, action }: { letter: string; color: string; name: string; ok: boolean; status: string; desc: string; action: ReactNode }) {
+  // celular: botões descem para baixo da descrição, em largura total
+  const phone = useYui((s) => s.device === 'phone')
   return (
-    <div style={{ ...panel, display: 'grid', gridTemplateColumns: '44px minmax(0,1fr) auto', alignItems: 'center', gap: 14 }}>
+    <div style={{ ...panel, display: 'grid', gridTemplateColumns: phone ? '44px minmax(0,1fr)' : '44px minmax(0,1fr) auto', alignItems: 'center', gap: phone ? 12 : 14 }}>
       <span aria-hidden style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color }}>{letter}</span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
         <span style={{ fontSize: 14.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -77,14 +80,15 @@ function ConnRow({ letter, color, name, ok, status, desc, action }: { letter: st
         </span>
         <span style={{ fontSize: 12.5, color: C.t2 }}>{desc}</span>
       </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>{action}</div>
+      <div style={phone ? ({ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 8, '--big-btn-h': '44px' } as CSSProperties) : { display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>{action}</div>
     </div>
   )
 }
 
 const bigBtn = (primary = false) =>
   ({
-    height: 36, padding: '0 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+    // altura vem de --big-btn-h (44px no toque, ver Section/ConnRow)
+    height: 'var(--big-btn-h, 36px)', padding: '0 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', justifyContent: 'center',
     border: primary ? 'none' : '1px solid rgba(255,255,255,.1)',
     background: primary ? 'linear-gradient(135deg,#67d8f2,#a68cf7)' : 'transparent',
     color: primary ? '#0a0c1d' : '#dfe3f3',

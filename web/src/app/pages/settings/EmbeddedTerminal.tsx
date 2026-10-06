@@ -4,6 +4,8 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 import { C } from '../../../lib/colors'
+import { useYui } from '../../../store/yui'
+import { TermKeys, useCtrlLatch } from '../../../views/TermKeys'
 
 // Terminal pequeno embutido nas Configurações (conectar Claude / GitHub sem sair da página).
 // Usa a mesma sessão tmux "shell" do workspace que a página Terminal.
@@ -21,11 +23,16 @@ const THEME = {
 export function EmbeddedTerminal({ command, height = 300, onClose }: { command: string; height?: number; onClose?: () => void }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const [state, setState] = useState<'connecting' | 'open' | 'closed'>('connecting')
+  const coarse = useYui((s) => s.coarse)
+  const ctrl = useCtrlLatch()
+  const applyCtrl = ctrl.apply
+  const sendRef = useRef<(d: string) => void>(() => {})
+  const appCursorRef = useRef<() => boolean>(() => false)
 
   useEffect(() => {
     const host = hostRef.current
     if (!host) return
-    const term = new Terminal({ fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 12.5, lineHeight: 1.25, cursorBlink: true, allowTransparency: true, scrollback: 3000, theme: THEME })
+    const term = new Terminal({ fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: useYui.getState().device === 'phone' ? 12 : 12.5, lineHeight: 1.25, cursorBlink: true, allowTransparency: true, scrollback: 3000, theme: THEME })
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.loadAddon(new WebLinksAddon())
@@ -42,7 +49,9 @@ export function EmbeddedTerminal({ command, height = 300, onClose }: { command: 
     }
     ws.onmessage = (e) => term.write(typeof e.data === 'string' ? e.data : new Uint8Array(e.data as ArrayBuffer))
     ws.onclose = () => setState('closed')
-    const sub = term.onData((d) => ws.readyState === WebSocket.OPEN && ws.send(d))
+    sendRef.current = (d) => ws.readyState === WebSocket.OPEN && ws.send(d)
+    appCursorRef.current = () => term.modes.applicationCursorKeysMode
+    const sub = term.onData((d) => ws.readyState === WebSocket.OPEN && ws.send(applyCtrl(d)))
     const ro = new ResizeObserver(() => {
       try {
         fit.fit()
@@ -58,16 +67,16 @@ export function EmbeddedTerminal({ command, height = 300, onClose }: { command: 
       ws.close()
       term.dispose()
     }
-  }, [command])
+  }, [command, applyCtrl])
 
   return (
     <div style={{ borderRadius: 14, background: 'rgba(0,0,0,.45)', border: '1px solid rgba(103,216,242,.22)', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,.06)', fontSize: 12, color: C.t2 }}>
         <span style={{ width: 7, height: 7, borderRadius: '50%', background: state === 'open' ? C.ok : state === 'connecting' ? C.warn : C.crit }} />
-        <span className="mono" style={{ color: '#a9e9f8' }}>$ {command}</span>
+        <span className="mono" style={{ color: '#a9e9f8', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>$ {command}</span>
         <span style={{ flex: 1 }} />
         {onClose && (
-          <button type="button" onClick={onClose} style={{ border: 'none', background: 'transparent', color: C.t2, cursor: 'pointer', fontSize: 12 }}>
+          <button type="button" onClick={onClose} style={{ border: 'none', background: 'transparent', color: C.t2, cursor: 'pointer', fontSize: 12, flexShrink: 0, minHeight: coarse ? 40 : undefined }}>
             Fechar
           </button>
         )}
@@ -75,6 +84,11 @@ export function EmbeddedTerminal({ command, height = 300, onClose }: { command: 
       <div className="yui-terminal" style={{ height, padding: '8px 10px' }}>
         <div ref={hostRef} style={{ width: '100%', height: '100%' }} />
       </div>
+      {coarse && (
+        <div style={{ padding: '6px 8px', borderTop: '1px solid rgba(255,255,255,.06)' }}>
+          <TermKeys send={(d) => sendRef.current(d)} ctrl={ctrl} appCursor={() => appCursorRef.current()} />
+        </div>
+      )}
     </div>
   )
 }

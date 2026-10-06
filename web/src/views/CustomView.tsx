@@ -25,6 +25,7 @@ export function CustomView() {
 }
 
 export function BlockView({ block }: { block: Block }) {
+  const phone = useYui((s) => s.device === 'phone')
   switch (block.type) {
     case 'kpis':
       return (
@@ -57,7 +58,7 @@ export function BlockView({ block }: { block: Block }) {
     case 'table':
       return (
         <Section title={block.title}>
-          <div style={{ overflowX: 'auto', borderRadius: 14, border: '1px solid rgba(255,255,255,.06)' }}>
+          <div data-own-scroll style={{ overflowX: 'auto', borderRadius: 14, border: '1px solid rgba(255,255,255,.06)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
               <thead>
                 <tr>
@@ -134,7 +135,7 @@ export function BlockView({ block }: { block: Block }) {
           title="Visualização"
           src={block.url}
           sandbox="allow-scripts"
-          style={{ width: '100%', height: block.height ?? 'calc(100vh - 260px)', minHeight: 420, border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, background: '#0a0c1d' }}
+          style={{ width: '100%', height: block.height ?? 'calc(var(--vvh, 100dvh) - 260px)', minHeight: phone ? 280 : 420, border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, background: '#0a0c1d' }}
         />
       )
     case 'link':

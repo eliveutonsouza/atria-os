@@ -22,7 +22,7 @@ export function AgentsView() {
   const agentsWorking = useYui((s) => s.agentsWorking)
   const { data, loading, error } = useApi<AgentInfo[]>('/api/agents', [agentsWorking], 15000)
   useHeader('Agent network', 'Agentes', [
-    { label: '+ Novo agente', fn: () => void newAgent() },
+    { label: '+ Novo agente', fn: () => void newAgent(), primary: true },
     { label: 'Ferramentas', fn: () => useYui.getState().show('tools') },
     { label: 'Execuções', fn: () => useYui.getState().show('runs') },
   ])
@@ -37,8 +37,8 @@ export function AgentsView() {
   })
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
-      <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap', alignItems: 'baseline' }}>
-        <div><span style={{ fontSize: 48, fontWeight: 300, letterSpacing: '-.03em' }}>{data.length}</span><span style={{ fontSize: 13, color: C.t2, marginLeft: 10 }}>configurados</span></div>
+      <div style={{ display: 'flex', gap: narrow ? '12px 24px' : 40, flexWrap: 'wrap', alignItems: 'baseline' }}>
+        <div><span style={{ fontSize: narrow ? 40 : 48, fontWeight: 300, letterSpacing: '-.03em' }}>{data.length}</span><span style={{ fontSize: 13, color: C.t2, marginLeft: 10 }}>configurados</span></div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: C.cyan, boxShadow: `0 0 10px ${C.cyan}` }} />{running} trabalhando</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: C.t2 }}><span style={{ width: 8, height: 8, borderRadius: '50%', border: `1px solid ${C.t3}` }} />{sleeping} dormindo</div>
       </div>
@@ -60,7 +60,7 @@ export function AgentsView() {
                   if (e.key === 'Enter') useYui.getState().show('agent', { agentId: ag.id })
                 }}
                 className="hov-row"
-                style={{ cursor: 'pointer', borderRadius: 8, display: 'grid', gridTemplateColumns: narrow ? '30px minmax(0,1fr) auto' : '30px minmax(80px,160px) minmax(0,1fr) minmax(0,100px) minmax(0,100px)', minWidth: 0, alignItems: 'center', gap: 14, padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,.04)', fontSize: 14 }}>
+                style={{ cursor: 'pointer', borderRadius: 8, display: 'grid', gridTemplateColumns: narrow ? '30px minmax(0,1fr) auto' : '30px minmax(80px,160px) minmax(0,1fr) minmax(0,100px) minmax(0,100px)', minWidth: 0, alignItems: 'center', gap: narrow ? 12 : 14, padding: '12px 0', minHeight: 44, borderBottom: '1px solid rgba(255,255,255,.04)', fontSize: 14 }}>
                 <span style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)' }}>
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: dot, boxShadow: `0 0 10px ${dot}` }} />
                 </span>

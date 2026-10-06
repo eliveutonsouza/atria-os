@@ -49,9 +49,10 @@ export function ClaudeGuideView() {
   const init = caps.data && 'tools' in caps.data ? (caps.data as ClaudeInitInfo) : null
   const [q, setQ] = useState('')
   const [cat, setCat] = useState<string | null>(null)
+  const phone = useYui((s) => s.device === 'phone')
 
   useHeader('Claude Code · mapa', 'O Claude Code no dia a dia', [
-    { label: 'Abrir terminal', fn: () => openTerm('claude') },
+    { label: 'Abrir terminal', fn: () => openTerm('claude'), primary: true },
     { label: 'Ferramentas', fn: () => (useYui.getState().shellMode === 'app' ? useYui.getState().set({ appPage: 'tools', appParams: {} }) : useYui.getState().show('tools')) },
   ])
 
@@ -71,7 +72,7 @@ export function ClaudeGuideView() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div className={phone ? 'h-scroll' : undefined} style={phone ? { gap: 6, width: '100%', minWidth: 0 } : { display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <Chip on={!cat} onClick={() => setCat(null)}>Tudo</Chip>
           {guide.data.categories.map((c) => (
             <Chip key={c.id} on={cat === c.id} onClick={() => setCat(cat === c.id ? null : c.id)}>
@@ -83,7 +84,7 @@ export function ClaudeGuideView() {
       </div>
 
       {init && (
-        <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', fontSize: 13, color: C.t2 }}>
+        <div style={{ display: 'flex', gap: phone ? '8px 18px' : 28, flexWrap: 'wrap', fontSize: 13, color: C.t2 }}>
           <span><b style={{ fontSize: 24, fontWeight: 300, color: C.text, marginRight: 6 }}>{init.slashCommands.length}</b>comandos</span>
           <span><b style={{ fontSize: 24, fontWeight: 300, color: C.lav, marginRight: 6 }}>{init.skills.length}</b>skills</span>
           <span><b style={{ fontSize: 24, fontWeight: 300, color: C.cyan, marginRight: 6 }}>{init.mcp.length}</b>MCP</span>
@@ -100,13 +101,13 @@ export function ClaudeGuideView() {
             <span className="eyebrow" style={{ color: C.cyan }}>{c.title}</span>
             <span style={{ fontSize: 13, color: C.t3 }}>{c.description}</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: phone ? 'minmax(0,1fr)' : 'repeat(auto-fill,minmax(260px,1fr))', gap: 12 }}>
             {c.cards.map((k) => {
               const isInstalled = k.match ? installed.has(k.match) : null
               return (
-                <article key={k.title} style={{ ...card, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <article key={k.title} style={{ ...card, display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                    <span className={k.kind === 'concept' ? undefined : 'mono'} style={{ fontSize: k.kind === 'concept' ? 15 : 14, fontWeight: 600, color: C.text }}>{k.title}</span>
+                    <span className={k.kind === 'concept' ? undefined : 'mono'} style={{ fontSize: k.kind === 'concept' ? 15 : 14, fontWeight: 600, color: C.text, minWidth: 0, overflowWrap: 'anywhere' }}>{k.title}</span>
                     <span style={{ fontSize: 11, color: KIND_COLOR[k.kind], whiteSpace: 'nowrap' }}>
                       {KIND_LABEL[k.kind]}
                       {isInstalled === true && <span style={{ color: C.ok }}> · instalado</span>}

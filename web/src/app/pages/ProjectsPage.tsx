@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Overview, RepoInfo } from '@shared/protocol'
 import { useApi } from '../../api/useApi'
 import { C, toneColor } from '../../lib/colors'
 import { useYui } from '../../store/yui'
 import { input } from '../../views/kit'
 import { ProjectView } from '../../views/ProjectView'
-import { Empty, useHeader } from '../../views/ui'
+import { Empty } from '../../views/ui'
 import { Dot, openApp, relTime, useViewParams } from './common'
 
 // Projetos: catálogo do GitHub (clonados ou não) com saúde; o escolhido abre com ações (terminal, Claude, logs, preview).
@@ -16,8 +16,14 @@ export function ProjectsPage() {
   const ov = useApi<Overview>('/api/overview', [], 60000)
   const [q, setQ] = useState('')
   const [all, setAll] = useState(false)
+  const device = useYui((s) => s.device)
+  const phone = device === 'phone'
   useViewParams(id ? { project: id } : {})
-  useHeader('Projetos', 'Seus repositórios', [{ label: all ? 'Só clonados' : 'Todos do GitHub', fn: () => setAll(!all) }], [all])
+  // no celular com projeto aberto o cabeçalho é do ProjectView (‹ Voltar + ações do projeto)
+  useEffect(() => {
+    if (id && phone) return
+    useYui.getState().setHeader({ eyebrow: 'Projetos', title: 'Seus repositórios', actions: [{ label: all ? 'Só clonados' : 'Todos do GitHub', fn: () => setAll(!all) }] })
+  }, [all, id, phone])
 
   const health = new Map((ov.data?.projects ?? []).map((p) => [p.slug, p]))
   const list = useMemo(() => {
@@ -33,12 +39,32 @@ export function ProjectsPage() {
   }, [repos.data, ov.data, q, all])
 
   const show = useYui.getState().show
+  const actions = id && (
+    // celular: botões em grade de 2 colunas
+    <div style={phone ? { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8 } : { display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <button className="app-btn small" onClick={() => show('terminal', { kind: 'claude', project: id })}>Claude no projeto</button>
+      <button className="app-btn small" onClick={() => show('terminal', { kind: 'shell', project: id })}>Terminal</button>
+      <button className="app-btn small" onClick={() => openApp('infra', id)}>Logs</button>
+      <button className="app-btn small" onClick={() => openApp('claude')}>Comandos do Claude</button>
+      <button className="app-btn small" onClick={() => show('website', { project: id })}>Preview</button>
+    </div>
+  )
+
+  // celular: projeto aberto ocupa a tela toda (sem a lista)
+  if (phone && id)
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
+        {actions}
+        <ProjectView />
+      </div>
+    )
+
   return (
     <div className="app-split" style={{ alignItems: 'flex-start' }}>
-      <section style={{ width: id ? 360 : '100%', maxWidth: '100%', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <input aria-label="Buscar projeto" placeholder={`Buscar entre ${repos.data?.length ?? '…'} repositórios…`} value={q} onChange={(e) => setQ(e.target.value)} style={{ ...input, height: 36 }} />
+      <section style={{ width: id ? (device === 'tablet' ? 280 : 360) : '100%', maxWidth: '100%', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <input aria-label="Buscar projeto" placeholder={`Buscar entre ${repos.data?.length ?? '…'} repositórios…`} value={q} onChange={(e) => setQ(e.target.value)} style={{ ...input, height: phone ? 44 : 36 }} />
         {list.length === 0 && <Empty text={repos.data?.length === 0 ? 'Conecte o GitHub em Configurações para ver seus repositórios.' : 'Nenhum projeto encontrado.'} />}
-        <div style={{ display: id ? 'flex' : 'grid', flexDirection: 'column', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 8 }}>
+        <div style={{ display: id || phone ? 'flex' : 'grid', flexDirection: 'column', gridTemplateColumns: `repeat(auto-fill,minmax(${device === 'tablet' ? 260 : 300}px,1fr))`, gap: 8 }}>
           {list.map((r) => {
             const h = health.get(r.slug)
             const on = r.slug === id
@@ -48,8 +74,8 @@ export function ProjectsPage() {
                 onClick={() => openApp('projects', r.slug)}
                 className={on ? undefined : 'app-row'}
                 style={{
-                  display: 'grid', gridTemplateColumns: '14px minmax(0,1fr) auto', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, textAlign: 'left', cursor: 'pointer', color: C.text,
-                  background: on ? 'rgba(103,216,242,.07)' : 'rgba(255,255,255,.025)', border: `1px solid ${on ? 'rgba(103,216,242,.25)' : 'rgba(255,255,255,.06)'}`,
+                  display: 'grid', gridTemplateColumns: phone ? '14px minmax(0,1fr) auto 12px' : '14px minmax(0,1fr) auto', alignItems: 'center', gap: 12, padding: phone ? 14 : '12px 14px', minHeight: 44, borderRadius: phone ? 16 : 14, textAlign: 'left', cursor: 'pointer', color: C.text,
+                  background: on ? 'rgba(103,216,242,.07)' : phone ? 'rgba(255,255,255,.035)' : 'rgba(255,255,255,.025)', border: `1px solid ${on ? 'rgba(103,216,242,.25)' : phone ? 'rgba(255,255,255,.07)' : 'rgba(255,255,255,.06)'}`,
                 }}
               >
                 {h ? <Dot c={toneColor(h.tone)} /> : <Dot c={C.t3} hollow />}
@@ -63,6 +89,7 @@ export function ProjectsPage() {
                   <span style={{ fontSize: 12, color: h ? toneColor(h.tone) : C.t3 }}>{h ? (h.health === null ? h.status : `${h.health}%`) : r.cloned ? 'clonado' : 'no GitHub'}</span>
                   <span className="app-mono" style={{ fontSize: 10.5, color: C.t3 }}>{r.lang ?? ''}{r.pushedAt ? ` · ${relTime(r.pushedAt)}` : ''}</span>
                 </span>
+                {phone && <span aria-hidden style={{ fontSize: 22, color: C.t3, lineHeight: 1 }}>›</span>}
               </button>
             )
           })}
@@ -70,13 +97,7 @@ export function ProjectsPage() {
       </section>
       {id && (
         <section style={{ flex: 1, minWidth: 0, width: '100%', padding: '18px 20px', borderRadius: 18, background: 'linear-gradient(180deg, rgba(20,24,50,.62), rgba(12,14,32,.62))', border: '1px solid rgba(160,170,255,.11)', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="app-btn small" onClick={() => show('terminal', { kind: 'claude', project: id })}>Claude no projeto</button>
-            <button className="app-btn small" onClick={() => show('terminal', { kind: 'shell', project: id })}>Terminal</button>
-            <button className="app-btn small" onClick={() => openApp('infra', id)}>Logs</button>
-            <button className="app-btn small" onClick={() => openApp('claude')}>Comandos do Claude</button>
-            <button className="app-btn small" onClick={() => show('website', { project: id })}>Preview</button>
-          </div>
+          {actions}
           <ProjectView />
         </section>
       )}

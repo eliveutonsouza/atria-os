@@ -76,14 +76,14 @@ export function MissionView() {
   const actions = !m
     ? []
     : m.status === 'running'
-      ? [{ label: 'Pausar', fn: act('pause') }, { label: 'Cancelar', fn: act('cancel') }]
+      ? [{ label: 'Pausar', fn: act('pause'), primary: true }, { label: 'Cancelar', fn: act('cancel') }]
       : m.status === 'paused'
-        ? [{ label: 'Retomar', fn: act('resume') }, { label: 'Cancelar', fn: act('cancel') }]
+        ? [{ label: 'Retomar', fn: act('resume'), primary: true }, { label: 'Cancelar', fn: act('cancel') }]
         : m.status === 'blocked' || m.status === 'failed'
-          ? [{ label: 'Tentar de novo', fn: act('retry') }, ...(m.status === 'blocked' ? [{ label: 'Cancelar', fn: act('cancel') }] : [])]
+          ? [{ label: 'Tentar de novo', fn: act('retry'), primary: true }, ...(m.status === 'blocked' ? [{ label: 'Cancelar', fn: act('cancel') }] : [])]
           : []
   const [delOpen, setDelOpen] = useState(false)
-  useHeader('Mission', m?.title ?? 'Missão', m ? [...actions, { label: 'Excluir', fn: () => setDelOpen(true) }] : actions, [m?.status, m?.id])
+  useHeader('Mission', m?.title ?? 'Missão', m ? [...actions, { label: 'Excluir missão', fn: () => setDelOpen(true), danger: true }] : actions, [m?.status, m?.id])
   if (!id) return <Empty text="Nenhuma missão aberta." hint="Peça algo grande: “Yui, cria uma landing page para uma clínica.”" />
   if (loading && !m) return <Skeleton kpis={0} rows={5} />
   if (error || !m) return <ErrorNote text="Não encontrei essa missão." />
@@ -182,6 +182,7 @@ function Graph({ steps }: { steps: MissionStep[] }) {
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 
 function StepRow({ step, n }: { step: MissionStep; n: number }) {
+  const phone = useYui((s) => s.device === 'phone')
   const [open, setOpen] = useState(step.status === 'failed')
   const st = ST[step.status]
   return (
@@ -189,26 +190,28 @@ function StepRow({ step, n }: { step: MissionStep; n: number }) {
       <button
         onClick={() => setOpen(!open)}
         className="hov-row"
-        style={{ width: '100%', display: 'grid', gridTemplateColumns: '28px 20px minmax(0,1fr) auto', alignItems: 'center', gap: 12, padding: '13px 0', border: 'none', background: 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer' }}
+        style={{ width: '100%', display: 'grid', gridTemplateColumns: phone ? '20px minmax(0,1fr)' : '28px 20px minmax(0,1fr) auto', alignItems: 'center', gap: phone ? 10 : 12, minHeight: 44, padding: '13px 0', border: 'none', background: 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer' }}
       >
-        <span className="mono" style={{ fontSize: 12, color: C.t3 }}>{String(n).padStart(2, '0')}</span>
+        {!phone && <span className="mono" style={{ fontSize: 12, color: C.t3 }}>{String(n).padStart(2, '0')}</span>}
         <span style={{ color: st.c, textAlign: 'center' }}>{st.icon}</span>
         <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-          <span style={{ fontSize: 15, fontWeight: 600 }}>{step.title}{step.risky && <span style={{ marginLeft: 8, fontSize: 11, color: C.warn, fontWeight: 500 }}>precisa de OK</span>}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, overflowWrap: 'anywhere' }}>{step.title}{step.risky && <span style={{ marginLeft: 8, fontSize: 11, color: C.warn, fontWeight: 500 }}>precisa de OK</span>}</span>
           <span style={{ fontSize: 13, color: C.t2 }}>{step.agent}{step.dependsOn.length ? ` · depois de ${step.dependsOn.join(', ')}` : ''}</span>
+          {/* celular: estado vai para baixo do agente (sem coluna fixa à direita) */}
+          {phone && <span style={{ fontSize: 12, color: st.c }}>{st.label}</span>}
         </span>
-        <span style={{ fontSize: 12, color: st.c, whiteSpace: 'nowrap' }}>{st.label}</span>
+        {!phone && <span style={{ fontSize: 12, color: st.c, whiteSpace: 'nowrap' }}>{st.label}</span>}
       </button>
       {open && (
-        <div style={{ padding: '0 0 16px 60px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontSize: 13, color: '#b4b9cf', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{step.instruction}</div>
+        <div style={{ padding: phone ? '0 0 16px 30px' : '0 0 16px 60px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontSize: 13, color: '#b4b9cf', lineHeight: 1.6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{step.instruction}</div>
           {step.result && (
-            <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(0,0,0,.3)', border: '1px solid rgba(255,255,255,.06)', fontSize: 13, color: '#d6d9e8', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{step.result}</div>
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(0,0,0,.3)', border: '1px solid rgba(255,255,255,.06)', fontSize: 13, color: '#d6d9e8', lineHeight: 1.6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{step.result}</div>
           )}
           {step.runId && (
             <button
               onClick={() => useYui.getState().show('runs', { runId: step.runId! })}
-              style={{ alignSelf: 'flex-start', height: 30, padding: '0 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.03)', color: '#dfe3f3', fontSize: 12, cursor: 'pointer' }}
+              style={{ alignSelf: 'flex-start', height: phone ? 44 : 30, padding: '0 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.03)', color: '#dfe3f3', fontSize: 12, cursor: 'pointer' }}
             >
               Ver execução
             </button>

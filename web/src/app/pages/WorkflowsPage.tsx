@@ -7,10 +7,11 @@ import { useViewParams } from './common'
 export function WorkflowsPage() {
   const id = useYui((s) => s.appParams.id)
   const run = useYui((s) => s.viewParams.workflowRunId)
+  const device = useYui((s) => s.device)
   useViewParams(id && id !== 'new' ? { workflowId: id, ...(run ? { workflowRunId: run } : {}) } : {})
   if (!id) return <WorkflowsView />
   return (
-    <div style={{ flex: 1, minHeight: 560, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ flex: 1, minHeight: device === 'phone' ? undefined : device === 'tablet' ? 480 : 560, display: 'flex', flexDirection: 'column' }}>
       <WorkflowView />
     </div>
   )

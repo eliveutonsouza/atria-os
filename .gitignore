@@ -3,3 +3,4 @@ dist/
 .env
 *.db
 e2e/shots/
+e2e/shots-test/

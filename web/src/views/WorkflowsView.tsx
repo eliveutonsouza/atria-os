@@ -25,9 +25,10 @@ export function WorkflowsView() {
   const [del, setDel] = useState<Row | null>(null)
   const show = useYui.getState().show
   const say = useYui.getState().say
+  const phone = useYui((s) => s.device === 'phone')
 
   useHeader('Workflows', 'Rotinas de trabalho', [
-    { label: '+ Novo workflow', fn: () => show('workflow') },
+    { label: '+ Novo workflow', fn: () => show('workflow'), primary: true },
     { label: 'Rotinas agendadas', fn: () => show('routines') },
   ])
 
@@ -84,7 +85,7 @@ export function WorkflowsView() {
       ) : !data.length ? (
         <Empty text="Ainda não há workflows." hint="Descreva uma rotina acima ou crie um do zero." />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(300px,100%),1fr))', gap: 14 }}>
           {data.map((w) => {
             const last = w.lastRun
             const counts = w.nodes.reduce<Record<string, number>>((acc, n) => ({ ...acc, [n.type]: (acc[n.type] ?? 0) + 1 }), {})
@@ -126,16 +127,30 @@ export function WorkflowsView() {
                     'nunca'
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: 6, marginTop: 'auto' }}>
-                  <button className="wf-btn" onClick={() => show('workflow', { workflowId: w.slug })}>Abrir</button>
-                  <button className="wf-btn" onClick={() => void run(w)}>Rodar</button>
-                  <button className="wf-btn ghost" onClick={() => show('workflow', { workflowId: w.slug })} title="Abra e use Agendar">
-                    Agendar
-                  </button>
-                  <button className="wf-btn ghost" onClick={() => setDel(w)} aria-label={`Remover workflow ${w.name}`} style={{ color: '#f39aa4', marginLeft: 'auto' }}>
-                    Remover
-                  </button>
-                </div>
+                {phone ? (
+                  // celular: grade de alvos de 44px, lixeira como ícone
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr)) 44px', gap: 6, marginTop: 'auto' }}>
+                    <button className="wf-btn" onClick={() => show('workflow', { workflowId: w.slug })}>Abrir</button>
+                    <button className="wf-btn" onClick={() => void run(w)}>Rodar</button>
+                    <button className="wf-btn ghost" onClick={() => show('workflow', { workflowId: w.slug })}>Agendar</button>
+                    <button className="wf-btn ghost" onClick={() => setDel(w)} aria-label={`Remover workflow ${w.name}`} style={{ color: '#f39aa4', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 'auto' }}>
+                    <button className="wf-btn" onClick={() => show('workflow', { workflowId: w.slug })}>Abrir</button>
+                    <button className="wf-btn" onClick={() => void run(w)}>Rodar</button>
+                    <button className="wf-btn ghost" onClick={() => show('workflow', { workflowId: w.slug })} title="Abra e use Agendar">
+                      Agendar
+                    </button>
+                    <button className="wf-btn ghost" onClick={() => setDel(w)} aria-label={`Remover workflow ${w.name}`} style={{ color: '#f39aa4', marginLeft: 'auto' }}>
+                      Remover
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}

@@ -40,16 +40,24 @@ export function SchedulePage() {
   const occ = useApi<ScheduleOccurrence[]>(`/api/schedule/occurrences?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, [from], 60000)
   const wfs = useApi<WfItem[]>('/api/workflows', [], 30000)
   const thisWeek = mondayOf(new Date()).getTime() === week.getTime()
-  useHeader(`Agendamentos · semana ${isoWeek(week)}`, 'Sua rotina automatizada', [
-    { label: '‹', fn: () => setWeek(new Date(week.getTime() - 7 * DAY)) },
-    { label: thisWeek ? 'Esta semana' : 'Hoje', fn: () => setWeek(mondayOf(new Date())) },
-    { label: '›', fn: () => setWeek(new Date(week.getTime() + 7 * DAY)) },
-    { label: '+ Nova rotina', fn: () => document.getElementById('yui-routines')?.scrollIntoView({ behavior: 'smooth' }) },
-  ], [from, thisWeek])
+  const device = useYui((s) => s.device)
+  const coarse = useYui((s) => s.coarse)
+  const narrow = device === 'phone'
+  const tablet = device === 'tablet'
+  const prevWeek = () => setWeek(new Date(week.getTime() - 7 * DAY))
+  const nextWeek = () => setWeek(new Date(week.getTime() + 7 * DAY))
+  const newRoutine = { label: '+ Nova rotina', fn: () => document.getElementById('yui-routines')?.scrollIntoView({ behavior: 'smooth' }), primary: true }
+  const today = { label: thisWeek ? 'Esta semana' : 'Hoje', fn: () => setWeek(mondayOf(new Date())) }
+  // celular: ‹ › ficam na faixa da semana (ícones com aria-label), não no menu ⋯
+  useHeader(
+    `Agendamentos · semana ${isoWeek(week)}`,
+    'Sua rotina automatizada',
+    narrow ? [newRoutine, today] : [{ label: '‹', fn: prevWeek }, today, { label: '›', fn: nextWeek }, newRoutine],
+    [from, thisWeek, narrow],
+  )
 
   const days = Array.from({ length: 7 }, (_, i) => new Date(week.getTime() + i * DAY))
   const todayKey = new Date().toDateString()
-  const narrow = useYui((s) => s.narrow)
   const [dayPick, setDayPick] = useState<string | null>(null)
   const selectedDay = dayPick && days.some((d) => d.toDateString() === dayPick) ? dayPick : days.find((d) => d.toDateString() === todayKey)?.toDateString() ?? days[0].toDateString()
   const dayItems = (occ.data ?? []).filter((o) => new Date(o.at).toDateString() === selectedDay).sort((a, b) => a.at.localeCompare(b.at))
@@ -75,10 +83,17 @@ export function SchedulePage() {
 
   return (
     <>
-      <div className="app-split" style={{ alignItems: 'flex-start' }}>
+      <div className="app-split" style={{ alignItems: 'flex-start', flexWrap: tablet ? 'wrap' : undefined }}>
         {narrow ? (
           // Celular: agenda do dia (chips dos 7 dias + lista) em vez da grade semanal larga.
           <section aria-label="Agenda do dia" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '44px minmax(0,1fr) 44px', alignItems: 'center', gap: 8 }}>
+              <button className="app-btn" aria-label="Semana anterior" onClick={prevWeek} style={{ width: 44, height: 44, padding: 0, justifyContent: 'center', fontSize: 20 }}>‹</button>
+              <span style={{ textAlign: 'center', fontSize: 13.5, color: C.t2 }}>
+                {days[0].toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} – {days[6].toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+              </span>
+              <button className="app-btn" aria-label="Próxima semana" onClick={nextWeek} style={{ width: 44, height: 44, padding: 0, justifyContent: 'center', fontSize: 20 }}>›</button>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 4 }}>
               {days.map((d) => {
                 const key = d.toDateString()
@@ -110,9 +125,9 @@ export function SchedulePage() {
         ) : (
         <section
           aria-label="Calendário semanal"
-          style={{ flex: 1, minWidth: 0, width: '100%', borderRadius: 16, background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.06)', overflowX: 'auto' }}
+          style={{ flex: tablet ? '1 1 620px' : 1, minWidth: 0, width: '100%', borderRadius: 16, background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.06)', overflowX: 'auto' }}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: '54px repeat(7, minmax(92px, 1fr))', minWidth: 700 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '54px repeat(7, minmax(84px, 1fr))', minWidth: 640 }}>
             <span />
             {days.map((d) => {
               const today = d.toDateString() === todayKey
@@ -128,12 +143,13 @@ export function SchedulePage() {
               </div>
             )}
             {hours.map((h) => (
-              <Row key={h} h={h} days={days} cell={cell} />
+              <Row key={h} h={h} days={days} cell={cell} coarse={coarse} />
             ))}
           </div>
         </section>
         )}
-        <aside style={{ width: 340, maxWidth: '100%', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* tablet: base 340px cresce até a largura toda quando quebra para baixo da grade */}
+        <aside style={{ ...(tablet ? { flex: '1 1 340px' } : { width: 340, flexShrink: 0 }), maxWidth: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div className="eyebrow">Workflows</div>
           {(wfs.data ?? []).length === 0 && <span className="app-muted">Nenhum workflow ainda.</span>}
           {(wfs.data ?? []).map((w) => {
@@ -177,7 +193,7 @@ export function SchedulePage() {
   )
 }
 
-function Row({ h, days, cell }: { h: number; days: Date[]; cell: Map<string, ScheduleOccurrence[]> }) {
+function Row({ h, days, cell, coarse }: { h: number; days: Date[]; cell: Map<string, ScheduleOccurrence[]>; coarse: boolean }) {
   return (
     <>
       <span className="app-mono" style={{ fontSize: 10.5, color: C.t3, padding: '8px 6px', borderTop: '1px solid rgba(255,255,255,.04)' }}>{String(h).padStart(2, '0')}h</span>
@@ -192,7 +208,11 @@ function Row({ h, days, cell }: { h: number; days: Date[]; cell: Map<string, Sch
                   key={o.routineId + o.at}
                   title={`${o.name} — ${new Date(o.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${o.enabled ? '' : ' (pausada)'}`}
                   onClick={() => (o.workflow ? openApp('workflows', o.workflow) : document.getElementById('yui-routines')?.scrollIntoView({ behavior: 'smooth' }))}
-                  style={{ fontSize: 11, padding: '5px 7px', borderRadius: 8, background: t.bg, border: `1px solid ${t.b}`, color: t.c, lineHeight: 1.3, textAlign: 'left', cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                  style={{
+                    fontSize: 11, padding: '5px 7px', borderRadius: 8, background: t.bg, border: `1px solid ${t.b}`, color: t.c, lineHeight: 1.3, textAlign: 'left', cursor: 'pointer', overflow: 'hidden',
+                    // toque não tem hover para o title: nome em até 2 linhas e alvo de 44px
+                    ...(coarse ? { minHeight: 44, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflowWrap: 'anywhere' } : { whiteSpace: 'nowrap', textOverflow: 'ellipsis' }),
+                  }}
                 >
                   {o.name}
                 </button>
