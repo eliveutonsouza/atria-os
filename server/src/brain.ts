@@ -53,7 +53,7 @@ Como responder:
 - "Volta", "fecha", "sair" => close_canvas. "Tela cheia" => set_focus(true).
 - Pedidos de trabalho (corrigir, criar, pesquisar, revisar, gerar relatório, criar site) => delegate_task com o agente mais adequado e uma instrução completa e autossuficiente (o agente não vê esta conversa). Diga em uma frase quem você acordou e o que vai fazer.
 - Para trabalhos que o usuário quer recorrentes ("todo dia às 8h…") use create_routine.
-- Os agentes têm acesso real às contas do usuário pelos conectores listados em "Conectores dos agentes" (ex.: Google Calendar, Gmail, Drive, Linear, Vercel, Supabase) e a um navegador. NUNCA diga que não há acesso a um serviço dessa lista: delegue ao agente Assistente (agenda, e-mail, documentos, tarefas, consultas) com instrução completa (data, hora, fuso America/Sao_Paulo, título). Se faltar só a data, assuma a próxima ocorrência futura e diga qual assumiu.
+- Os agentes têm acesso real às contas do usuário pelos conectores listados em "Conectores dos agentes" (ex.: Google Calendar, Gmail, Drive, Linear, Vercel, Supabase) e a um navegador. NUNCA diga que não há acesso a um serviço dessa lista: delegue ao agente Assistente (agenda, e-mail, documentos, tarefas, consultas) com instrução completa (data, hora, fuso ${config.timezone}, título). Se faltar só a data, assuma a próxima ocorrência futura e diga qual assumiu.
 - Os projetos do usuário são os repositórios dele no GitHub (catálogo automático). Nunca peça para cadastrar projeto: se não reconhecer o nome, use list_repos. Projetos ainda não clonados são clonados sozinhos ao abrir ou delegar.
 - Se o usuário mudar de projeto ("agora no Stoqmate"), use switch_project.
 - Aprovações são sempre decididas pelo usuário no modal; use open_approval para mostrá-lo, nunca aprove sozinha.
@@ -105,7 +105,7 @@ const TOOLS: OpenAI.Responses.FunctionTool[] = [
     }, ['agent', 'project', 'instruction', 'use_selected_element', 'display']),
   },
   {
-    type: 'function', name: 'create_routine', strict: true, description: 'Agenda trabalho recorrente de um agente (cron, fuso America/Sao_Paulo).',
+    type: 'function', name: 'create_routine', strict: true, description: `Agenda trabalho recorrente de um agente (cron, fuso ${config.timezone}).`,
     parameters: S({ name: { type: 'string' }, cron: { type: 'string', description: 'expressão cron de 5 campos' }, agent: { type: 'string' }, project: nullableStr('slug'), instruction: { type: 'string' } }, ['name', 'cron', 'agent', 'project', 'instruction']),
   },
   { type: 'function', name: 'list_repos', strict: true, description: 'Busca nos repositórios GitHub do usuário (catálogo completo, clonados ou não).', parameters: S({ query: nullableStr('trecho do nome/descrição; null lista os mais recentes') }, ['query']) },
@@ -138,7 +138,6 @@ function snapshot(): string {
   const ap = activeProject();
   const runs = listRuns(12);
   const lines = [
-    `Agora: ${new Date().toLocaleString('pt-BR', { timeZone: config.timezone })}.`,
     `Projeto ativo: ${ap ?? 'nenhum'}.`,
     `Tela atual: ${uiContext.mode === 'center' ? 'Yui ao centro, sem Canvas' : `Canvas com view "${uiContext.view}"${uiContext.params?.project ? ` do projeto ${uiContext.params.project}` : ''}${uiContext.mode === 'focus' ? ' em tela cheia' : ''}`}.`,
     uiContext.selectedElement ? `Elemento selecionado no preview: ${uiContext.selectedElement}.` : '',

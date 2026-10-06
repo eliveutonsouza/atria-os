@@ -7,6 +7,8 @@ import * as customViews from '../src/customViews.ts';
 import * as toolbox from '../src/toolbox.ts';
 import * as agentsAdmin from '../src/agentsAdmin.ts';
 import * as workflows from '../src/workflows.ts';
+import '../src/ambiente.ts';
+import '../src/lembretes.ts';
 
 // Módulos registram tools do cérebro em register(app); aqui um app falso só para isso (rotas ignoradas).
 const noop = () => fakeApp;
@@ -25,6 +27,7 @@ interface Case {
   any: string[];
   args?: Record<string, string>;
   pending?: string; // depende de outra frente
+  say?: RegExp; // resposta direta: o texto precisa bater
 }
 
 const show = (view: string) => ({ any: ['show_view'], args: { view } });
@@ -102,9 +105,21 @@ const CASES: Case[] = [
   // small talk
   { q: 'oi Yui, tudo bem?', any: [] },
   { q: 'obrigado', any: [] },
+  // agora / dia a dia (resposta direta pelo bloco "Agora")
+  { q: 'que horas são?', any: [], say: /\d{1,2}(:\d{2}| ?h)/ },
+  { q: 'que dia é hoje?', any: [], say: /(segunda|terça|quarta|quinta|sexta|sábado|domingo)/i },
+  { q: 'é de manhã ou de tarde agora?', any: [], say: /(manhã|tarde|noite|madrugada)/i },
+  { q: 'quando é o próximo feriado?', any: ['ambiente_feriados'] },
+  { q: 'vai chover essa semana em Goiânia?', any: ['ambiente_clima'] },
+  { q: 'que horas são em Tóquio?', any: ['ambiente_hora'] },
+  { q: 'quanto tá o dólar hoje?', any: ['ambiente_cotacoes'] },
+  { q: 'me lembra daqui 10 minutos de tirar o café', any: ['lembrete_criar'] },
+  { q: 'me avisa amanhã às 9h de ligar pro contador', any: ['lembrete_criar'] },
+  { q: 'quais lembretes eu tenho?', any: ['lembrete_listar'] },
 ];
 
-function pass(c: Case, calls: { name: string; args: Record<string, unknown> }[]): boolean {
+function pass(c: Case, calls: { name: string; args: Record<string, unknown> }[], text = ''): boolean {
+  if (c.say && !c.say.test(text)) return false;
   if (!c.any.length) return calls.filter((x) => !x.name.startsWith('get_') && !x.name.startsWith('list_')).length === 0;
   const hits = calls.filter((x) => c.any.includes(x.name));
   if (!hits.length) return false;
@@ -132,7 +147,7 @@ for (let i = 0; i < cases.length; i += conc) {
       } catch (e) {
         text = `ERRO ${(e as Error).message}`;
       }
-      return { c, calls, text, good: pass(c, calls) };
+      return { c, calls, text, good: pass(c, calls, text) };
     }),
   );
   results.push(...out);

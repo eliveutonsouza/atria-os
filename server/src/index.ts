@@ -19,7 +19,7 @@ import { activeProject, ensureProject, findProject, listProjectConfigs, projectD
 import { cancelRun, claudeLoggedIn, enqueueRun, getRun, inboxItems, listRuns, pendingApprovals, recoverRuns, resolveApproval, runEvents } from './runs.ts';
 import { brief, infra, latestReport, overview } from './metrics.ts';
 import { getUiContext, recentMessages, setUiContext } from './brain.ts';
-import { endLive, handleText, liveActive, setUiContextNote, startLive } from './live.ts';
+import { endLive, handleText, liveActive, narrate, setUiContextNote, startLive } from './live.ts';
 import { startRoutines } from './routines.ts';
 import { initTerminal, registerTerminal } from './terminal.ts';
 import { trustDirs } from './trust.ts';
@@ -38,6 +38,8 @@ import * as vault from './vault.ts';
 import * as vaultAuto from './vaultAuto.ts';
 import * as company from './company/index.ts';
 import * as help from './help.ts';
+import { agora, saudacao, startAmbiente } from './ambiente.ts';
+import { startLembretes } from './lembretes.ts';
 import { sandboxUrl, sbToken } from './sandbox.ts';
 import { catalog, githubEnabled, startGithub, syncCatalog } from './github.ts';
 
@@ -76,6 +78,8 @@ initTerminal();
 registerTerminal(app);
 for (const mod of [missions, customViews, toolbox, agentsAdmin, workflows, push, stats, browserLive, settings, onboarding, vault, company, help]) mod.register(app);
 vaultAuto.register();
+startAmbiente();
+startLembretes((text) => narrate(text, { speak: true }));
 
 app.get('/api/health', async () => ({ ok: true }));
 
@@ -135,8 +139,7 @@ app.get('/api/events', (req, reply) => {
 
 // ---------- bootstrap ----------
 function greeting(): Bootstrap['greeting'] {
-  const h = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: config.timezone }));
-  const hello = h < 12 ? 'Bom dia.' : h < 18 ? 'Boa tarde.' : 'Boa noite.';
+  const hello = `${saudacao(agora().periodo)}.`;
   const lastSeen = kvGet('last_seen');
   const away = !lastSeen || Date.now() - new Date(lastSeen).getTime() > 4 * 3600_000;
   const b = brief();

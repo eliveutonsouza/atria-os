@@ -27,6 +27,7 @@ interface Def {
 export const SETTINGS: Record<string, Def> = {
   'user.name': { kind: 'string', env: 'YUI_USER_NAME', def: '', maxLen: 60 },
   'user.email': { kind: 'string', env: 'YUI_USER_EMAIL', def: '', maxLen: 120 },
+  'user.city': { kind: 'string', env: 'YUI_USER_CITY', def: '', maxLen: 80 },
   'openai.key': { kind: 'secret', env: 'OPENAI_API_KEY', def: '' },
   'models.brain': { kind: 'string', env: 'YUI_BRAIN_MODEL', def: 'gpt-6-luna', maxLen: 60 },
   'models.planner': { kind: 'string', env: 'YUI_PLANNER_MODEL', def: 'gpt-6-sol', maxLen: 60 },

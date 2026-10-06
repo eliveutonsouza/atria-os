@@ -6,6 +6,7 @@ import { emit, setYuiState } from './bus.ts';
 import { openai, recentMessages, saveMessage, think } from './brain.ts';
 import { runBus } from './runs.ts';
 import { agentsWorking } from './agents.ts';
+import { contextoAgora } from './ambiente.ts';
 
 // Yui por voz = GPT-Live-1 (o mesmo modelo full-duplex do ChatGPT Voice/Codex).
 // Browser <-> OpenAI por WebRTC (áudio). Este servidor acompanha a sessão por um sideband WebSocket:
@@ -24,7 +25,13 @@ e respostas curtas a perguntas suas ("sim", "pode", "quero ver").
 Você e os agentes TÊM acesso às contas do usuário (Google Calendar, Gmail, Drive, Linear, Vercel, Supabase, Figma…) pelo backend.
 Nunca diga que não tem acesso a algo sem antes delegar.
 Enquanto o backend trabalha, mantenha a conversa natural (ex.: "Deixa eu ver."), sem inventar resultados.
-Quando receber resultado do backend, diga-o com naturalidade, sem repetir palavra por palavra.`;
+Quando receber resultado do backend, diga-o com naturalidade, sem repetir palavra por palavra.
+Exceção à regra de delegar: hora, data, dia da semana, período do dia, clima de hoje/amanhã e feriado você responde DIRETO
+com o bloco "Agora" abaixo (ou com a "Atualização do relógio" mais recente que o backend mandar). Nunca pergunte de volta
+"horas do quê?": "que horas são" é a hora atual. Previsão de outros dias/cidades, cotações e lembretes => delegue.
+Ajuste a saudação ao período (bom dia / boa tarde / boa noite).
+
+${contextoAgora(0)}`;
 
 interface LiveState {
   sessionId: string;
@@ -40,6 +47,7 @@ interface LiveState {
   silenceTimer?: NodeJS.Timeout;
   watchTimer?: NodeJS.Timeout;
   inflight: Inflight | null;
+  clockTimer?: NodeJS.Timeout;
 }
 
 // Pedido sendo atendido pelo servidor (watchdog). Se a delegação do GPT-Live chegar depois,
@@ -54,6 +62,9 @@ interface Inflight {
 
 const SMALL_TALK = /^(oi+|ol[aá]|e a[ií]|opa|tudo (bem|bom|certo)|obrigad[oa]|valeu|beleza|bom dia|boa (tarde|noite)|t[aá] me ouvindo|est[aá] me ouvindo|calma|espera|hum+|ah+|eh+|ok(ay)?|tchau|at[eé] (mais|logo)|isso a[ií]|legal|show|perfeito|entendi|t[aá] bom|certo)\b[\s\S]{0,25}$/i;
 export const isSmallTalk = (t: string) => SMALL_TALK.test(t.trim().replace(/^yui[,!.]?\s*/i, '').replace(/[.!?]+$/, ''));
+// Hora/data/clima de hoje: o GPT-Live responde sozinho com o bloco "Agora" — o watchdog não deve responder em dobro.
+const NOW_Q = /\b(que|quantas) horas\b|\bhoras? (s[aã]o|agora)\b|\bque dia (é|e|foi|ser[aá])\b|\bdia (de )?hoje\b|\bdata de hoje\b|\bque m[eê]s\b|\bem que ano\b|\bdia da semana\b|\b(vai|t[aá]|est[aá]) (chover|chovendo|calor|frio|quente)\b|\b(clima|tempo|temperatura) (hoje|agora|amanh[aã])\b|\bferiado\b/i;
+export const isNowQuestion = (t: string) => NOW_Q.test(t) && t.trim().length < 90;
 const SILENCE_MS = 1200;
 const WATCH_MS = 2500;
 
@@ -88,7 +99,7 @@ function flushUser() {
   st.userBuf = '';
   // Watchdog: se o GPT-Live não delegar em WATCH_MS, o servidor atende o pedido ele mesmo.
   clearTimeout(st.watchTimer);
-  if (!done && !isSmallTalk(text)) {
+  if (!done && !isSmallTalk(text) && !isNowQuestion(text)) {
     st.watchTimer = setTimeout(() => {
       if (live !== st || !st.pendingRequest) return;
       const request = st.pendingRequest;
@@ -163,6 +174,11 @@ export async function startLive(offerSdp: string): Promise<{ sdp: string; sessio
   const sideband = new SidebandWS(openai, { session_id: sessionId, graceful_close: true });
   live = { sessionId, sideband, muted: false, userBuf: '', yuiBuf: '', pendingRequest: '', lastActivity: Date.now(), lastProgressNote: new Map(), inflight: null };
   wire(live);
+  // Sessão longa: o relógio do prompt envelhece; manda o "agora" de novo a cada 5 min.
+  const st = live;
+  st.clockTimer = setInterval(() => {
+    if (live === st) send(st, { type: 'session.thinking.append', delegation_id: null, content: `Atualização do relógio (use esta, não a anterior):\n${contextoAgora(0)}` });
+  }, 5 * 60_000);
   emit({ type: 'live.status', active: true, muted: false });
   return { sdp: res.transport.sdp, sessionId };
 }
@@ -246,6 +262,7 @@ export function endLive(reason = 'user') {
   clearTimeout(st.silenceTimer);
   clearTimeout(st.watchTimer);
   clearTimeout(st.speakingTimer);
+  clearInterval(st.clockTimer);
   flushUserOf(st);
   try {
     st.sideband.send({ type: 'session.close' });

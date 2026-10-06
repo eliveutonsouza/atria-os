@@ -131,6 +131,7 @@ export function AccountSection() {
   const { data, save, msg } = useSettings()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [city, setCity] = useState('')
   const [cur, setCur] = useState('')
   const [next, setNext] = useState('')
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null)
@@ -138,6 +139,7 @@ export function AccountSection() {
     if (data) {
       setName(String(data.values['user.name'] ?? ''))
       setEmail(String(data.values['user.email'] ?? ''))
+      setCity(String(data.values['user.city'] ?? ''))
     }
   }, [data])
   const changePw = async () => {
@@ -157,9 +159,10 @@ export function AccountSection() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
           <Field label="Nome"><input value={name} onChange={(e) => setName(e.target.value)} style={input} autoComplete="name" /></Field>
           <Field label="E-mail" hint="Usado como remetente das notificações push."><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={input} autoComplete="email" /></Field>
+          <Field label="Cidade" hint="Para a Yui saber o clima e os feriados. Ex.: Goiânia, GO."><input value={city} onChange={(e) => setCity(e.target.value)} style={input} autoComplete="address-level2" placeholder="Cidade, UF" /></Field>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button type="button" style={bigBtn(true)} onClick={() => save({ 'user.name': name, 'user.email': email })}>Salvar</button>
+          <button type="button" style={bigBtn(true)} onClick={() => save({ 'user.name': name, 'user.email': email, 'user.city': city })}>Salvar</button>
           <SaveMsg msg={msg} />
         </div>
       </Section>
