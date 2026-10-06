@@ -2,7 +2,7 @@
 tipo: produto
 status: no ar
 tags: [projeto, yui]
-dominio: yui.eliveutonsouza.cloud
+dominio: (o domínio desta instalação)
 ---
 # Yui Console
 

@@ -4,6 +4,7 @@ import type { ServerEvent } from '../../shared/protocol.ts';
 import { db, kvGet, kvSet, now } from './db.ts';
 import { onEmit } from './bus.ts';
 import { getSetting } from './settings.ts';
+import { config } from './config.ts';
 
 // Notificações push (PWA): aprovações, falhas e conclusões chegam no celular/desktop mesmo com o app fechado.
 // Só envia quando nenhuma tela do console está visível (presença enviada pelo app a cada 30 s).
@@ -118,7 +119,9 @@ function onEvent(ev: ServerEvent) {
 
 export function register(app: FastifyInstance): void {
   const keys = vapid();
-  webpush.setVapidDetails(process.env.VAPID_SUBJECT ?? 'mailto:eliveuton.dev@gmail.com', keys.publicKey, keys.privateKey);
+  // Remetente das notificações: VAPID_SUBJECT > e-mail do dono (Configurações) > endereço do painel.
+  const email = String(getSetting('user.email') ?? '');
+  webpush.setVapidDetails(process.env.VAPID_SUBJECT || (email ? `mailto:${email}` : `https://${config.domain}`), keys.publicKey, keys.privateKey);
   onEmit(onEvent);
 
   app.get('/api/push/key', () => ({ key: keys.publicKey }));

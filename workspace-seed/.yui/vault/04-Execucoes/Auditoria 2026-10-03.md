@@ -41,7 +41,7 @@ cd server && EVAL_CONC=3 YUI_DATA_DIR=/tmp/x YUI_WORKSPACE_DIR=/tmp/ws OPENAI_AP
 - TopBar no celular: botões "pendências"/"Terminal" sobrepõem o botão YUI (fora da frente A).
 - Gráficos com todos os valores zero aparecem como linhas finas (correto, mas pouco informativo).
 
-## Validação integrada em produção (yui.eliveutonsouza.cloud, 2026-10-03)
+## Validação integrada em produção (2026-10-03)
 
 | Verificação | Resultado |
 |---|---|

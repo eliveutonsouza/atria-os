@@ -742,7 +742,7 @@ function WorkflowProps({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
         <textarea className="wf-input" rows={3} value={draft.description} onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))} />
       </Field>
       <Field label="Projeto (slug, opcional)">
-        <input className="wf-input" value={draft.project ?? ''} onChange={(e) => setDraft((d) => ({ ...d, project: e.target.value.trim() || null }))} placeholder="eliveuton-instagram" />
+        <input className="wf-input" value={draft.project ?? ''} onChange={(e) => setDraft((d) => ({ ...d, project: e.target.value.trim() || null }))} placeholder="meu-projeto" />
       </Field>
       <Field label="Time de agentes">
         <input className="wf-input" value={listText(draft.team)} onChange={(e) => setDraft((d) => ({ ...d, team: textList(e.target.value) }))} />

@@ -6,7 +6,7 @@ import type { WorkflowDef, WorkflowNode, WorkflowNodeType } from './protocol.ts'
 // nome: Post Instagram
 // descricao: Cria e publica um post
 // gatilho: cron 0 9 * * 1      (ou: manual)
-// projeto: eliveuton-instagram (opcional)
+// projeto: meu-projeto (opcional)
 // time: [Research, Copy, Designer]
 // ---
 //
