@@ -228,10 +228,10 @@ function describeTool(name: string, input: Record<string, unknown>): string {
 }
 
 // Aprovação genérica (modal do console). `ownerId` = run, missão ou execução de workflow.
-export async function askApproval(ownerId: string, title: string, rows: ApprovalInfo['rows'], signal?: AbortSignal): Promise<boolean> {
+export async function askApproval(ownerId: string, title: string, rows: ApprovalInfo['rows'], signal?: AbortSignal, opts: { kind?: ApprovalInfo['kind'] } = {}): Promise<boolean> {
   const id = uid();
-  db.prepare(`INSERT INTO approvals(id, run_id, title, rows, created_at) VALUES(?, ?, ?, ?, ?)`).run(id, ownerId, title, JSON.stringify(rows), now());
-  const approval: ApprovalInfo = { id, runId: ownerId, title, rows, createdAt: now() };
+  db.prepare(`INSERT INTO approvals(id, run_id, title, rows, created_at, kind) VALUES(?, ?, ?, ?, ?, ?)`).run(id, ownerId, title, JSON.stringify(rows), now(), opts.kind ?? null);
+  const approval: ApprovalInfo = { id, runId: ownerId, title, rows, createdAt: now(), ...(opts.kind ? { kind: opts.kind } : {}) };
   emit({ type: 'approval.requested', approval });
   emit({ type: 'inbox.updated', inbox: inboxItems() });
   runBus.emit('approval', approval);
@@ -274,17 +274,17 @@ export function resolveApproval(id: string, approved: boolean): boolean {
 
 export function pendingApprovals(): ApprovalInfo[] {
   const rows = db.prepare(`SELECT * FROM approvals WHERE status = 'pending' ORDER BY created_at`).all() as {
-    id: string; run_id: string; title: string; rows: string; created_at: string;
+    id: string; run_id: string; title: string; rows: string; created_at: string; kind: string | null;
   }[];
-  return rows.map((r) => ({ id: r.id, runId: r.run_id, title: r.title, rows: JSON.parse(r.rows), createdAt: r.created_at }));
+  return rows.map((r) => ({ id: r.id, runId: r.run_id, title: r.title, rows: JSON.parse(r.rows), createdAt: r.created_at, ...(r.kind === 'destructive' ? { kind: 'destructive' as const } : {}) }));
 }
 
 export function inboxItems(): InboxItem[] {
   const items: InboxItem[] = pendingApprovals().map((a) => ({
     id: `approval:${a.id}`,
-    tag: 'Aprovação',
+    tag: a.kind === 'destructive' ? 'Exclusão' : 'Aprovação',
     label: a.title,
-    tone: 'warn',
+    tone: a.kind === 'destructive' ? 'crit' : 'warn',
     action: { type: 'approval', approvalId: a.id },
   }));
   const failed = db

@@ -166,11 +166,13 @@ export function ApprovalModal() {
   }, [ap])
   if (!id || !ap) return null
   const left = mode === 'center' || narrow ? '50%' : '62%'
+  // Exclusão pedida pela Yui: visual vermelho, foco no "Cancelar" e rótulo explícito no botão destrutivo.
+  const danger = ap.kind === 'destructive'
   return (
     <>
       <div style={{ position: 'absolute', inset: 0, zIndex: 58, background: 'rgba(4,5,12,.6)', backdropFilter: 'blur(6px)' }} />
-      <div role="alertdialog" aria-modal="true" aria-labelledby="ap-title" style={{ position: 'absolute', top: '50%', left, transform: 'translate(-50%,-50%)', width: 'min(460px,calc(100% - 32px))', zIndex: 59, padding: 28, borderRadius: 22, background: 'linear-gradient(180deg,rgba(26,22,52,.97),rgba(14,16,34,.97))', border: '1px solid rgba(245,181,74,.3)', boxShadow: '0 0 60px rgba(245,181,74,.08), 0 30px 90px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 18 }}>
-        <div style={{ fontSize: 11, letterSpacing: '.24em', color: C.warn, fontWeight: 700 }}>APROVAÇÃO NECESSÁRIA</div>
+      <div role="alertdialog" aria-modal="true" aria-labelledby="ap-title" style={{ position: 'absolute', top: '50%', left, transform: 'translate(-50%,-50%)', width: 'min(460px,calc(100% - 32px))', zIndex: 59, padding: 28, borderRadius: 22, background: 'linear-gradient(180deg,rgba(26,22,52,.97),rgba(14,16,34,.97))', border: `1px solid ${danger ? 'rgba(240,98,114,.5)' : 'rgba(245,181,74,.3)'}`, boxShadow: `0 0 60px ${danger ? 'rgba(240,98,114,.12)' : 'rgba(245,181,74,.08)'}, 0 30px 90px rgba(0,0,0,.6)`, display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div style={{ fontSize: 11, letterSpacing: '.24em', color: danger ? C.crit : C.warn, fontWeight: 700 }}>{danger ? 'AÇÃO DESTRUTIVA · NÃO DÁ PARA DESFAZER' : 'APROVAÇÃO NECESSÁRIA'}</div>
         <div id="ap-title" style={{ fontSize: 22, fontWeight: 400, lineHeight: 1.35 }}>{ap.title}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 14 }}>
           {ap.rows.map((r) => (
@@ -180,19 +182,29 @@ export function ApprovalModal() {
             </div>
           ))}
         </div>
-        <button ref={btnRef} onClick={() => {
-            // aprovação pode ser de um run, de uma etapa de missão ou de um passo de workflow
+        <button ref={danger ? undefined : btnRef} onClick={() => {
+            // aprovação pode ser de um run, de uma etapa de missão, de um passo de workflow ou de uma exclusão pedida à Yui
             const st = useYui.getState()
+            const [, what, target] = ap.runId.match(/^delete:(workflow|mission):(.+)$/) ?? []
+            if (what === 'workflow') return st.show('workflow', { workflowId: target })
+            if (what === 'mission') return st.show('mission', { missionId: target })
             const wf = st.workflowRuns[ap.runId]
             if (wf) return st.show('workflow', { workflowId: wf.workflow, workflowRunId: wf.id })
             const ms = Object.values(st.missions).find((m) => m.id === ap.runId || m.steps.some((x) => x.runId === ap.runId))
             if (ms) return st.show('mission', { missionId: ms.id })
             st.show('runs', { runId: ap.runId })
-          }} style={{ height: 40, borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.03)', color: '#dfe3f3', fontSize: 14, cursor: 'pointer' }}>Revisar alterações</button>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={() => resolveApproval(ap.id, false)} style={{ flex: 1, height: 44, borderRadius: 12, border: '1px solid rgba(240,98,114,.35)', background: 'transparent', color: '#f39aa4', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Rejeitar</button>
-          <button onClick={() => resolveApproval(ap.id, true)} style={{ flex: 1, height: 44, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#4fe0b0,#67d8f2)', color: '#06221c', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Aprovar</button>
-        </div>
+          }} style={{ height: 40, borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.03)', color: '#dfe3f3', fontSize: 14, cursor: 'pointer' }}>{danger ? 'Ver o que será excluído' : 'Revisar alterações'}</button>
+        {danger ? (
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button ref={btnRef} onClick={() => resolveApproval(ap.id, false)} style={{ flex: 1, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.05)', color: '#dfe3f3', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={() => resolveApproval(ap.id, true)} style={{ flex: 1, height: 44, borderRadius: 12, border: 'none', background: '#e2566a', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Excluir definitivamente</button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={() => resolveApproval(ap.id, false)} style={{ flex: 1, height: 44, borderRadius: 12, border: '1px solid rgba(240,98,114,.35)', background: 'transparent', color: '#f39aa4', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Rejeitar</button>
+            <button onClick={() => resolveApproval(ap.id, true)} style={{ flex: 1, height: 44, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#4fe0b0,#67d8f2)', color: '#06221c', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Aprovar</button>
+          </div>
+        )}
       </div>
     </>
   )

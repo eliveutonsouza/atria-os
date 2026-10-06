@@ -153,6 +153,7 @@ export interface ApprovalInfo {
   title: string; // "DevOps quer publicar o AutoComissão em produção."
   rows: { label: string; value: string; tone?: Tone }[];
   createdAt: string;
+  kind?: 'destructive'; // ação irreversível (ex.: excluir workflow/missão): modal em vermelho
 }
 
 export interface InboxItem {
@@ -255,6 +256,8 @@ export type ServerEvent =
   | { type: 'artifact.created'; artifact: ArtifactInfo }
   | { type: 'live.status'; active: boolean; muted: boolean }
   | { type: 'mission.updated'; mission: MissionInfo }
+  | { type: 'mission.deleted'; missionId: string }
+  | { type: 'workflow.deleted'; slug: string }
   | { type: 'workflow.run.updated'; run: WorkflowRunInfo }
   | { type: 'custom.created'; view: CustomViewInfo }
   | { type: 'vault.changed'; paths: string[]; at: number }

@@ -5,6 +5,7 @@ import { useApi } from '../api/useApi'
 import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
 import { describeCron, send } from '../workflow/http'
+import { DeleteWorkflowModal } from '../workflow/DeleteWorkflow'
 import { TYPE_META } from '../workflow/StepNode'
 import { Empty, ErrorNote, Skeleton, useHeader } from './ui'
 
@@ -21,6 +22,7 @@ export function WorkflowsView() {
   const { data, loading, error, reload } = useApi<Row[]>('/api/workflows', [], 8000)
   const [ask, setAsk] = useState('')
   const [busy, setBusy] = useState(false)
+  const [del, setDel] = useState<Row | null>(null)
   const show = useYui.getState().show
   const say = useYui.getState().say
 
@@ -130,11 +132,30 @@ export function WorkflowsView() {
                   <button className="wf-btn ghost" onClick={() => show('workflow', { workflowId: w.slug })} title="Abra e use Agendar">
                     Agendar
                   </button>
+                  <button className="wf-btn ghost" onClick={() => setDel(w)} aria-label={`Remover workflow ${w.name}`} style={{ color: '#f39aa4', marginLeft: 'auto' }}>
+                    Remover
+                  </button>
                 </div>
               </div>
             )
           })}
         </div>
+      )}
+      {del && (
+        <DeleteWorkflowModal
+          slug={del.slug}
+          name={del.name}
+          rows={[
+            { label: 'Passos', value: String(del.nodes.length) },
+            { label: 'Rotinas agendadas', value: del.routines.length ? del.routines.map((r) => r.cron).join(', ') : 'nenhuma' },
+            ...(del.lastRun && (del.lastRun.status === 'running' || del.lastRun.status === 'waiting_approval') ? [{ label: 'Em execução agora', value: 'será interrompida' }] : []),
+          ]}
+          onClose={() => setDel(null)}
+          onDeleted={() => {
+            setDel(null)
+            reload()
+          }}
+        />
       )}
     </div>
   )

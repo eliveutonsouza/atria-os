@@ -66,3 +66,13 @@ export async function startRun(agentId: string, project: string | null, instruct
     s.say('Não consegui acordar o agente agora.', { state: 'warning' })
   }
 }
+
+/** Tira a missão do estado local e fecha o que estiver aberto nela (também usado pelo evento mission.deleted). */
+export function dropMission(id: string) {
+  const s = useYui.getState()
+  const rest = { ...s.missions }
+  delete rest[id]
+  s.set({ missions: rest })
+  if (s.appPage === 'missions' && s.appParams.id === id) s.set({ appParams: {} })
+  if (s.view === 'mission' && s.viewParams.missionId === id) s.show('mission', {})
+}

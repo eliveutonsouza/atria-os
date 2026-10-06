@@ -52,3 +52,50 @@ export function Empty({ text, hint }: { text: string; hint?: string }) {
 export function ErrorNote({ text }: { text?: string }) {
   return <Empty text={text ?? 'Não consegui carregar isso agora.'} hint="Peça de novo para a Yui em instantes." />
 }
+
+/** Confirmação de exclusão definitiva (workflows, missões…): Cancelar recebe o foco, o botão vermelho exclui. */
+export function ConfirmDeleteModal({ title, text, rows = [], busy, onCancel, onConfirm }: {
+  title: string
+  text: string
+  rows?: { label: string; value: string }[]
+  busy?: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onCancel() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [busy, onCancel])
+  return (
+    <div onClick={busy ? undefined : onCancel} style={{ position: 'fixed', inset: 0, background: 'rgba(4,5,10,.66)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: 16 }}>
+      <div role="alertdialog" aria-modal="true" aria-labelledby="cdm-title" onClick={(e) => e.stopPropagation()} style={{ width: 460, maxWidth: '100%', padding: 22, borderRadius: 18, background: '#10132a', border: '1px solid rgba(240,98,114,.35)', boxShadow: '0 30px 80px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ fontSize: 11, letterSpacing: '.2em', color: C.crit, fontWeight: 700 }}>AÇÃO DESTRUTIVA · NÃO DÁ PARA DESFAZER</div>
+        <div id="cdm-title" style={{ fontSize: 18, fontWeight: 700, overflowWrap: 'anywhere' }}>{title}</div>
+        <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: '#c9cde0' }}>{text}</p>
+        {rows.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', fontSize: 13 }}>
+            {rows.map((r) => (
+              <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '7px 0', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+                <span style={{ color: C.t2 }}>{r.label}</span>
+                <span style={{ textAlign: 'right', overflowWrap: 'anywhere' }}>{r.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+          <button autoFocus disabled={busy} onClick={onCancel} style={{ height: 42, padding: '0 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.03)', color: '#dfe3f3', fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit' }}>
+            Cancelar
+          </button>
+          <button
+            disabled={busy}
+            onClick={onConfirm}
+            style={{ height: 42, padding: '0 16px', borderRadius: 10, border: 'none', background: '#e2566a', color: '#fff', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}
+          >
+            {busy ? 'Excluindo…' : 'Excluir definitivamente'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

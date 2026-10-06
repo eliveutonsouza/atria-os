@@ -8,7 +8,7 @@ import { config } from './config.ts';
 import { db, now, uid } from './db.ts';
 import { emit, setYuiState } from './bus.ts';
 import { findAgent, loadAgents } from './agents.ts';
-import { cancelRun, enqueueRun, inboxItems, runBus } from './runs.ts';
+import { askApproval, cancelRun, enqueueRun, expireApprovals, inboxItems, runBus } from './runs.ts';
 import { registerBrain } from './extensions.ts';
 import { openai } from './brain.ts';
 import { narrate } from './live.ts';
@@ -138,13 +138,40 @@ function syncTriggerRoutine(def: Pick<WorkflowDef, 'slug' | 'name' | 'trigger'>)
   } else for (const r of linked) deleteRoutine(r.id);
 }
 
+// Exclusão definitiva: para execuções ativas, apaga rotinas, histórico de execuções e o arquivo.
+// Runs de agentes disparados pelo workflow ficam no histórico, só perdem o vínculo.
 export function deleteWorkflow(slug: string): boolean {
   const s = slugify(slug);
   const f = join(wfDir(), `${s}.md`);
   if (!existsSync(f)) return false;
+  for (const ex of executions.values()) {
+    if (ex.def.slug !== s) continue;
+    cancelWorkflowRun(ex.id);
+    expireApprovals(ex.id);
+  }
   for (const r of routinesForWorkflow(s)) deleteRoutine(r.id);
+  const runIds = (db.prepare('SELECT id FROM workflow_runs WHERE workflow = ?').all(s) as { id: string }[]).map((r) => r.id);
+  for (const id of runIds) db.prepare('UPDATE runs SET workflow_run_id = NULL WHERE workflow_run_id = ?').run(id);
+  db.prepare('DELETE FROM workflow_runs WHERE workflow = ?').run(s);
   unlinkSync(f);
+  if (existsSync(`${f}.bak`)) unlinkSync(`${f}.bak`);
+  emit({ type: 'workflow.deleted', slug: s });
   return true;
+}
+
+// O que some junto com o workflow (linhas do modal de aprovação da Yui).
+export function workflowDeleteSummary(w: WorkflowDef): ApprovalInfo['rows'] {
+  const runs = (db.prepare('SELECT COUNT(*) AS n FROM workflow_runs WHERE workflow = ?').get(w.slug) as { n: number }).n;
+  const routines = routinesForWorkflow(w.slug);
+  const active = [...executions.values()].filter((ex) => ex.def.slug === w.slug).length;
+  return [
+    { label: 'Workflow', value: `${w.name} [${w.slug}]` },
+    { label: 'Passos', value: String(w.nodes.length) },
+    { label: 'Rotinas agendadas', value: routines.length ? routines.map((r) => r.cron).join(', ') : 'nenhuma', tone: routines.length ? 'crit' : undefined },
+    { label: 'Execuções no histórico', value: String(runs), tone: runs ? 'crit' : undefined },
+    ...(active ? [{ label: 'Em execução agora', value: `${active} — será interrompida`, tone: 'crit' as const }] : []),
+    { label: 'Desfazer', value: 'não é possível', tone: 'crit' },
+  ];
 }
 
 // ---------- execução ----------
@@ -612,7 +639,7 @@ export function register(app: FastifyInstance): void {
   registerBrain({
     name: 'workflows',
     instructions:
-      '- Workflows = rotinas de trabalho repetíveis com vários passos, decisões, aprovações e agentes (ex.: "post pro Instagram", "leads diários"). Quando o usuário quiser criar um processo/rotina de trabalho, use create_workflow com uma descrição detalhada (objetivo, passos, agentes, decisões, aprovações) — ele abre no editor para o usuário ajustar. "Roda o workflow X" → run_workflow. "Agenda / todo dia / toda segunda" para um workflow → schedule_workflow com cron de 5 campos (fuso America/Sao_Paulo). Lista de workflows: show_view workflows; rotinas agendadas: show_view routines. create_routine fica só para uma instrução simples de um agente.',
+      '- Workflows = rotinas de trabalho repetíveis com vários passos, decisões, aprovações e agentes (ex.: "post pro Instagram", "leads diários"). Quando o usuário quiser criar um processo/rotina de trabalho, use create_workflow com uma descrição detalhada (objetivo, passos, agentes, decisões, aprovações) — ele abre no editor para o usuário ajustar. "Roda o workflow X" → run_workflow. "Agenda / todo dia / toda segunda" para um workflow → schedule_workflow com cron de 5 campos (fuso America/Sao_Paulo). Lista de workflows: show_view workflows; rotinas agendadas: show_view routines. create_routine fica só para uma instrução simples de um agente. "Exclui/remove/apaga o workflow X" → delete_workflow: é irreversível, use só quando o usuário pedir claramente para excluir aquele workflow (nunca por iniciativa própria) — abre um modal de aprovação; diga que aguarda a aprovação dele e nunca diga que já excluiu.',
     snapshot: () => {
       const ws = listWorkflows();
       return ws.length
@@ -665,6 +692,13 @@ export function register(app: FastifyInstance): void {
       },
       {
         type: 'function',
+        name: 'delete_workflow',
+        strict: true,
+        description: 'Pede a exclusão definitiva de um workflow (arquivo, rotinas agendadas e histórico). Só exclui depois que o usuário aprovar no modal de ação destrutiva.',
+        parameters: { type: 'object', additionalProperties: false, required: ['slug'], properties: { slug: { type: 'string' } } },
+      },
+      {
+        type: 'function',
         name: 'list_workflows',
         strict: true,
         description: 'Lista os workflows com gatilho e última execução.',
@@ -709,6 +743,16 @@ export function register(app: FastifyInstance): void {
             passos: w.nodes.map((n) => ({ id: n.id, tipo: n.type, titulo: n.title, agente: n.agent ?? null, instrucao: n.instruction ?? null, condicao: n.condition ?? null })),
             erros: validateWorkflow(w),
           });
+        }
+        case 'delete_workflow': {
+          const w = findWf(args.slug);
+          if (!w) return Promise.resolve({ ok: false, error: 'workflow não encontrado', disponiveis: listWorkflows().map((x) => x.slug) });
+          // Não espera o clique: o turno da Yui termina já e a exclusão acontece só se o usuário aprovar.
+          void askApproval(`delete:workflow:${w.slug}`, `Excluir o workflow "${w.name}" definitivamente?`, workflowDeleteSummary(w), undefined, { kind: 'destructive' }).then((ok) => {
+            if (!ok) return announce(`Ok, mantive o workflow ${w.name}.`);
+            announce(deleteWorkflow(w.slug) ? `Workflow ${w.name} excluído.` : `O workflow ${w.name} já não existia.`);
+          });
+          return Promise.resolve({ ok: true, status: 'aguardando_aprovacao', nome: w.name, aviso: 'Nada foi excluído ainda: só exclui se o usuário aprovar no modal.' });
         }
         case 'list_workflows':
           return Promise.resolve(

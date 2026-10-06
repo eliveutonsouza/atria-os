@@ -6,6 +6,15 @@ import { useYui } from '../../store/yui'
 import { Empty, useHeader } from '../../views/ui'
 import { relTime } from './common'
 
+// Exclusões pedidas à Yui usam run_id "delete:workflow:<slug>" / "delete:mission:<id>".
+function review(runId: string) {
+  const s = useYui.getState()
+  const [, what, target] = runId.match(/^delete:(workflow|mission):(.+)$/) ?? []
+  if (what === 'workflow') return s.show('workflow', { workflowId: target })
+  if (what === 'mission') return s.show('mission', { missionId: target })
+  s.show('runs', { runId })
+}
+
 // Aprovações & inbox: decide direto daqui (Aprovar/Rejeitar), sem abrir o modal.
 export function InboxPage() {
   const inbox = useYui((s) => s.inbox)
@@ -21,10 +30,12 @@ export function InboxPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 920 }}>
       {list.length === 0 && others.length === 0 && <Empty text="Nada precisa de você agora." hint="Aprovações de deploy, envio e publicação aparecem aqui." />}
-      {list.map((a) => (
-        <section key={a.id} style={{ padding: '18px 20px', borderRadius: 18, background: 'linear-gradient(180deg,rgba(26,22,52,.6),rgba(14,16,34,.6))', border: '1px solid rgba(245,181,74,.3)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {list.map((a) => {
+        const danger = a.kind === 'destructive'
+        return (
+        <section key={a.id} style={{ padding: '18px 20px', borderRadius: 18, background: 'linear-gradient(180deg,rgba(26,22,52,.6),rgba(14,16,34,.6))', border: `1px solid ${danger ? 'rgba(240,98,114,.45)' : 'rgba(245,181,74,.3)'}`, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-            <span style={{ fontSize: 11, letterSpacing: '.22em', color: C.warn, fontWeight: 700 }}>APROVAÇÃO NECESSÁRIA</span>
+            <span style={{ fontSize: 11, letterSpacing: '.22em', color: danger ? C.crit : C.warn, fontWeight: 700 }}>{danger ? 'AÇÃO DESTRUTIVA · NÃO DÁ PARA DESFAZER' : 'APROVAÇÃO NECESSÁRIA'}</span>
             <span className="app-mono" style={{ fontSize: 11, color: C.t3 }}>{relTime(a.createdAt)}</span>
           </div>
           <div style={{ fontSize: 17, lineHeight: 1.4 }}>{a.title}</div>
@@ -37,15 +48,16 @@ export function InboxPage() {
             ))}
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button className="app-btn" onClick={() => useYui.getState().show('runs', { runId: a.runId })}>Revisar</button>
+            <button className="app-btn" onClick={() => review(a.runId)}>Revisar</button>
             <span style={{ flex: 1 }} />
-            <button className="app-btn danger" style={{ minWidth: 120, height: 42 }} onClick={() => void decide(a.id, false)}>Rejeitar</button>
-            <button style={{ minWidth: 140, height: 42, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#4fe0b0,#67d8f2)', color: '#06221c', fontSize: 14, fontWeight: 700, cursor: 'pointer' }} onClick={() => void decide(a.id, true)}>
-              Aprovar
+            <button className={danger ? 'app-btn' : 'app-btn danger'} style={{ minWidth: 120, height: 42 }} onClick={() => void decide(a.id, false)}>{danger ? 'Cancelar' : 'Rejeitar'}</button>
+            <button style={{ minWidth: 140, height: 42, borderRadius: 12, border: 'none', background: danger ? '#e2566a' : 'linear-gradient(135deg,#4fe0b0,#67d8f2)', color: danger ? '#fff' : '#06221c', fontSize: 14, fontWeight: 700, cursor: 'pointer' }} onClick={() => void decide(a.id, true)}>
+              {danger ? 'Excluir definitivamente' : 'Aprovar'}
             </button>
           </div>
         </section>
-      ))}
+        )
+      })}
       {others.map((ib) => (
         <button
           key={ib.id}

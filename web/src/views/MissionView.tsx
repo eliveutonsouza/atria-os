@@ -3,8 +3,9 @@ import type { MissionInfo, MissionStep, StepStatus } from '@shared/protocol'
 import { api } from '../api/client'
 import { useApi } from '../api/useApi'
 import { C } from '../lib/colors'
+import { dropMission } from '../lib/actions'
 import { useYui } from '../store/yui'
-import { Empty, ErrorNote, Eyebrow, Skeleton, useHeader } from './ui'
+import { ConfirmDeleteModal, Empty, ErrorNote, Eyebrow, Skeleton, useHeader } from './ui'
 
 // Missão: plano de execução multi-agente (PRD §94/§36) — grafo de etapas + lista com estado ao vivo.
 
@@ -25,6 +26,39 @@ const MST: Record<MissionInfo['status'], { c: string; label: string }> = {
   done: { c: C.ok, label: 'Concluída' },
   failed: { c: C.crit, label: 'Com falhas' },
   cancelled: { c: C.t3, label: 'Cancelada' },
+}
+
+// Exclusão de missão pelo console (lista e detalhe): confirmação explícita antes do DELETE.
+export function DeleteMissionModal({ mission: m, onClose }: { mission: MissionInfo; onClose: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const active = m.steps.filter((s) => s.status === 'running' || s.status === 'waiting_approval').length
+  const confirm = async () => {
+    setBusy(true)
+    try {
+      await api.del(`/api/missions/${encodeURIComponent(m.id)}`)
+      dropMission(m.id)
+      useYui.getState().say(`Missão "${m.title}" excluída.`)
+    } catch (e) {
+      useYui.getState().say(`Não consegui excluir a missão: ${(e as Error).message}.`)
+    } finally {
+      setBusy(false)
+      onClose()
+    }
+  }
+  return (
+    <ConfirmDeleteModal
+      title={`Excluir a missão "${m.title}"?`}
+      text="A missão e o plano somem da lista. Etapas em andamento são canceladas antes; os runs dos agentes continuam no histórico."
+      rows={[
+        { label: 'Status', value: MST[m.status].label },
+        { label: 'Etapas', value: `${m.steps.filter((s) => s.status === 'done').length}/${m.steps.length} concluídas` },
+        ...(active ? [{ label: 'Em andamento', value: `${active} etapa(s) serão canceladas` }] : []),
+      ]}
+      busy={busy}
+      onCancel={onClose}
+      onConfirm={() => void confirm()}
+    />
+  )
 }
 
 export function MissionView() {
@@ -48,7 +82,8 @@ export function MissionView() {
         : m.status === 'blocked' || m.status === 'failed'
           ? [{ label: 'Tentar de novo', fn: act('retry') }, ...(m.status === 'blocked' ? [{ label: 'Cancelar', fn: act('cancel') }] : [])]
           : []
-  useHeader('Mission', m?.title ?? 'Missão', actions, [m?.status, m?.id])
+  const [delOpen, setDelOpen] = useState(false)
+  useHeader('Mission', m?.title ?? 'Missão', m ? [...actions, { label: 'Excluir', fn: () => setDelOpen(true) }] : actions, [m?.status, m?.id])
   if (!id) return <Empty text="Nenhuma missão aberta." hint="Peça algo grande: “Yui, cria uma landing page para uma clínica.”" />
   if (loading && !m) return <Skeleton kpis={0} rows={5} />
   if (error || !m) return <ErrorNote text="Não encontrei essa missão." />
@@ -58,6 +93,7 @@ export function MissionView() {
   const ms = MST[m.status]
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 1100 }}>
+      {delOpen && <DeleteMissionModal mission={m} onClose={() => setDelOpen(false)} />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: ms.c, fontWeight: 600 }}>

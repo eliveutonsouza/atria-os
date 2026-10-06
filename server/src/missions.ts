@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import type { MissionInfo, MissionStep, RunInfo } from '../../shared/protocol.ts';
+import type { ApprovalInfo, MissionInfo, MissionStep, RunInfo } from '../../shared/protocol.ts';
 import { db, kvGet, now, uid } from './db.ts';
 import { emit, setYuiState } from './bus.ts';
 import { findAgent, loadAgents } from './agents.ts';
@@ -330,6 +330,32 @@ export function controlMission(id: string, action: 'pause' | 'resume' | 'cancel'
 }
 
 // Após reinício: etapas "running" cujo run morreu viram falha (missão fica bloqueada para retry).
+// Exclusão definitiva: cancela o que estiver rodando (mesmo caminho do "cancel") e apaga a missão.
+// Runs das etapas ficam no histórico, só perdem o vínculo.
+export function deleteMission(id: string): boolean {
+  const m = getMission(id);
+  if (!m) return false;
+  if (!['done', 'failed', 'cancelled'].includes(m.status)) controlMission(id, 'cancel');
+  expireApprovals(id);
+  for (const key of approving) if (key.startsWith(`${id}:`)) approving.delete(key);
+  db.prepare('UPDATE runs SET mission_id = NULL, step_id = NULL WHERE mission_id = ?').run(id);
+  db.prepare('DELETE FROM missions WHERE id = ?').run(id);
+  emit({ type: 'mission.deleted', missionId: id });
+  return true;
+}
+
+// O que some junto com a missão (linhas do modal de aprovação da Yui).
+export function missionDeleteSummary(m: MissionInfo): ApprovalInfo['rows'] {
+  const running = m.steps.filter((s) => s.status === 'running' || s.status === 'waiting_approval').length;
+  return [
+    { label: 'Missão', value: m.title },
+    { label: 'Status', value: m.status },
+    { label: 'Etapas', value: `${m.steps.filter((s) => s.status === 'done').length}/${m.steps.length} concluídas` },
+    ...(running ? [{ label: 'Em andamento', value: `${running} etapa(s) — serão canceladas`, tone: 'crit' as const }] : []),
+    { label: 'Desfazer', value: 'não é possível', tone: 'crit' },
+  ];
+}
+
 function recoverMissions() {
   for (const m of listMissions(50).filter((x) => x.status === 'running' || x.status === 'paused')) {
     let changed = false;
@@ -363,7 +389,8 @@ function recoverMissions() {
 registerBrain({
   name: 'missions',
   instructions: `- Pedidos grandes ou com mais de uma especialidade (site completo, landing page, auditoria completa, campanha, pesquisa + conteúdo, "faça X, Y e Z") => plan_mission com o objetivo completo e o projeto. A missão já aparece na tela e começa sozinha; diga em uma frase quantas etapas e quais agentes. Tarefa pontual de um especialista => delegate_task. Não trave pedindo projeto ou nome: sem projeto use project null (trabalha num diretório temporário) e use nomes provisórios, avisando.
-- "pausa/retoma/cancela a missão", "tenta de novo" => mission_control. "como está a missão?" => get_mission.`,
+- "pausa/retoma/cancela a missão", "tenta de novo" => mission_control. "como está a missão?" => get_mission.
+- "exclui/remove/apaga a missão X" => delete_mission: é irreversível, use só quando o usuário pedir claramente para excluir aquela missão (nunca por iniciativa própria; para parar uma missão use mission_control cancel) — abre um modal de aprovação; diga que aguarda a aprovação dele e nunca diga que já excluiu.`,
   snapshot: () => {
     const act = listMissions(10).filter((m) => ['running', 'paused', 'blocked'].includes(m.status));
     return act.length
@@ -386,8 +413,23 @@ registerBrain({
       description: 'Estado de uma missão (etapas, agentes, resultados). mission_id null = mais recente.',
       parameters: { type: 'object', additionalProperties: false, required: ['mission_id', 'show'], properties: { mission_id: { type: ['string', 'null'] }, show: { type: 'boolean', description: 'true para abrir a missão no Canvas' } } },
     },
+    {
+      type: 'function', name: 'delete_mission', strict: true,
+      description: 'Pede a exclusão definitiva de uma missão (cancela etapas em andamento). Só exclui depois que o usuário aprovar no modal de ação destrutiva.',
+      parameters: { type: 'object', additionalProperties: false, required: ['mission_id'], properties: { mission_id: { type: 'string' } } },
+    },
   ],
   run(tool, args) {
+    if (tool === 'delete_mission') {
+      const m = getMission(String(args.mission_id));
+      if (!m) return Promise.resolve({ ok: false, error: 'missão não encontrada', recentes: listMissions(10).map((x) => ({ id: x.id, titulo: x.title })) });
+      // Não espera o clique: o turno da Yui termina já e a exclusão acontece só se o usuário aprovar.
+      void askApproval(`delete:mission:${m.id}`, `Excluir a missão "${m.title}" definitivamente?`, missionDeleteSummary(m), undefined, { kind: 'destructive' }).then((ok) => {
+        if (!ok) return narrate(`Ok, mantive a missão ${m.title}.`, { speak: true });
+        narrate(deleteMission(m.id) ? `Missão ${m.title} excluída.` : `A missão ${m.title} já não existia.`, { speak: true });
+      });
+      return Promise.resolve({ ok: true, status: 'aguardando_aprovacao', titulo: m.title, aviso: 'Nada foi excluído ainda: só exclui se o usuário aprovar no modal.' });
+    }
     if (tool === 'plan_mission') {
       return (async () => {
         const proj = typeof args.project === 'string' && args.project ? findProject(args.project) : findProject(activeProject());
@@ -425,6 +467,7 @@ export function register(app: FastifyInstance): void {
   for (const action of ['pause', 'resume', 'cancel', 'retry'] as const) {
     app.post(`/api/missions/:id/${action}`, (req, reply) => controlMission((req.params as { id: string }).id, action) ?? reply.code(404).send({ error: 'not found' }));
   }
+  app.delete('/api/missions/:id', (req, reply) => reply.code(deleteMission((req.params as { id: string }).id) ? 204 : 404).send());
   app.post('/api/missions', async (req, reply) => {
     const b = (req.body ?? {}) as { goal?: string; project?: string | null };
     if (!b.goal) return reply.code(400).send({ error: 'goal' });

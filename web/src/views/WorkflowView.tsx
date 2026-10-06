@@ -22,6 +22,7 @@ import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
 import { connect, disconnect, nextId, removeStep, toFlow, type FlowNode } from '../workflow/graph'
 import { nodeTypes, TYPE_META } from '../workflow/StepNode'
+import { DeleteWorkflowModal } from '../workflow/DeleteWorkflow'
 import { CRON_PRESETS, describeCron, send } from '../workflow/http'
 import { ErrorNote, Skeleton, useHeader } from './ui'
 
@@ -67,6 +68,7 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
   const [busy, setBusy] = useState(false)
   const [runId, setRunId] = useState<string | null>(runParam)
   const [schedOpen, setSchedOpen] = useState(false)
+  const [delOpen, setDelOpen] = useState(false)
   const agents = useApi<AgentInfo[]>('/api/agents').data ?? []
   const agentNames = useMemo(() => Object.fromEntries(agents.map((a) => [a.id, a.name])), [agents])
   const liveRun = useYui((s) => (runId ? s.workflowRuns[runId] : undefined))
@@ -234,6 +236,7 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
       running ? { label: 'Parar execução', fn: () => void cancelRun() } : { label: 'Rodar agora', fn: () => void runNow() },
       { label: 'Agendar', fn: () => setSchedOpen((o) => !o) },
       { label: 'Todos os workflows', fn: () => useYui.getState().show('workflows') },
+      ...(isNew ? [] : [{ label: 'Excluir workflow', fn: () => setDelOpen(true) }]),
     ],
     [busy, dirty, isNew, running, draft.name, draft.trigger.cron, errors.length],
   )
@@ -340,6 +343,19 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
           </div>
         </aside>
       </div>
+      {delOpen && initial && (
+        <DeleteWorkflowModal
+          slug={initial.slug}
+          name={initial.name}
+          rows={[
+            { label: 'Passos', value: String(initial.nodes.length) },
+            { label: 'Gatilho', value: describeCron(initial.trigger.type === 'cron' ? initial.trigger.cron : null) },
+            ...(running ? [{ label: 'Em execução agora', value: 'será interrompida' }] : []),
+          ]}
+          onClose={() => setDelOpen(false)}
+          onDeleted={() => useYui.getState().show('workflows')}
+        />
+      )}
     </div>
   )
 }

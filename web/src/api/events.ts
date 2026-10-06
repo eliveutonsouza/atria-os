@@ -1,4 +1,5 @@
 import type { ServerEvent, UiAction } from '@shared/protocol'
+import { dropMission } from '../lib/actions'
 import { useYui } from '../store/yui'
 import { MOCK } from './client'
 
@@ -77,6 +78,12 @@ export function applyEvent(ev: ServerEvent) {
       break
     case 'mission.updated':
       s.set({ missions: { ...s.missions, [ev.mission.id]: ev.mission } })
+      break
+    case 'mission.deleted':
+      dropMission(ev.missionId)
+      break
+    case 'workflow.deleted':
+      if (s.view === 'workflow' && s.viewParams.workflowId === ev.slug) s.show('workflows')
       break
     case 'workflow.run.updated':
       s.set({ workflowRuns: { ...s.workflowRuns, [ev.run.id]: ev.run } })

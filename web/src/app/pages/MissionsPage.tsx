@@ -1,10 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { MissionInfo } from '@shared/protocol'
 import { useApi } from '../../api/useApi'
 import { C } from '../../lib/colors'
 import { dockInput } from '../../shell/parts'
 import { useYui } from '../../store/yui'
-import { MissionView } from '../../views/MissionView'
+import { DeleteMissionModal, MissionView } from '../../views/MissionView'
 import { Empty, useHeader } from '../../views/ui'
 import { Dot, openApp, relTime, Tag, useViewParams } from './common'
 
@@ -27,7 +27,8 @@ function newMission() {
 export function MissionsPage() {
   const id = useYui((s) => s.appParams.id)
   const live = useYui((s) => s.missions)
-  const { data } = useApi<MissionInfo[]>('/api/missions', [], 15000)
+  const { data, reload } = useApi<MissionInfo[]>('/api/missions', [], 15000)
+  const [del, setDel] = useState<MissionInfo | null>(null)
   useHeader('Missões', 'Planos de execução', [{ label: '+ Nova missão', fn: newMission }])
   const list = useMemo(() => {
     const m = new Map<string, MissionInfo>()
@@ -46,12 +47,12 @@ export function MissionsPage() {
           const done = m.steps.filter((s) => s.status === 'done').length
           const on = m.id === id
           return (
+            <div key={m.id} style={{ position: 'relative' }}>
             <button
-              key={m.id}
               onClick={() => openApp('missions', m.id)}
               className={on ? undefined : 'app-row'}
               style={{
-                padding: '12px 14px', borderRadius: 14, textAlign: 'left', cursor: 'pointer', color: C.text, display: 'flex', flexDirection: 'column', gap: 8,
+                width: '100%', padding: '12px 48px 12px 14px', borderRadius: 14, textAlign: 'left', cursor: 'pointer', color: C.text, display: 'flex', flexDirection: 'column', gap: 8,
                 background: on ? 'rgba(103,216,242,.07)' : 'rgba(255,255,255,.025)', border: `1px solid ${on ? 'rgba(103,216,242,.25)' : 'rgba(255,255,255,.06)'}`,
               }}
             >
@@ -71,8 +72,28 @@ export function MissionsPage() {
                 {done}/{m.steps.length} etapas{m.project ? ` · ${m.project}` : ''} · {relTime(m.createdAt)}
               </span>
             </button>
+            <button
+              onClick={() => setDel(m)}
+              aria-label={`Excluir missão ${m.title}`}
+              title="Excluir missão"
+              style={{ position: 'absolute', right: 8, bottom: 8, width: 32, height: 32, borderRadius: 9, border: '1px solid rgba(240,98,114,.25)', background: 'rgba(240,98,114,.06)', color: '#f39aa4', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" />
+              </svg>
+            </button>
+            </div>
           )
         })}
+        {del && (
+          <DeleteMissionModal
+            mission={del}
+            onClose={() => {
+              setDel(null)
+              reload()
+            }}
+          />
+        )}
       </section>
       {id && (
         <section style={{ flex: 1, minWidth: 0, width: '100%', padding: '18px 20px', borderRadius: 18, background: 'linear-gradient(180deg, rgba(20,24,50,.62), rgba(12,14,32,.62))', border: '1px solid rgba(160,170,255,.11)' }}>
