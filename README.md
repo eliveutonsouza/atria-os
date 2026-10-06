@@ -28,6 +28,8 @@ agendados, lembra seus compromissos e mostra os resultados. Quando preferir, use
 8. [Desenvolvimento](#desenvolvimento)
 9. [Problemas comuns](#problemas-comuns)
 
+Como funciona por dentro: [docs/arquitetura.md](docs/arquitetura.md).
+
 ---
 
 ## Requisitos
@@ -193,6 +195,8 @@ cd server && YUI_DATA_DIR=$(mktemp -d) YUI_WORKSPACE_DIR=$(mktemp -d) OPENAI_API
 Deploy na VPS de produção: `./scripts-deploy.sh` (espera execuções terminarem, rebuild, sobe e roda o e2e —
 precisa de `YUI_E2E_PASSWORD`; `--no-e2e` pula). O **CI** (GitHub Actions) roda em todo push: gitleaks,
 tipos e testes do servidor, lint e build do painel, `docker compose config` nos três modos e build das duas imagens.
+
+Mapa dos módulos, fluxo de um pedido e onde ficam os dados: [docs/arquitetura.md](docs/arquitetura.md).
 
 Ao mudar uma tela, atualize o guia correspondente em `docs/ajuda/guias/`.
 
