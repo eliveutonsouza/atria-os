@@ -32,6 +32,19 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
   finished_at TEXT
 );
 CREATE INDEX IF NOT EXISTS workflow_runs_wf ON workflow_runs(workflow, started_at);
+CREATE TABLE IF NOT EXISTS workflow_approval_decisions (
+  id TEXT PRIMARY KEY,
+  workflow TEXT NOT NULL,
+  node_id TEXT NOT NULL,
+  run_id TEXT,
+  decided_by TEXT NOT NULL,
+  approved INTEGER NOT NULL,
+  confidence REAL,
+  reason TEXT,
+  context TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS wad_wf ON workflow_approval_decisions(workflow, created_at);
 `);
 
 const wfDir = () => join(config.workspaceDir, '.yui', 'workflows');
@@ -426,16 +439,109 @@ async function decide(ex: Exec, node: WorkflowNode): Promise<string> {
   return choice.to;
 }
 
+// ---------- aprovação: a Yui decide e aprende com as decisões do usuário ----------
+
+export interface Lesson { nodeId: string; approved: boolean; reason: string | null; context: string | null; createdAt: string }
+export interface ApprovalVerdict { aprovar: boolean; confianca: number; motivo: string }
+type Judge = (input: { workflow: string; passo: string; criterio: string; contexto: string; licoes: Lesson[]; nodeId: string }) => Promise<ApprovalVerdict>;
+
+export const AUTO_APPROVAL_MIN_CONFIDENCE = 0.7;
+
+// Lições = decisões do usuário neste workflow (respostas no modal e Concordo/Discordo), primeiro as do mesmo passo.
+export function buildLessons(workflow: string, nodeId: string, limit = 12): Lesson[] {
+  const rows = db
+    .prepare(
+      `SELECT node_id, approved, reason, context, created_at FROM workflow_approval_decisions
+       WHERE workflow = ? AND decided_by = 'user' ORDER BY (node_id = ?) DESC, created_at DESC LIMIT ?`,
+    )
+    .all(workflow, nodeId, limit) as { node_id: string; approved: number; reason: string | null; context: string | null; created_at: string }[];
+  return rows.map((r) => ({ nodeId: r.node_id, approved: !!r.approved, reason: r.reason, context: r.context, createdAt: r.created_at }));
+}
+
+function recordDecision(d: { workflow: string; nodeId: string; runId: string | null; by: 'yui' | 'user'; approved: boolean; confidence?: number | null; reason?: string | null; context?: string | null }) {
+  db.prepare(
+    `INSERT INTO workflow_approval_decisions(id, workflow, node_id, run_id, decided_by, approved, confidence, reason, context, created_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(uid(), d.workflow, d.nodeId, d.runId, d.by, d.approved ? 1 : 0, d.confidence ?? null, d.reason ?? null, d.context ?? null, now());
+}
+
+const openaiJudge: Judge = async (i) => {
+  const licoes = i.licoes.length
+    ? i.licoes.map((l) => `- ${l.nodeId === i.nodeId ? 'Este passo' : `Passo ${l.nodeId}`}: ${l.approved ? 'APROVOU' : 'REJEITOU'}${l.reason ? ` — "${l.reason}"` : ''}${l.context ? `\n  Contexto na época: ${clip(l.context, 400)}` : ''}`).join('\n')
+    : '(nenhuma decisão anterior do usuário neste workflow)';
+  const res = await openai.responses.create({
+    model: process.env.YUI_BRAIN_MODEL || 'gpt-6-luna',
+    instructions:
+      'Você decide, no lugar do dono, um passo de aprovação de um workflow que roda no automático. As decisões anteriores dele são as lições mais importantes: siga o mesmo critério. Aprove quando o resultado atende ao critério do passo e é coerente com o que ele já aprovou; rejeite quando contraria algo que ele rejeitou ou quando o resultado está claramente errado, incompleto ou fora do pedido. confianca de 0 a 1: abaixo de 0.7 quando não há lições parecidas e a decisão é ambígua ou cara de errar — aí o dono é chamado. Motivo curto em português.',
+    input: `Workflow: ${i.workflow}\nPasso: ${i.passo}\nO que revisar: ${i.criterio}\n\nDecisões anteriores do dono:\n${licoes}\n\nResultados desta execução:\n${i.contexto || '(nenhum)'}`,
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'aprovacao',
+        strict: true,
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['aprovar', 'confianca', 'motivo'],
+          properties: { aprovar: { type: 'boolean' }, confianca: { type: 'number' }, motivo: { type: 'string' } },
+        },
+      },
+    },
+  });
+  return JSON.parse(res.output_text) as ApprovalVerdict;
+};
+let judge: Judge = openaiJudge;
+/** Troca o juiz (testes). null volta ao modelo. */
+export function setApprovalJudge(j: Judge | null) {
+  judge = j ?? openaiJudge;
+}
+
+const lessonContext = (ex: Exec) => {
+  const last = ex.outputs.filter((o) => o.node.type === 'task').at(-1);
+  return last ? clip(`${last.node.title}: ${last.result.replace(/\s+/g, ' ')}`, 600) : ex.input ? clip(ex.input, 600) : null;
+};
+
+async function approval(ex: Exec, node: WorkflowNode) {
+  let why = 'passo marcado “sempre me perguntar”';
+  if (!node.ask) {
+    setNode(ex, node.id, { status: 'running' });
+    persist(ex);
+    let v: ApprovalVerdict | null = null;
+    try {
+      v = await judge({ workflow: ex.def.name, passo: `${node.id}. ${node.title}`, criterio: node.instruction ?? node.title, contexto: contextFor(ex), licoes: buildLessons(ex.def.slug, node.id), nodeId: node.id });
+    } catch (e) {
+      console.error('workflow aprovação automática', (e as Error).message);
+    }
+    if (v && v.confianca >= AUTO_APPROVAL_MIN_CONFIDENCE) {
+      recordDecision({ workflow: ex.def.slug, nodeId: node.id, runId: ex.id, by: 'yui', approved: v.aprovar, confidence: v.confianca, reason: v.motivo, context: lessonContext(ex) });
+      if (v.aprovar) {
+        setNode(ex, node.id, { status: 'done', result: `Yui aprovou: ${v.motivo}`, decision: 'aprovado', decidedBy: 'yui', feedback: null });
+        ex.outputs.push({ node, result: `Aprovação (decidida pela Yui): aprovado — ${v.motivo}` });
+        persist(ex, { status: 'running' });
+        narrate(`${ex.def.name}: aprovei "${node.title}" — ${v.motivo}`, { speak: false });
+        return;
+      }
+      setNode(ex, node.id, { status: 'cancelled', result: `Yui rejeitou: ${v.motivo}`, decision: 'rejeitado', decidedBy: 'yui', feedback: null });
+      ex.cancelled = true;
+      persist(ex);
+      announce(`Parei o workflow ${ex.def.name} no passo "${node.title}": ${v.motivo}. Se eu errei, marque Discordo na execução.`);
+      throw new Error(`aprovação rejeitada pela Yui no passo ${node.id}`);
+    }
+    why = v ? `a Yui não teve certeza (${Math.round(v.confianca * 100)}%): ${v.motivo}` : 'a Yui não conseguiu avaliar';
+  }
+  await humanApproval(ex, node, why);
+}
+
 // Aprovação humana: usa a tabela/fluxo de aprovações do console (modal + inbox + narração da Yui).
 // O run_id da aprovação é o id da execução do workflow; a resolução chega por POST /api/approvals/:id
 // (runs.resolveApproval grava o status) e aqui é observada por polling da tabela.
-async function approval(ex: Exec, node: WorkflowNode) {
+async function humanApproval(ex: Exec, node: WorkflowNode, why: string) {
   const id = uid();
   const lastTask = ex.outputs.filter((o) => o.node.type === 'task').at(-1);
   const rows: ApprovalInfo['rows'] = [
     { label: 'Workflow', value: ex.def.name },
     { label: 'Passo', value: `${node.id}. ${node.title}` },
     ...(lastTask ? [{ label: 'Último resultado', value: clip(lastTask.result.replace(/\s+/g, ' '), 90) }] : []),
+    { label: 'Por que pergunto', value: clip(why, 120) },
   ];
   const title = `${ex.def.name}: ${node.instruction ?? `"${node.title}" precisa da sua aprovação.`}`;
   db.prepare(`INSERT INTO approvals(id, run_id, title, rows, created_at) VALUES(?, ?, ?, ?, ?)`).run(id, ex.id, title, JSON.stringify(rows), now());
@@ -460,14 +566,35 @@ async function approval(ex: Exec, node: WorkflowNode) {
       }
     }, 1500);
   });
+  // A resposta do usuário vira lição para as próximas decisões automáticas.
+  if (status === 'approved' || status === 'rejected') {
+    recordDecision({ workflow: ex.def.slug, nodeId: node.id, runId: ex.id, by: 'user', approved: status === 'approved', context: lessonContext(ex) });
+  }
   if (status !== 'approved') {
-    setNode(ex, node.id, { status: 'cancelled', result: status === 'rejected' ? 'rejeitado' : status });
+    setNode(ex, node.id, { status: 'cancelled', result: status === 'rejected' ? 'rejeitado' : status, decidedBy: status === 'rejected' ? 'user' : null });
     ex.cancelled = true;
     persist(ex);
     throw new Error(status === 'rejected' ? `aprovação rejeitada no passo ${node.id}` : `aprovação ${status}`);
   }
-  setNode(ex, node.id, { status: 'done', result: 'aprovado' });
+  setNode(ex, node.id, { status: 'done', result: 'aprovado', decidedBy: 'user' });
   persist(ex, { status: 'running' });
+}
+
+// Concordo/Discordo numa aprovação decidida pela Yui: grava a lição (não desfaz a execução).
+export function approvalFeedback(runId: string, nodeId: string, approved: boolean, note?: string | null): WorkflowRunInfo | null {
+  const run = getWorkflowRun(runId);
+  const yui = db
+    .prepare(`SELECT approved, context FROM workflow_approval_decisions WHERE run_id = ? AND node_id = ? AND decided_by = 'yui' ORDER BY created_at DESC LIMIT 1`)
+    .get(runId, nodeId) as { approved: number; context: string | null } | undefined;
+  if (!run || !yui) return null;
+  recordDecision({ workflow: run.workflow, nodeId, runId, by: 'user', approved, reason: note?.trim() || null, context: yui.context });
+  const nodes = { ...run.nodes, [nodeId]: { ...run.nodes[nodeId], feedback: approved === !!yui.approved ? ('agree' as const) : ('disagree' as const) } };
+  db.prepare('UPDATE workflow_runs SET nodes = ? WHERE id = ?').run(JSON.stringify(nodes), runId);
+  const ex = executions.get(runId);
+  if (ex) ex.nodes[nodeId] = nodes[nodeId];
+  const info = getWorkflowRun(runId);
+  if (info) emit({ type: 'workflow.run.updated', run: info });
+  return info;
 }
 
 export function cancelWorkflowRun(id: string): boolean {
@@ -487,7 +614,7 @@ function recoverWorkflowRuns() {
 const NODE_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['id', 'type', 'title', 'agent', 'instruction', 'output', 'condition', 'branches', 'next', 'mcp'],
+  required: ['id', 'type', 'title', 'agent', 'instruction', 'output', 'condition', 'branches', 'next', 'mcp', 'ask'],
   properties: {
     id: { type: 'string' },
     type: { type: 'string', enum: ['start', 'task', 'decision', 'approval', 'parallel', 'end'] },
@@ -496,6 +623,7 @@ const NODE_SCHEMA = {
     instruction: { type: ['string', 'null'] },
     output: { type: ['string', 'null'] },
     condition: { type: ['string', 'null'] },
+    ask: { type: 'boolean', description: 'approval: true (o usuário pediu para ser consultado); demais tipos: false' },
     branches: {
       type: 'array',
       items: { type: 'object', additionalProperties: false, required: ['label', 'to'], properties: { label: { type: 'string' }, to: { type: 'string' } } },
@@ -512,10 +640,10 @@ export async function generateWorkflow(input: { descricao: string; nome?: string
   const res = await openai.responses.create({
     model: process.env.YUI_PLANNER_MODEL || process.env.YUI_BRAIN_MODEL || 'gpt-6-luna',
     instructions: `Você desenha workflows de trabalho para agentes Claude Code do Yui Console. Gere passos numerados ("1", "2"…) na ordem de execução.
-Tipos: task (um agente executa; instrução completa e autossuficiente em português, citando ferramentas/conectores quando útil), decision (condição objetiva + 2 ramos, normalmente "sim"/"não", com "to" = id do passo), approval (revisão humana antes de ação externa irreversível: publicar, enviar, deploy, pagar), parallel (next com 2+ passos em paralelo), end (último passo).
+Tipos: task (um agente executa; instrução completa e autossuficiente em português, citando ferramentas/conectores quando útil), decision (condição objetiva + 2 ramos, normalmente "sim"/"não", com "to" = id do passo), approval (revisão do usuário: use SOMENTE quando o pedido disser para pedir aprovação/permissão/revisão dele naquela etapa, e então com ask=true e instruction dizendo o que revisar), parallel (next com 2+ passos em paralelo), end (último passo).
 Use SOMENTE estes agentes (campo agent = id):
 ${agents}
-Em tasks preencha agent, instruction e output (nome curto da saída). Fora de tasks use null nesses campos. next = próximo(s) id(s) (vazio em decision/end). Termine sempre com um passo end. Inclua approval antes de qualquer ação externa irreversível. Uma aprovação rejeitada já interrompe o workflow: NÃO crie decisão para checar se foi aprovado. Não crie passo start só para descrever agenda/recorrência (o agendamento é configurado à parte).`,
+Em tasks preencha agent, instruction e output (nome curto da saída). Fora de tasks use null nesses campos. next = próximo(s) id(s) (vazio em decision/end). Termine sempre com um passo end. O workflow roda no automático: sem pedido explícito do usuário NÃO crie approval, nem antes de publicar, enviar ou fazer deploy. Uma aprovação rejeitada já interrompe o workflow: NÃO crie decisão para checar se foi aprovado. Não crie passo start só para descrever agenda/recorrência (o agendamento é configurado à parte).`,
     input: `Pedido do usuário: ${input.descricao}${input.nome ? `\nNome desejado: ${input.nome}` : ''}${input.projeto ? `\nProjeto: ${input.projeto}` : ''}`,
     text: {
       format: {
@@ -531,7 +659,7 @@ Em tasks preencha agent, instruction e output (nome curto da saída). Fora de ta
       },
     },
   });
-  type GenNode = { id: string; type: WorkflowNode['type']; title: string; agent: string | null; instruction: string | null; output: string | null; condition: string | null; branches: { label: string; to: string }[]; next: string[]; mcp: string[] };
+  type GenNode = { id: string; type: WorkflowNode['type']; title: string; agent: string | null; instruction: string | null; output: string | null; condition: string | null; branches: { label: string; to: string }[]; next: string[]; mcp: string[]; ask: boolean };
   const raw = JSON.parse(res.output_text) as { name: string; description: string; nodes: GenNode[] };
   const nodes: WorkflowNode[] = raw.nodes.map((n) => {
     const out: WorkflowNode = { id: n.id, type: n.type, title: n.title };
@@ -542,6 +670,7 @@ Em tasks preencha agent, instruction e output (nome curto da saída). Fora de ta
     if (n.branches?.length) out.branches = n.branches;
     if (n.next?.length && n.type !== 'decision' && n.type !== 'end') out.next = n.next;
     if (n.mcp?.length) out.mcp = n.mcp;
+    if (n.type === 'approval') out.ask = true; // gerador só cria aprovação quando o usuário pediu
     return out;
   });
   const name = input.nome || raw.name;
@@ -634,12 +763,18 @@ export function register(app: FastifyInstance): void {
   });
   app.get('/api/workflows/:slug/runs', (req) => listWorkflowRuns((req.params as { slug: string }).slug));
   app.get('/api/workflow-runs/:id', async (req, reply) => getWorkflowRun((req.params as { id: string }).id) ?? reply.code(404).send({ error: 'not found' }));
+  app.post('/api/workflow-runs/:id/nodes/:node/feedback', async (req, reply) => {
+    const p = req.params as { id: string; node: string };
+    const b = (req.body ?? {}) as { approved?: unknown; note?: unknown };
+    if (typeof b.approved !== 'boolean') return reply.code(400).send({ error: 'approved' });
+    return approvalFeedback(p.id, p.node, b.approved, typeof b.note === 'string' ? b.note.slice(0, 500) : null) ?? reply.code(404).send({ error: 'not found' });
+  });
   app.post('/api/workflow-runs/:id/cancel', async (req, reply) => reply.code(cancelWorkflowRun((req.params as { id: string }).id) ? 204 : 404).send());
 
   registerBrain({
     name: 'workflows',
     instructions:
-      '- Workflows = rotinas de trabalho repetíveis com vários passos, decisões, aprovações e agentes (ex.: "post pro Instagram", "leads diários"). Quando o usuário quiser criar um processo/rotina de trabalho, use create_workflow com uma descrição detalhada (objetivo, passos, agentes, decisões, aprovações) — ele abre no editor para o usuário ajustar. "Roda o workflow X" → run_workflow. "Agenda / todo dia / toda segunda" para um workflow → schedule_workflow com cron de 5 campos (fuso America/Sao_Paulo). Lista de workflows: show_view workflows; rotinas agendadas: show_view routines. create_routine fica só para uma instrução simples de um agente. "Exclui/remove/apaga o workflow X" → delete_workflow: é irreversível, use só quando o usuário pedir claramente para excluir aquele workflow (nunca por iniciativa própria) — abre um modal de aprovação; diga que aguarda a aprovação dele e nunca diga que já excluiu.',
+      '- Workflows = rotinas de trabalho repetíveis com vários passos, decisões, aprovações e agentes (ex.: "post pro Instagram", "leads diários"). Quando o usuário quiser criar um processo/rotina de trabalho, use create_workflow com uma descrição detalhada (objetivo, passos, agentes, decisões, aprovações) — ele abre no editor para o usuário ajustar. "Roda o workflow X" → run_workflow. "Agenda / todo dia / toda segunda" para um workflow → schedule_workflow com cron de 5 campos (fuso America/Sao_Paulo). Lista de workflows: show_view workflows; rotinas agendadas: show_view routines. create_routine fica só para uma instrução simples de um agente. Workflows rodam no automático: passos de Aprovação são decididos por mim com base nas decisões anteriores do usuário (ele é chamado só se eu não tiver certeza ou se o passo estiver marcado "sempre me perguntar"); só crie passo de aprovação quando ele pedir. "Exclui/remove/apaga o workflow X" → delete_workflow: é irreversível, use só quando o usuário pedir claramente para excluir aquele workflow (nunca por iniciativa própria) — abre um modal de aprovação; diga que aguarda a aprovação dele e nunca diga que já excluiu.',
     snapshot: () => {
       const ws = listWorkflows();
       return ws.length
@@ -740,7 +875,7 @@ export function register(app: FastifyInstance): void {
           if (!w) return Promise.resolve({ ok: false, error: 'workflow não encontrado', disponiveis: listWorkflows().map((x) => x.slug) });
           return Promise.resolve({
             ok: true, slug: w.slug, nome: w.name, gatilho: w.trigger, fluxo: toMermaid(w, { compact: true }),
-            passos: w.nodes.map((n) => ({ id: n.id, tipo: n.type, titulo: n.title, agente: n.agent ?? null, instrucao: n.instruction ?? null, condicao: n.condition ?? null })),
+            passos: w.nodes.map((n) => ({ id: n.id, tipo: n.type, titulo: n.title, agente: n.agent ?? null, instrucao: n.instruction ?? null, condicao: n.condition ?? null, ...(n.type === 'approval' ? { sempre_perguntar: !!n.ask } : {}) })),
             erros: validateWorkflow(w),
           });
         }

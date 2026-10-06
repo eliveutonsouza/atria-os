@@ -129,6 +129,7 @@ export function parseWorkflowMarkdown(src: string, fallbackSlug?: string): Omit<
       else if (kv && ['skills', 'skill'].includes(key)) node.skills = parseList(kv[2]);
       else if (kv && ['mcp', 'mcps', 'conectores', 'ferramentas'].includes(key)) node.mcp = parseList(kv[2]);
       else if (kv && ['saida', 'output', 'resultado'].includes(key)) node.output = kv[2].trim();
+      else if (kv && ['perguntar', 'ask', 'sempre perguntar'].includes(key)) node.ask = /^(sim|s|yes|true|1)$/i.test(strip(kv[2]));
       else if (kv && ['condicao', 'condition', 'pergunta'].includes(key)) {
         node.condition = kv[2].trim();
         if (!typeSet) node.type = 'decision';
@@ -199,6 +200,7 @@ export function serializeWorkflow(def: Pick<WorkflowDef, 'name' | 'description' 
     if (n.mcp?.length) out.push(`- mcp: [${n.mcp.join(', ')}]`);
     if (n.output) out.push(`- saída: ${n.output}`);
     if (n.condition) out.push(`- condição: ${n.condition.replace(/\n+/g, ' ')}`);
+    if (n.type === 'approval' && n.ask) out.push('- perguntar: sim');
     if (n.position) out.push(`- posição: ${Math.round(n.position.x)},${Math.round(n.position.y)}`);
   }
   return `${out.join('\n')}\n`;

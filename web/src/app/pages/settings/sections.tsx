@@ -336,18 +336,19 @@ export function ModelsSection() {
 
 export function AgentsApprovalsSection() {
   const { data, save, msg } = useSettings()
-  const on = data ? data.values['approvals.mcpSensitive'] !== false : true
+  const on = data ? data.values['approvals.mcpSensitive'] === true : false
   return (
     <>
-      <Section title="Aprovações" hint="Comandos que mexem fora do servidor sempre passam por você.">
+      <Section title="Aprovações" hint="Workflows, rotinas, missões e projetos rodam no automático. Só pedem sua permissão onde você pediu.">
         <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#c9cde0' }}>
-          <li>Sempre: git push, deploy/publish/release, docker, ssh/rsync, rm -rf, banco de dados, merges e releases no GitHub.</li>
-          <li>Por projeto: padrões extras em <span className="mono">yui.json → approvalPatterns</span>.</li>
-          <li>Etapas de missão marcadas como arriscadas pedem OK antes de começar.</li>
+          <li>Bloqueado sempre (negado, sem perguntar): apagar raiz/workspace/dados inteiros, formatar disco, DROP DATABASE, prune do Docker, mexer nos stacks de produção protegidos e force push na main.</li>
+          <li>Workflows: a Yui decide os passos de Aprovação com base nas suas decisões anteriores; marque “Sempre me perguntar” no passo para decidir você.</li>
+          <li>Missões: só pedem OK nas etapas em que você pediu aprovação.</li>
+          <li>Por projeto: padrões em <span className="mono">yui.json → approvalPatterns</span> pedem aprovação.</li>
         </ul>
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}>
           <input type="checkbox" checked={on} onChange={(e) => save({ 'approvals.mcpSensitive': e.target.checked })} />
-          Pedir aprovação para ações sensíveis em conectores (enviar e-mail, publicar, pagar, apagar…)
+          Pedir aprovação antes de enviar/publicar/pagar por conectores (desligado = automático)
         </label>
         <SaveMsg msg={msg} />
       </Section>

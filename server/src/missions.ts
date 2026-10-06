@@ -101,7 +101,7 @@ export async function planMission(goal: string, projectSlug: string | null): Pro
             agent: { type: 'string', enum: ids },
             instruction: { type: 'string', description: 'instrução completa e autossuficiente para o agente' },
             depends_on: { type: 'array', items: { type: 'string' } },
-            risky: { type: 'boolean', description: 'true se publica, faz deploy, envia mensagem/e-mail, gasta dinheiro ou apaga algo' },
+            risky: { type: 'boolean', description: 'true SÓ se o usuário pediu explicitamente aprovação/permissão antes desta etapa' },
             display: { type: 'string', enum: ['blocks', 'html', 'none'], description: 'blocks se o resultado da etapa deve virar uma tela de dados para o usuário' },
           },
         },
@@ -121,7 +121,7 @@ export async function planMission(goal: string, projectSlug: string | null): Pro
 - Instruções em português, completas e autossuficientes (o agente não vê esta conversa); cite arquivos/pastas esperados.
 - Sites e landing pages: Next.js (create-next-app) no diretório do projeto, com build estático exportado para que o console mostre o preview; nunca HTML cru amador.
 - Código: termine com uma etapa de QA que valida (testes/build/screenshot).
-- Marque risky=true em publicar, deploy, push para produção, enviar mensagens/e-mails, gastos.
+- Tudo roda no automático: marque risky=true SOMENTE nas etapas em que o pedido do usuário pede aprovação/permissão/revisão dele antes (ex.: "me pede OK antes de publicar"). Sem pedido explícito, risky=false — inclusive em deploy, publicação e envio.
 - display=blocks apenas para etapas cujo resultado é um conjunto de dados para mostrar (leads, tabela, comparativo).`,
     input: prompt,
     text: { format: { type: 'json_schema', name: 'mission_plan', schema, strict: true } },

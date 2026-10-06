@@ -408,6 +408,7 @@ function clean(n: WorkflowNode): WorkflowNode {
     delete out.output
   }
   if (out.type === 'end') delete out.next
+  if (out.type !== 'approval' || !out.ask) delete out.ask
   return out
 }
 
@@ -468,9 +469,19 @@ function StepProps({ step, steps, agents, onChange, onDelete }: { step: Workflow
         </>
       )}
       {step.type === 'approval' && (
-        <Field label="O que revisar">
-          <textarea className="wf-input" rows={3} value={step.instruction ?? ''} onChange={(e) => onChange({ instruction: e.target.value })} />
-        </Field>
+        <>
+          <Field label="O que revisar">
+            <textarea className="wf-input" rows={3} value={step.instruction ?? ''} onChange={(e) => onChange({ instruction: e.target.value })} />
+          </Field>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: C.t2, lineHeight: 1.45, marginBottom: 10 }}>
+            <input type="checkbox" checked={!!step.ask} onChange={(e) => onChange({ ask: e.target.checked })} style={{ marginTop: 2 }} />
+            <span>
+              <b style={{ color: C.text, fontWeight: 600 }}>Sempre me perguntar</b>
+              <br />
+              Desmarcado, a Yui decide sozinha com base nas suas decisões anteriores e só te chama quando não tiver certeza.
+            </span>
+          </label>
+        </>
       )}
       {step.type === 'decision' && (
         <>
@@ -590,6 +601,7 @@ function RunsPanel({ runs, current, onPick, steps }: { runs: WorkflowRunInfo[]; 
                       </span>
                       {ns.decision && <span style={{ color: C.lav }}> → {ns.decision}</span>}
                       {ns.result && <div style={{ color: C.t2, whiteSpace: 'pre-wrap' }}>{ns.result.length > 280 ? `${ns.result.slice(0, 280)}…` : ns.result}</div>}
+                      {ns.decidedBy === 'yui' && <YuiDecisionFeedback runId={r.id} nodeId={s.id} approved={ns.decision === 'aprovado'} feedback={ns.feedback ?? null} />}
                       {ns.runId && (
                         <button className="wf-btn ghost" style={{ height: 24, padding: '0 6px', fontSize: 11 }} onClick={() => useYui.getState().show('runs', { runId: ns.runId! })}>
                           ver execução do agente
@@ -603,6 +615,48 @@ function RunsPanel({ runs, current, onPick, steps }: { runs: WorkflowRunInfo[]; 
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// Aprovação decidida pela Yui: Concordo/Discordo vira lição para as próximas (não desfaz a execução).
+function YuiDecisionFeedback({ runId, nodeId, approved, feedback }: { runId: string; nodeId: string; approved: boolean; feedback: 'agree' | 'disagree' | null }) {
+  const [note, setNote] = useState('')
+  const [writing, setWriting] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const send_ = async (agree: boolean) => {
+    setBusy(true)
+    try {
+      const r = await send<WorkflowRunInfo>('POST', `/api/workflow-runs/${encodeURIComponent(runId)}/nodes/${encodeURIComponent(nodeId)}/feedback`, { approved: agree ? approved : !approved, note: note.trim() || undefined })
+      useYui.getState().set({ workflowRuns: { ...useYui.getState().workflowRuns, [r.id]: r } })
+      useYui.getState().say(agree ? 'Anotado, sigo assim.' : 'Anotado: da próxima vez decido diferente.')
+      setWriting(false)
+    } catch (e) {
+      useYui.getState().say(`Não consegui registrar: ${(e as Error).message}.`)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4, padding: '8px 10px', borderRadius: 10, background: 'rgba(166,140,247,.07)', border: '1px solid rgba(166,140,247,.18)' }}>
+      <span style={{ fontSize: 11.5, color: C.lav }}>
+        Decidido pela Yui{feedback === 'agree' ? ' · você concordou' : feedback === 'disagree' ? ' · você discordou (ela aprendeu)' : ''}
+      </span>
+      {!feedback && !writing && (
+        <span style={{ display: 'flex', gap: 6 }}>
+          <button className="wf-btn ghost" disabled={busy} style={{ height: 26, fontSize: 11.5 }} onClick={() => void send_(true)}>Concordo</button>
+          <button className="wf-btn ghost" disabled={busy} style={{ height: 26, fontSize: 11.5, color: '#f39aa4' }} onClick={() => setWriting(true)}>Discordo</button>
+        </span>
+      )}
+      {writing && (
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <input className="wf-input" autoFocus aria-label="Por que você discorda" placeholder={approved ? 'Por que não deveria ter aprovado? (opcional)' : 'Por que deveria ter aprovado? (opcional)'} value={note} onChange={(e) => setNote(e.target.value)} />
+          <span style={{ display: 'flex', gap: 6 }}>
+            <button className="wf-btn" disabled={busy} style={{ height: 26, fontSize: 11.5 }} onClick={() => void send_(false)}>Ensinar a Yui</button>
+            <button className="wf-btn ghost" disabled={busy} style={{ height: 26, fontSize: 11.5 }} onClick={() => setWriting(false)}>Voltar</button>
+          </span>
+        </span>
+      )}
     </div>
   )
 }

@@ -10,6 +10,7 @@ import { findAgent, agentsWorking, type AgentDef } from './agents.ts';
 import { ensureProject, findProject } from './projects.ts';
 import { agentOptions, runPromptExtras } from './extensions.ts';
 import { getSetting } from './settings.ts';
+import { blockedReason } from './safety.ts';
 
 // Eventos para a camada de conversa (live.ts / brain.ts) narrar o trabalho.
 export const runBus = new EventEmitter<{
@@ -170,17 +171,6 @@ export function recoverRuns() {
 // ---------- execução via Claude Agent SDK ----------
 
 const SAFE_TOOLS = ['Read', 'Glob', 'Grep', 'Edit', 'Write', 'NotebookEdit', 'TodoWrite', 'WebSearch', 'WebFetch', 'Task'];
-const DANGER = [
-  /\bgit\s+push\b/,
-  /\bdocker\b/,
-  /\brm\s+-[a-z]*r[a-z]*f?\b/i,
-  /\b(deploy|publish|release)\b/i,
-  /\bnpm\s+publish\b/,
-  /\bkubectl\b|\bssh\b|\bscp\b|\brsync\b/,
-  /\bcurl\b[^|]*\s-X\s*(POST|PUT|DELETE|PATCH)/i,
-  /\bgh\s+(pr\s+merge|release|repo\s+delete)\b/,
-  /\bpsql\b|\bmysql\b|\bDROP\s+TABLE\b/i,
-];
 
 const SENSITIVE_MCP = /(send|reply|forward|delete|trash|remove|publish|deploy|merge|purchase|buy|pay|transfer|refund|share|invite|create_event|update_event|post_|tiktok_publish|execute_preset)/i;
 
@@ -304,7 +294,7 @@ function systemAppend(agent: AgentDef, projectName: string | null): string {
     'Regras de execução:',
     '- Use TodoWrite logo no início com 3 a 6 passos curtos em português; mantenha-o atualizado — ele vira a timeline que o usuário vê.',
     '- Trabalhe de forma autônoma; não faça perguntas ao usuário. Se algo bloquear, explique no resultado final.',
-    '- Ações irreversíveis (push, deploy, docker, publicar) podem exigir aprovação humana: o sistema pausa e pergunta. Se for negada, siga sem ela.',
+    '- Você trabalha no automático: não peça confirmação ao usuário, siga até entregar. Comandos catastróficos (apagar raiz/workspace, formatar disco, DROP DATABASE, mexer em stacks de produção protegidos, force push na main) são bloqueados; se um comando for negado, siga sem ele.',
     '- Resposta final: 1 a 3 frases em português, no estilo de status para ser falado em voz alta (o que foi feito, resultado, próximo passo).',
     projectName ? `- Projeto atual: ${projectName}.` : '- Sem projeto específico: trabalhe em /workspace/.yui/scratch.',
     '- Navegador: use as ferramentas mcp__playwright__* (Chromium headless na VPS) para navegar, testar sites, preencher formulários e tirar screenshots. Use mcp__claude-in-chrome__* só quando precisar do Chrome real do usuário (contas logadas dele) — chame list_connected_browsers antes; se não houver navegador conectado, use o Playwright e diga isso no resultado. Screenshots com filename relativo são salvos no diretório do projeto atual.',
@@ -341,7 +331,14 @@ async function execute(run: RunRow, ac: AbortController) {
   const canUseTool: CanUseTool = async (toolName, input, { signal }) => {
     if (toolName === 'Bash') {
       const cmd = String(input.command ?? '');
-      if ([...DANGER, ...extraPatterns].some((re) => re.test(cmd))) {
+      // Automático por padrão: só o catastrófico é negado (sem modal) e só os padrões que o usuário
+      // configurou no yui.json do projeto pedem aprovação.
+      const blocked = blockedReason(cmd);
+      if (blocked) {
+        logEvent(run.id, 'system', `Bloqueado por segurança (${blocked}): ${cmd.split('\n')[0].slice(0, 200)}`);
+        return { behavior: 'deny', message: `Comando bloqueado por segurança (${blocked}). Não tente contornar; siga sem ele e explique no resultado.` };
+      }
+      if (extraPatterns.some((re) => re.test(cmd))) {
         const ok = await requestApproval(
           run,
           `${agent.name} quer executar um comando sensível${project ? ` no ${project.name}` : ''}.`,

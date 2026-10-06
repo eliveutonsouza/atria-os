@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { SettingsPayload } from '../../shared/protocol.ts';
 import { setSettingsResolver } from './config.ts';
-import { db, now } from './db.ts';
+import { db, kvGet, kvSet, now } from './db.ts';
 
 // Configurações editáveis pelo painel. Precedência: banco > .env > padrão.
 // O .env vira só o "bootstrap" da instalação; tudo que o usuário ajusta no painel mora aqui.
@@ -38,7 +38,7 @@ export const SETTINGS: Record<string, Def> = {
   'voice.pttKey': { kind: 'enum', def: 'Space', options: ['Space', 'Backquote', 'F8', 'AltRight'] },
   'ui.particleDensity': { kind: 'number', def: 1, min: 0.3, max: 2 },
   'ui.reducedMotion': { kind: 'boolean', def: false },
-  'approvals.mcpSensitive': { kind: 'boolean', def: true },
+  'approvals.mcpSensitive': { kind: 'boolean', def: false },
   'notify.types': { kind: 'string', def: 'approval,failed,done', maxLen: 120 },
 };
 
@@ -144,6 +144,11 @@ setSettingsResolver((key) => rawGet(key));
 for (const k of Object.keys(SETTINGS)) mirrorEnv(k);
 
 export function register(app: FastifyInstance): void {
+  // 2026-10-06: tudo no automático — o "pedir aprovação em conectores" salvo antes volta ao padrão (desligado), uma vez.
+  if (!kvGet('approvals_auto_v1')) {
+    setRaw('approvals.mcpSensitive', null);
+    kvSet('approvals_auto_v1', '1');
+  }
   app.get('/api/settings', () => payload());
 
   app.put('/api/settings', async (req, reply) => {

@@ -410,6 +410,7 @@ export interface WorkflowNode {
   condition?: string; // decision
   branches?: { label: string; to: string }[]; // decision
   next?: string[]; // task/approval/parallel/start
+  ask?: boolean; // approval: sempre perguntar ao usuário (sem isso a Yui decide com base nas decisões anteriores)
   position?: { x: number; y: number };
 }
 export interface WorkflowDef {
@@ -428,7 +429,7 @@ export interface WorkflowRunInfo {
   workflow: string; // slug
   status: 'running' | 'waiting_approval' | 'done' | 'failed' | 'cancelled';
   current: string | null;
-  nodes: Record<string, { status: StepStatus; runId?: string | null; result?: string | null; decision?: string | null }>;
+  nodes: Record<string, { status: StepStatus; runId?: string | null; result?: string | null; decision?: string | null; decidedBy?: 'yui' | 'user' | null; feedback?: 'agree' | 'disagree' | null }>;
   startedAt: string;
   finishedAt: string | null;
 }

@@ -16,7 +16,7 @@ frases:
 dicas:
   - Diga tudo no primeiro pedido (público, tom, referências, projeto). Cada etapa recebe uma instrução fechada e não ouve a conversa.
   - Etapas sem dependência rodam em paralelo; as que dependem recebem o resultado das anteriores.
-  - Etapas que publicam, fazem deploy, enviam mensagem, gastam dinheiro ou apagam algo pedem seu OK antes de começar.
+  - A missão roda no automático, inclusive deploy e envio. Se quiser revisar uma etapa, peça no pedido: "me pede OK antes de publicar".
 erros:
   - Usar missão para uma tarefa pequena. Ela vira 2 a 8 etapas e gasta mais do que uma delegação direta.
   - Esquecer o projeto. Sem projeto, as etapas trabalham numa pasta de rascunho do workspace.
@@ -30,7 +30,7 @@ Uma missão é um plano de execução: o objetivo vira de 2 a 8 etapas, cada uma
 ## Passo a passo
 1. **Peça algo grande.** Fale com a Yui ou clique em **+ Nova missão** (aqui ou na Visão geral) e descreva o objetivo.
 2. **Confira o plano.** A missão abre com as Etapas, o agente de cada uma e o estado (na fila, trabalhando, aguardando seu OK, concluída, falhou, pulada).
-3. **Aprove as etapas arriscadas.** Elas ficam "aguardando seu OK" até você decidir em Aprovações.
+3. **Aprove só o que você pediu.** Etapas em que você pediu aprovação ficam "aguardando seu OK" até você decidir em Aprovações; o resto segue sozinho.
 4. **Controle o andamento.** Botões **Pausar**, **Retomar**, **Cancelar** e, se algo falhar, **Tentar de novo**.
 5. **Veja as entregas.** Clique numa etapa para abrir a execução e o resultado.
 6. **Exclua o que não serve mais.** A lixeira na lista (ou **Excluir** no topo da missão) pede confirmação; etapas em andamento são canceladas antes. Pedindo à Yui, ela abre uma aprovação vermelha e só exclui se você clicar em **Excluir definitivamente**. Os runs dos agentes continuam em Execuções.
@@ -41,6 +41,6 @@ Uma missão é um plano de execução: o objetivo vira de 2 a 8 etapas, cada uma
 - "Precisa de você": há etapa falhada ou aprovação pendente.
 
 ## Exemplos do dia a dia
-- Novo cliente quer site → missão com Designer, Copy, Frontend e QA; o deploy final pede OK.
+- Novo cliente quer site → missão com Designer, Copy, Frontend e QA, até o deploy, sem parar (diga "me pede OK antes do deploy" se quiser revisar).
 - Auditoria antes de entregar um sistema → missão com Security, QA e Report.
 - Uma etapa falhou por falta de acesso → resolva o acesso e diga "tenta de novo a missão".

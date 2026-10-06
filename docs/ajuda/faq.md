@@ -15,7 +15,7 @@ Ctrl/⌘ J alterna entre os dois. Também dá para passar o mouse na borda esque
 
 ## Segurança
 ### Os agentes podem fazer deploy ou apagar algo sem eu saber?
-Não. Push, deploy, docker, rm -rf, ssh, acesso a banco, merge e release no GitHub sempre pedem aprovação. Ações de conectores como enviar, publicar, pagar e apagar também pedem, a menos que você desligue em Configurações › Agentes & aprovações.
+Sim, por padrão: workflows, rotinas, missões e projetos rodam no automático, com push, deploy, docker e envios, e tudo fica registrado em Execuções. Eles só param onde você pediu aprovação ("me pede OK antes de publicar", "Sempre me perguntar" no passo do workflow ou yui.json › approvalPatterns). O catastrófico é sempre bloqueado: apagar raiz/workspace/dados inteiros, formatar disco, DROP DATABASE, prune do Docker, stacks de produção protegidos e force push na main. Para voltar a aprovar ações de conectores (enviar, publicar, pagar), ligue em Configurações › Agentes & aprovações.
 
 ### A Yui pode aprovar por mim?
 Não. Ela só mostra o pedido. Quem clica em Aprovar ou Rejeitar é você.

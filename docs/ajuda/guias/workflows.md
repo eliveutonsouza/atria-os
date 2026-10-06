@@ -13,7 +13,8 @@ frases:
   - "Como está desenhado o workflow do Instagram?"
   - "Exclui o workflow de leads."
 dicas:
-  - Ponha um passo de Aprovação antes de qualquer ação externa (publicar, enviar, deploy, pagar).
+  - Workflows rodam no automático. Passos de Aprovação são decididos pela Yui com base nas suas decisões anteriores; marque "Sempre me perguntar" no passo quando quiser decidir você.
+  - Na aba Execuções, Concordo/Discordo numa aprovação decidida pela Yui ensina o critério para as próximas.
   - Em cada Tarefa, preencha Nome da saída; os passos seguintes usam esse resultado.
   - A aba Markdown é o mesmo texto que os agentes leem. Dá para copiar, colar e editar por ali.
 erros:
@@ -33,6 +34,9 @@ Um workflow é um processo com passos: Tarefa (um agente executa), Decisão (uma
 4. **Rode.** **Rodar agora** executa e destaca o passo atual; **Parar execução** interrompe. A aba **Execuções** guarda o histórico.
 5. **Agende.** **Agendar** mostra opções como Todo dia 8h, Dias úteis 8h, Toda segunda 9h, Toda sexta 17h, A cada hora, Dia 1 do mês 9h ou um cron personalizado. **Manual** tira o agendamento.
 6. **Remova.** **Remover** no card da lista (ou **Excluir workflow** no editor) pede confirmação e apaga o workflow, as rotinas agendadas dele e o histórico de execuções. Se pedir à Yui, ela abre uma aprovação vermelha e só exclui se você clicar em **Excluir definitivamente**. Não dá para desfazer.
+
+## Aprovações que aprendem
+Num passo de Aprovação, a Yui lê o que revisar, os resultados da execução e as suas decisões anteriores naquele workflow, e aprova ou para a execução sozinha. Se não tiver certeza, chama você no modal; a sua resposta vira lição. Na aba **Execuções**, o passo mostra "Decidido pela Yui" com **Concordo** e **Discordo**. Discordar não desfaz a execução, mas muda as próximas decisões. Criando pela Yui, o passo de aprovação só entra se você pedir ("me pede OK antes de publicar") e já vem com "Sempre me perguntar".
 
 ## O que você vê na tela
 - Fluxograma no centro; arraste do ponto inferior do losango até outro passo para criar um ramo.
