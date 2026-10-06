@@ -11,6 +11,7 @@ frases:
   - "Roda o workflow de leads agora."
   - "Agenda o workflow de leads para dias úteis às 8h."
   - "Como está desenhado o workflow do Instagram?"
+  - "Exclui o workflow de leads."
 dicas:
   - Ponha um passo de Aprovação antes de qualquer ação externa (publicar, enviar, deploy, pagar).
   - Em cada Tarefa, preencha Nome da saída; os passos seguintes usam esse resultado.
@@ -31,12 +32,13 @@ Um workflow é um processo com passos: Tarefa (um agente executa), Decisão (uma
 3. **Salve.** O botão do topo mostra **Salvar** enquanto há mudanças.
 4. **Rode.** **Rodar agora** executa e destaca o passo atual; **Parar execução** interrompe. A aba **Execuções** guarda o histórico.
 5. **Agende.** **Agendar** mostra opções como Todo dia 8h, Dias úteis 8h, Toda segunda 9h, Toda sexta 17h, A cada hora, Dia 1 do mês 9h ou um cron personalizado. **Manual** tira o agendamento.
+6. **Remova.** **Remover** no card da lista (ou **Excluir workflow** no editor) pede confirmação e apaga o workflow, as rotinas agendadas dele e o histórico de execuções. Se pedir à Yui, ela abre uma aprovação vermelha e só exclui se você clicar em **Excluir definitivamente**. Não dá para desfazer.
 
 ## O que você vê na tela
 - Fluxograma no centro; arraste do ponto inferior do losango até outro passo para criar um ramo.
 - Abas Propriedades, Markdown, Mermaid (com Copiar Mermaid) e Execuções.
 - Copiar markdown e Colar markdown, para duplicar ou trazer um workflow de outro lugar.
-- Na lista: gatilho, time de agentes, última execução e os botões Abrir, Rodar e Agendar.
+- Na lista: gatilho, time de agentes, última execução e os botões Abrir, Rodar, Agendar e Remover.
 
 ## Exemplos do dia a dia
 - Leads toda manhã → workflow com Research buscando e qualificando, decisão "tem leads bons?" e registro no CRM pelo Assistente.

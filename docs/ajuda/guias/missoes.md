@@ -12,6 +12,7 @@ frases:
   - "Como está a missão?"
   - "Pausa a missão."
   - "Tenta de novo a etapa que falhou."
+  - "Exclui a missão da landing page."
 dicas:
   - Diga tudo no primeiro pedido (público, tom, referências, projeto). Cada etapa recebe uma instrução fechada e não ouve a conversa.
   - Etapas sem dependência rodam em paralelo; as que dependem recebem o resultado das anteriores.
@@ -32,9 +33,10 @@ Uma missão é um plano de execução: o objetivo vira de 2 a 8 etapas, cada uma
 3. **Aprove as etapas arriscadas.** Elas ficam "aguardando seu OK" até você decidir em Aprovações.
 4. **Controle o andamento.** Botões **Pausar**, **Retomar**, **Cancelar** e, se algo falhar, **Tentar de novo**.
 5. **Veja as entregas.** Clique numa etapa para abrir a execução e o resultado.
+6. **Exclua o que não serve mais.** A lixeira na lista (ou **Excluir** no topo da missão) pede confirmação; etapas em andamento são canceladas antes. Pedindo à Yui, ela abre uma aprovação vermelha e só exclui se você clicar em **Excluir definitivamente**. Os runs dos agentes continuam em Execuções.
 
 ## O que você vê na tela
-- Lista de missões à esquerda: título, estado (rodando, pausada, precisa de você, concluída, falhou, cancelada), agentes e "x/y etapas".
+- Lista de missões à esquerda: título, estado (rodando, pausada, precisa de você, concluída, falhou, cancelada), agentes e "x/y etapas", com a lixeira para excluir.
 - Plano à direita com grafo das etapas e a lista detalhada.
 - "Precisa de você": há etapa falhada ou aprovação pendente.
 

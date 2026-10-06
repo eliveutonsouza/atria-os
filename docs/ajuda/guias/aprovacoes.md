@@ -33,6 +33,7 @@ O console para e pergunta antes de ações sensíveis. Nos comandos de terminal 
 
 ## O que você vê na tela
 - Cartões "APROVAÇÃO NECESSÁRIA" com tempo desde o pedido e os botões Revisar, Rejeitar e Aprovar.
+- Cartões vermelhos "AÇÃO DESTRUTIVA · NÃO DÁ PARA DESFAZER" quando você pediu à Yui para excluir um workflow ou uma missão: **Cancelar** mantém tudo, **Excluir definitivamente** apaga.
 - Outros avisos do inbox (entregas, falhas) logo abaixo; clique para abrir.
 - "Nada precisa de você agora." quando está tudo em dia.
 
