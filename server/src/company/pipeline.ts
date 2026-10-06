@@ -1,3 +1,4 @@
+import { trackOpenAI } from '../usage.ts';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -126,6 +127,7 @@ async function extract(doc: CompanyDoc, md: string) {
     input: `Arquivo: ${doc.name}\n\n${md.slice(0, 16000)}`,
     text: { format: { type: 'json_schema', name: 'company_doc', schema: EXTRACT_SCHEMA as unknown as Record<string, unknown>, strict: true } },
   });
+  trackOpenAI('empresa', res.model, res.usage);
   const r = JSON.parse(res.output_text) as {
     doc_type: string; summary: string; category: string; fields: { key: string; value: string }[]; entities: { type: string; value: string }[]; tags: string[];
   };
@@ -142,6 +144,7 @@ export async function embed(texts: string[]): Promise<number[][]> {
   const out: number[][] = [];
   for (let i = 0; i < texts.length; i += 64) {
     const r = await openai.embeddings.create({ model: config.embedModel, input: texts.slice(i, i + 64).map((t) => t.slice(0, 24000)) });
+    trackOpenAI('empresa-embeddings', r.model, r.usage);
     out.push(...r.data.sort((a, b) => a.index - b.index).map((d) => d.embedding));
   }
   return out;

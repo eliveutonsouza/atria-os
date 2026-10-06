@@ -69,7 +69,7 @@ function parsePath(path: string): { view: ViewName; params: ViewParams } | null 
 }
 
 // /app/<página>/<id?> = dashboard (Yui minimizada); demais rotas = modo Yui.
-const APP_PAGES = new Set(['overview', 'ops', 'agents', 'runs', 'missions', 'workflows', 'schedule', 'projects', 'browser', 'terminal', 'claude', 'tools', 'inbox', 'infra', 'settings', 'vault', 'brain', 'company', 'help', 'more'])
+const APP_PAGES = new Set(['overview', 'ops', 'agents', 'runs', 'missions', 'workflows', 'schedule', 'projects', 'browser', 'terminal', 'claude', 'tools', 'inbox', 'infra', 'settings', 'vault', 'brain', 'company', 'help', 'more', 'usage', 'reminders'])
 function appPathFor(page: string, p: Record<string, string>) {
   const base = page === 'overview' ? '/app' : `/app/${page}`
   return p.id ? `${base}/${encodeURIComponent(p.id)}` : base

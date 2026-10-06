@@ -11,6 +11,7 @@ import { Dot, openApp, relTime, Tag, useViewParams } from './common'
 // Missões: planos de execução multi-agente. Lista à esquerda, plano (MissionView) à direita.
 
 const STATUS: Record<MissionInfo['status'], [string, string]> = {
+  draft: ['rascunho', C.lav],
   running: ['rodando', C.cyan],
   paused: ['pausada', C.t2],
   blocked: ['precisa de você', C.warn],

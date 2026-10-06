@@ -7,6 +7,7 @@ import { openai, recentMessages, saveMessage, think } from './brain.ts';
 import { runBus } from './runs.ts';
 import { agentsWorking } from './agents.ts';
 import { contextoAgora } from './ambiente.ts';
+import { trackOpenAI } from './usage.ts';
 
 // Yui por voz = GPT-Live-1 (o mesmo modelo full-duplex do ChatGPT Voice/Codex).
 // Browser <-> OpenAI por WebRTC (áudio). Este servidor acompanha a sessão por um sideband WebSocket:
@@ -35,6 +36,7 @@ ${contextoAgora(0)}`;
 
 interface LiveState {
   sessionId: string;
+  startedAt?: number; // para medir minutos de voz (Consumo de IA)
   sideband: SidebandWS;
   muted: boolean;
   userBuf: string;
@@ -172,7 +174,7 @@ export async function startLive(offerSdp: string): Promise<{ sdp: string; sessio
   });
   const sessionId = res.session.id;
   const sideband = new SidebandWS(openai, { session_id: sessionId, graceful_close: true });
-  live = { sessionId, sideband, muted: false, userBuf: '', yuiBuf: '', pendingRequest: '', lastActivity: Date.now(), lastProgressNote: new Map(), inflight: null };
+  live = { sessionId, startedAt: Date.now(), sideband, muted: false, userBuf: '', yuiBuf: '', pendingRequest: '', lastActivity: Date.now(), lastProgressNote: new Map(), inflight: null };
   wire(live);
   // Sessão longa: o relógio do prompt envelhece; manda o "agora" de novo a cada 5 min.
   const st = live;
@@ -259,6 +261,8 @@ export function endLive(reason = 'user') {
   const st = live;
   if (!st) return;
   live = null;
+  // a sessão de voz não devolve tokens por aqui: registra a duração (custo por minuto, se houver preço)
+  if (st.startedAt) trackOpenAI('voz', config.liveModel, null, { seconds: Math.round((Date.now() - st.startedAt) / 1000) });
   clearTimeout(st.silenceTimer);
   clearTimeout(st.watchTimer);
   clearTimeout(st.speakingTimer);

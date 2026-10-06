@@ -1,3 +1,4 @@
+import { trackOpenAI } from './usage.ts';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
@@ -127,6 +128,7 @@ export async function ask(pergunta: string, who = 'Painel'): Promise<HelpAnswer>
           'Se os trechos não respondem, comece exatamente com "Não encontrei isso nos guias." e sugira o guia mais próximo.',
         input: `Pergunta: ${q}\n\nTrechos:\n${hits.map((h) => `(${h.p.source.kind === 'guia' ? 'Guia' : h.p.source.kind === 'receita' ? 'Receita' : 'FAQ'}: ${h.p.source.titulo} — ${h.p.section})\n${h.p.text.slice(0, 1800)}`).join('\n\n')}`,
       });
+      trackOpenAI('ajuda', res.model, res.usage);
       resposta = res.output_text.trim() || null;
       if (resposta?.startsWith('Não encontrei isso nos guias')) semResposta = true;
     } catch (e) {

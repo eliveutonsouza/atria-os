@@ -1,3 +1,4 @@
+import { trackOpenAI } from './usage.ts';
 import OpenAI from 'openai';
 import type { ChatContext, ViewName } from '../../shared/protocol.ts';
 import { VIEW_NAMES } from '../../shared/protocol.ts';
@@ -293,6 +294,7 @@ export async function think({ request, dryRun = false, calls }: ThinkInput): Pro
       previous_response_id: previous,
       parallel_tool_calls: true,
     });
+    trackOpenAI('cerebro', res.model, res.usage);
     previous = res.id;
     const calls = res.output.filter((o): o is OpenAI.Responses.ResponseFunctionToolCall => o.type === 'function_call');
     if (!calls.length) return res.output_text.trim() || 'Pronto.';

@@ -326,10 +326,12 @@ export interface MissionInfo {
   title: string;
   goal: string;
   project: string | null;
-  status: 'running' | 'paused' | 'blocked' | 'done' | 'failed' | 'cancelled';
+  status: 'draft' | 'running' | 'paused' | 'blocked' | 'done' | 'failed' | 'cancelled';
   steps: MissionStep[];
   createdAt: string;
   finishedAt: string | null;
+  details?: string | null; // detalhes e referências do pedido (entram no planejamento)
+  approvalBefore?: string[]; // "deploy" | "enviar": pedir OK antes dessas ações
 }
 
 // ---------- telas sob medida ----------
@@ -451,7 +453,7 @@ export interface RoutineInfo {
 export type AppPage =
   | 'overview' | 'ops' | 'agents' | 'runs' | 'missions' | 'workflows' | 'schedule' | 'projects'
   | 'browser' | 'terminal' | 'claude' | 'tools' | 'inbox' | 'infra' | 'settings'
-  | 'vault' | 'brain' | 'company' | 'help' | 'more';
+  | 'vault' | 'brain' | 'company' | 'help' | 'more' | 'usage' | 'reminders';
 
 export interface StatsOverview {
   kpis: { runsToday: number; runsYesterday: number; success7d: number | null; failed7d: number; agentsActive: number; agentsTotal: number; approvals: number; cost7d: number; tokens7d: number };
@@ -846,4 +848,67 @@ export interface HelpResults {
   };
   rows: { tipo: HelpTaskType; label: string; count: number; minutes: number; hours: number }[];
   weeks: { label: string; from: string; hours: number; byTipo: Partial<Record<HelpTaskType, number>> }[];
+}
+
+// ---------- consumo de IA ----------
+export interface UsageLimit {
+  kind: string; // five_hour | seven_day | seven_day_opus | …
+  label: string; // "Sessão atual (5 h)"
+  pct: number | null; // 0–100
+  resetsAt: string | null; // ISO
+  status?: string | null; // allowed | allowed_warning | rejected
+}
+export interface UsageDay { date: string; claude: number; openai: number }
+export interface UsageReport {
+  days: number;
+  claude: {
+    plan: string | null; // max | pro | api…
+    model: string | null; // padrão da conta (init)
+    limits: UsageLimit[];
+    limitsAt: string | null; // quando os limites foram lidos
+    lastContext: { agent: string; task: string; used: number; window: number; at: string } | null;
+    runs: number;
+    tokens: number;
+    cost: number;
+    byAgent: { agentId: string; agent: string; runs: number; tokens: number; cost: number }[];
+  };
+  openai: {
+    today: number;
+    d7: number;
+    d30: number;
+    tokens: number;
+    voiceSeconds: number;
+    byFeature: { feature: string; label: string; model: string; tokens: number; seconds: number; cost: number | null }[];
+    byModel: { model: string; tokens: number; cost: number | null }[];
+    unpriced: string[]; // modelos sem preço na tabela (custo desconhecido)
+  };
+  daily: UsageDay[];
+}
+
+// ---------- catálogo de modelos ----------
+export interface ModelOption { value: string; label: string; hint?: string }
+export interface ModelsCatalog {
+  openai: { chat: ModelOption[]; live: ModelOption[]; embed: ModelOption[]; at: string | null; error?: string | null };
+  claude: ModelOption[];
+  defaults: { claudeAccount: string | null; claudeConsole: string | null; brain: string; planner: string; live: string; embed: string };
+}
+
+// ---------- lembretes ----------
+export type ReminderRepeat = 'diario' | 'dias_uteis' | 'semanal' | 'mensal';
+export interface ReminderInfo {
+  id: string;
+  text: string;
+  dueAt: string;
+  repeat: ReminderRepeat | null;
+  status: 'pending' | 'done' | 'cancelled' | 'missed';
+  createdAt: string;
+  firedAt: string | null;
+}
+
+// ---------- agentes: onde um agente é usado (antes de demitir) ----------
+export interface AgentUsageRef {
+  kind: 'routine' | 'workflow' | 'mission' | 'toolbox';
+  id: string;
+  label: string; // "Revisão de acessibilidade · seg 09:00"
+  detail?: string; // "passos 2 e 4"
 }

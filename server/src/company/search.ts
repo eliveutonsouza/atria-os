@@ -1,3 +1,4 @@
+import { trackOpenAI } from '../usage.ts';
 import type { CompanyCategory, CompanySearchHit, CompanySearchResult } from '../../../shared/protocol.ts';
 import { config } from '../config.ts';
 import { openai } from '../brain.ts';
@@ -82,6 +83,7 @@ export async function search(
           `Se os trechos não respondem, responda exatamente: "${NOT_FOUND}" e diga em uma frase o que faltou. Não invente valores.`,
         input: `Pergunta: ${text}\n\nTrechos:\n${hits.map((h) => `[${h.n}] (${h.docName}${h.page ? `, pág. ${h.page}` : ''})\n${h.text.slice(0, 2400)}`).join('\n\n')}`,
       });
+      trackOpenAI('empresa', res.model, res.usage);
       answer = res.output_text.trim() || null;
       if (answer?.startsWith(NOT_FOUND)) noAnswer = true;
     } catch (e) {

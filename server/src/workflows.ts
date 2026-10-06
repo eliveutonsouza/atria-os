@@ -1,3 +1,4 @@
+import { trackOpenAI } from './usage.ts';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
@@ -408,7 +409,7 @@ async function decide(ex: Exec, node: WorkflowNode): Promise<string> {
   let motivo = 'sem avaliação';
   try {
     const res = await openai.responses.create({
-      model: process.env.YUI_BRAIN_MODEL || 'gpt-6-luna',
+      model: config.brainModel,
       instructions:
         'Você avalia um ponto de decisão de um workflow. Escolha o ramo que responde à condição com base nos resultados dos passos. Seja criterioso; motivo curto em português.',
       input: `Workflow: ${ex.def.name}\nCondição: ${node.condition ?? node.title}\nRamos: ${branches.map((b) => b.label).join(' | ')}\n\nResultados até aqui:\n${contextFor(ex) || '(nenhum)'}`,
@@ -426,6 +427,7 @@ async function decide(ex: Exec, node: WorkflowNode): Promise<string> {
         },
       },
     });
+    trackOpenAI('workflow-decisao', res.model, res.usage);
     const out = JSON.parse(res.output_text) as { ramo: string; motivo: string };
     choice = branches.find((b) => b.label === out.ramo) ?? choice;
     motivo = out.motivo;
@@ -469,7 +471,7 @@ const openaiJudge: Judge = async (i) => {
     ? i.licoes.map((l) => `- ${l.nodeId === i.nodeId ? 'Este passo' : `Passo ${l.nodeId}`}: ${l.approved ? 'APROVOU' : 'REJEITOU'}${l.reason ? ` — "${l.reason}"` : ''}${l.context ? `\n  Contexto na época: ${clip(l.context, 400)}` : ''}`).join('\n')
     : '(nenhuma decisão anterior do usuário neste workflow)';
   const res = await openai.responses.create({
-    model: process.env.YUI_BRAIN_MODEL || 'gpt-6-luna',
+    model: config.brainModel,
     instructions:
       'Você decide, no lugar do dono, um passo de aprovação de um workflow que roda no automático. As decisões anteriores dele são as lições mais importantes: siga o mesmo critério. Aprove quando o resultado atende ao critério do passo e é coerente com o que ele já aprovou; rejeite quando contraria algo que ele rejeitou ou quando o resultado está claramente errado, incompleto ou fora do pedido. confianca de 0 a 1: abaixo de 0.7 quando não há lições parecidas e a decisão é ambígua ou cara de errar — aí o dono é chamado. Motivo curto em português.',
     input: `Workflow: ${i.workflow}\nPasso: ${i.passo}\nO que revisar: ${i.criterio}\n\nDecisões anteriores do dono:\n${licoes}\n\nResultados desta execução:\n${i.contexto || '(nenhum)'}`,
@@ -487,6 +489,7 @@ const openaiJudge: Judge = async (i) => {
       },
     },
   });
+  trackOpenAI('workflow-aprovacao', res.model, res.usage);
   return JSON.parse(res.output_text) as ApprovalVerdict;
 };
 let judge: Judge = openaiJudge;
@@ -638,7 +641,7 @@ export async function generateWorkflow(input: { descricao: string; nome?: string
     .map((a) => `- ${a.id}: ${a.name} — ${a.description}`)
     .join('\n');
   const res = await openai.responses.create({
-    model: process.env.YUI_PLANNER_MODEL || process.env.YUI_BRAIN_MODEL || 'gpt-6-luna',
+    model: config.plannerModel,
     instructions: `Você desenha workflows de trabalho para agentes Claude Code do Yui Console. Gere passos numerados ("1", "2"…) na ordem de execução.
 Tipos: task (um agente executa; instrução completa e autossuficiente em português, citando ferramentas/conectores quando útil), decision (condição objetiva + 2 ramos, normalmente "sim"/"não", com "to" = id do passo), approval (revisão do usuário: use SOMENTE quando o pedido disser para pedir aprovação/permissão/revisão dele naquela etapa, e então com ask=true e instruction dizendo o que revisar), parallel (next com 2+ passos em paralelo), end (último passo).
 Use SOMENTE estes agentes (campo agent = id):
@@ -659,6 +662,7 @@ Em tasks preencha agent, instruction e output (nome curto da saída). Fora de ta
       },
     },
   });
+  trackOpenAI('workflow-gerar', res.model, res.usage);
   type GenNode = { id: string; type: WorkflowNode['type']; title: string; agent: string | null; instruction: string | null; output: string | null; condition: string | null; branches: { label: string; to: string }[]; next: string[]; mcp: string[]; ask: boolean };
   const raw = JSON.parse(res.output_text) as { name: string; description: string; nodes: GenNode[] };
   const nodes: WorkflowNode[] = raw.nodes.map((n) => {

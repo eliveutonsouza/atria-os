@@ -20,6 +20,7 @@ const ST: Record<StepStatus, { icon: string; c: string; label: string }> = {
 }
 
 const MST: Record<MissionInfo['status'], { c: string; label: string }> = {
+  draft: { c: C.lav, label: 'Rascunho' },
   running: { c: C.cyan, label: 'Em execução' },
   paused: { c: C.t2, label: 'Pausada' },
   blocked: { c: C.warn, label: 'Precisa de você' },

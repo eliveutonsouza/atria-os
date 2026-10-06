@@ -11,6 +11,7 @@ import { ensureProject, findProject } from './projects.ts';
 import { agentOptions, runPromptExtras } from './extensions.ts';
 import { getSetting } from './settings.ts';
 import { blockedReason } from './safety.ts';
+import { saveRateLimit } from './claudeUsage.ts';
 
 // Eventos para a camada de conversa (live.ts / brain.ts) narrar o trabalho.
 export const runBus = new EventEmitter<{
@@ -22,7 +23,7 @@ export const runBus = new EventEmitter<{
 type RunRow = {
   id: string; mission_id: string | null; step_id: string | null; workflow_run_id: string | null; display: 'blocks' | 'html' | null; agent_id: string; project: string | null; instruction: string; task: string; state: RunState;
   progress: number; current_op: string | null; tools: string; steps: string; result: string | null;
-  session_id: string | null; tokens_in: number; tokens_out: number; cost_usd: number;
+  session_id: string | null; tokens_in: number; tokens_out: number; cost_usd: number; context_tokens?: number | null; context_window?: number | null; num_turns?: number | null;
   created_at: string; started_at: string | null; finished_at: string | null;
 };
 
@@ -372,6 +373,7 @@ async function execute(run: RunRow, ac: AbortController) {
 
   const tools = new Set<string>(JSON.parse(run.tools));
   let steps: RunStep[] = [];
+  let lastContext = 0;
   let turns = 0;
 
   const { mcpServers: extraMcp, ...perAgent } = agentOptions(agent.id);
@@ -409,8 +411,14 @@ async function execute(run: RunRow, ac: AbortController) {
       if (mcp.length) logEvent(run.id, 'system', `MCP: ${mcp.join(', ')}`);
       if (msg.plugins.length) logEvent(run.id, 'system', `plugins: ${msg.plugins.map((p) => p.name).join(', ')}`);
       kvSet('claude_capabilities', JSON.stringify({ at: now(), mcp: msg.mcp_servers, plugins: msg.plugins.map((p) => p.name), apiKeySource: msg.apiKeySource }));
+    } else if (msg.type === 'rate_limit_event') {
+      // limites do plano (sessão de 5 h, semana…): o painel Consumo de IA mostra o último lido
+      saveRateLimit((msg as { rate_limit_info?: unknown }).rate_limit_info);
     } else if (msg.type === 'assistant') {
       turns++;
+      // contexto ocupado no turno do loop principal (subagentes têm janela própria)
+      const u = (msg.message as { usage?: { input_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } }).usage;
+      if (u && !(msg as { parent_tool_use_id?: string | null }).parent_tool_use_id) lastContext = (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
       for (const block of msg.message.content) {
         if (block.type === 'text' && block.text.trim()) {
           logEvent(run.id, 'text', block.text.trim());
@@ -438,6 +446,11 @@ async function execute(run: RunRow, ac: AbortController) {
       }
     } else if (msg.type === 'result') {
       const usage = msg.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
+      // modelUsage soma também os subagentes (Task); usage é só o loop principal
+      const mu = Object.values((msg as { modelUsage?: Record<string, { inputTokens?: number; outputTokens?: number; cacheReadInputTokens?: number; cacheCreationInputTokens?: number; contextWindow?: number }> }).modelUsage ?? {});
+      const muIn = mu.reduce((a, m) => a + (m.inputTokens ?? 0) + (m.cacheReadInputTokens ?? 0) + (m.cacheCreationInputTokens ?? 0), 0);
+      const muOut = mu.reduce((a, m) => a + (m.outputTokens ?? 0), 0);
+      const ctxWindow = mu.reduce((a, m) => Math.max(a, m.contextWindow ?? 0), 0);
       const ok = msg.subtype === 'success';
       const result = ok ? ((msg as { result?: string }).result ?? '').trim() : `Falhou (${msg.subtype}). ${(msg as { errors?: string[] }).errors?.join('; ') ?? ''}`;
       logEvent(run.id, ok ? 'result' : 'error', result || '(sem texto)');
@@ -449,9 +462,12 @@ async function execute(run: RunRow, ac: AbortController) {
         result: result.slice(0, 24000), // resultado completo: missões e workflows passam adiante
         current_op: ok ? 'Concluído' : 'Falhou',
         steps: JSON.stringify(ok ? steps.map((s) => ({ ...s, status: 'done' })) : steps),
-        tokens_in: (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
-        tokens_out: usage.output_tokens ?? 0,
+        tokens_in: muIn || (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
+        tokens_out: muOut || (usage.output_tokens ?? 0),
         cost_usd: msg.total_cost_usd,
+        context_tokens: lastContext || null,
+        context_window: ctxWindow || null,
+        num_turns: (msg as { num_turns?: number }).num_turns ?? turns,
       } as Partial<Record<keyof RunRow, unknown>>);
       runBus.emit('finished', info);
       return;

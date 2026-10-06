@@ -45,6 +45,9 @@ export const config = {
   get brainModel() {
     return dyn('models.brain', 'YUI_BRAIN_MODEL', 'gpt-6-luna');
   },
+  get plannerModel() {
+    return dyn('models.planner', 'YUI_PLANNER_MODEL', 'gpt-6-sol');
+  },
   get voice() {
     return dyn('voice.name', 'YUI_VOICE', 'marin');
   },

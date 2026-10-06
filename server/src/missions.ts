@@ -1,8 +1,10 @@
+import { trackOpenAI } from './usage.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { ApprovalInfo, MissionInfo, MissionStep, RunInfo } from '../../shared/protocol.ts';
 import { db, kvGet, now, uid } from './db.ts';
+import { config } from './config.ts';
 import { emit, setYuiState } from './bus.ts';
 import { findAgent, loadAgents } from './agents.ts';
 import { activeProject, findProject, setActiveProject } from './projects.ts';
@@ -14,7 +16,6 @@ import { registerBrain } from './extensions.ts';
 // Missões: um pedido grande vira um plano (DAG de etapas, cada uma com um agente), mostrado no Canvas
 // e executado em ordem de dependência. Resultados das etapas anteriores entram no contexto das seguintes.
 
-const PLANNER_MODEL = process.env.YUI_PLANNER_MODEL || 'gpt-6-sol';
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS missions (
@@ -115,7 +116,7 @@ export async function planMission(goal: string, projectSlug: string | null): Pro
     `Conectores dos agentes: ${connectorsLine() || 'Google Calendar, Gmail, Drive, Linear, Vercel, Supabase, Figma'}; navegador Playwright e Chrome do usuário.`,
   ].join('\n\n');
   const res = await openai.responses.create({
-    model: PLANNER_MODEL,
+    model: config.plannerModel,
     instructions: `Você planeja missões para uma equipe de agentes Claude Code. Gere de 2 a 8 etapas, cada uma com UM agente da lista.
 - Use dependências (depends_on) só quando a etapa precisa do resultado/arquivos de outra; etapas independentes rodam em paralelo.
 - Instruções em português, completas e autossuficientes (o agente não vê esta conversa); cite arquivos/pastas esperados.
@@ -126,6 +127,7 @@ export async function planMission(goal: string, projectSlug: string | null): Pro
     input: prompt,
     text: { format: { type: 'json_schema', name: 'mission_plan', schema, strict: true } },
   });
+  trackOpenAI('planejador', res.model, res.usage);
   const plan = JSON.parse(res.output_text) as { title: string; steps: PlannedStep[] };
   const planned = plan.steps.slice(0, 8);
   const known = new Set(planned.map((s) => s.id));

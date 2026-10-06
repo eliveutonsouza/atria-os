@@ -115,6 +115,9 @@ addColumn('runs', 'workflow_run_id', 'TEXT');
 addColumn('runs', 'display', 'TEXT');
 addColumn('routines', 'workflow_id', 'TEXT');
 addColumn('approvals', 'kind', 'TEXT');
+addColumn('runs', 'context_tokens', 'INTEGER');
+addColumn('runs', 'context_window', 'INTEGER');
+addColumn('runs', 'num_turns', 'INTEGER');
 
 export const now = () => new Date().toISOString();
 export const uid = () => randomUUID();

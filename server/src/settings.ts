@@ -33,6 +33,8 @@ export const SETTINGS: Record<string, Def> = {
   'models.planner': { kind: 'string', env: 'YUI_PLANNER_MODEL', def: 'gpt-6-sol', maxLen: 60 },
   'models.live': { kind: 'string', env: 'YUI_LIVE_MODEL', def: 'gpt-live-1', maxLen: 60 },
   'claude.model': { kind: 'string', env: 'YUI_CLAUDE_MODEL', def: '', maxLen: 60 },
+  'models.embed': { kind: 'string', env: 'YUI_EMBED_MODEL', def: 'text-embedding-3-small', maxLen: 60 },
+  'pricing.openai': { kind: 'string', def: '', maxLen: 4000 },
   'runs.concurrency': { kind: 'number', env: 'YUI_MAX_CONCURRENT_RUNS', def: 2, min: 1, max: 8 },
   'voice.name': { kind: 'string', env: 'YUI_VOICE', def: 'marin', maxLen: 40 },
   'voice.idleMin': { kind: 'number', env: 'YUI_LIVE_IDLE_MIN', def: 5, min: 1, max: 60 },
