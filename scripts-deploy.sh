@@ -6,7 +6,8 @@ set -euo pipefail
 cd "$(dirname "$0")"
 FORCE=0; E2E=1
 for a in "$@"; do case "$a" in --force) FORCE=1;; --no-e2e) E2E=0;; esac; done
-C=yui-console-yui-console-1
+PROJECT="${YUI_PROJECT:-$(sed -n 's/^YUI_PROJECT=//p' .env 2>/dev/null | tail -1)}"; PROJECT="${PROJECT:-yui-console}"
+C="$PROJECT-yui-console-1"
 busy() {
   docker exec "$C" node -e "const D=require('/app/server/node_modules/better-sqlite3');const db=new D('/data/yui.db',{readonly:true});console.log(db.prepare(\"SELECT COUNT(*) n FROM runs WHERE state IN ('running','waiting_approval')\").get().n)" 2>/dev/null || echo 0
 }
@@ -16,8 +17,7 @@ if [ "$FORCE" = 0 ]; then
     echo "aguardando $n execução(ões) terminarem…"; sleep 15
   done
 fi
-(cd web && npm run build >/dev/null)
-docker compose -p yui-console up -d --build
+docker compose -p "$PROJECT" up -d --build
 for i in $(seq 1 30); do
   st=$(docker inspect -f '{{.State.Health.Status}}' "$C" 2>/dev/null || echo starting)
   [ "$st" = healthy ] && break; sleep 3

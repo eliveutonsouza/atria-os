@@ -1,0 +1,8 @@
+# Modo sem proxy (YUI_PROXY=none): publica o painel numa porta do host para o seu próprio proxy
+# (nginx, Apache, Cloudflare Tunnel…) ou para acesso direto em rede local.
+# Ativado pelo install.sh com COMPOSE_FILE=docker-compose.yml:docker-compose.port.yml no .env.
+# O proxy precisa repassar SSE e WebSocket sem buffer (veja docs/instalacao.md).
+services:
+  yui-console:
+    ports:
+      - "${YUI_BIND:-127.0.0.1}:${YUI_HTTP_PORT:-8080}:8080"

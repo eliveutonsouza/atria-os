@@ -1,13 +1,15 @@
-name: yui-console
+# Nome do projeto (prefixo de containers, volumes, imagens e router do Traefik). Mude só para rodar
+# uma segunda instalação na mesma VPS (ex.: teste); trocar numa instalação existente cria volumes novos e vazios.
+name: ${YUI_PROJECT:-yui-console}
 
 services:
   yui-console:
     build: .
-    image: yui-console:local
+    image: ${YUI_PROJECT:-yui-console}:local
     restart: unless-stopped
     env_file: [.env]
     environment:
-      TZ: America/Sao_Paulo
+      TZ: ${TZ:-America/Sao_Paulo}
       YUI_DOCKER_API: http://yui-dockerproxy:2375
       YUI_HOST_PROC: /host/proc
       YUI_BROWSER_CDP: http://yui-browser:9223
@@ -31,12 +33,13 @@ services:
       - yui-postgres
       - yui-qdrant
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.yui-console.rule=Host(`${YUI_DOMAIN}`)
-      - traefik.http.routers.yui-console.entrypoints=${YUI_TRAEFIK_ENTRYPOINT:-websecure}
-      - traefik.http.routers.yui-console.tls.certresolver=${YUI_TRAEFIK_CERTRESOLVER:-letsencrypt}
-      - traefik.http.routers.yui-console.service=yui-console
-      - traefik.http.services.yui-console.loadbalancer.server.port=8080
+      # Usadas só quando há um Traefik na VPS (YUI_PROXY=traefik). Com caddy/none, YUI_TRAEFIK_ENABLE=false.
+      - traefik.enable=${YUI_TRAEFIK_ENABLE:-true}
+      - traefik.http.routers.${YUI_PROJECT:-yui-console}.rule=Host(`${YUI_DOMAIN}`)
+      - traefik.http.routers.${YUI_PROJECT:-yui-console}.entrypoints=${YUI_TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.${YUI_PROJECT:-yui-console}.tls.certresolver=${YUI_TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.routers.${YUI_PROJECT:-yui-console}.service=${YUI_PROJECT:-yui-console}
+      - traefik.http.services.${YUI_PROJECT:-yui-console}.loadbalancer.server.port=8080
 
   # Navegador headless para os agentes (Playwright MCP via HTTP). Perfil persistente: logins feitos
   # pelos agentes sobrevivem a reinícios. Monta o mesmo workspace: screenshots/PDFs caem no projeto do agente (caminho relativo) ou em /workspace/.yui/browser.
@@ -59,12 +62,12 @@ services:
   # checa a sessão e repassa /code (HTTP + WebSocket). Mesmo uid (1000) do console no volume.
   yui-code:
     build: ./code
-    image: yui-code:local
+    image: ${YUI_PROJECT:-yui-console}-code:local
     restart: unless-stopped
     volumes:
       - yui-workspace:/workspace
     environment:
-      TZ: America/Sao_Paulo
+      TZ: ${TZ:-America/Sao_Paulo}
     mem_limit: 1536m
     cpus: "1.5"
     security_opt:
