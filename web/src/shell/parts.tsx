@@ -204,7 +204,7 @@ export function YuiCenter() {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, letterSpacing: '.32em', color: C.t2, fontWeight: 600 }}>
-        <span>ATRIA OS</span>
+        <span>YUI</span>
         <span style={{ width: 3, height: 3, borderRadius: '50%', background: C.t4 }} />
         <span style={{ color, letterSpacing: '.2em' }}>{label}</span>
       </div>
@@ -254,7 +254,7 @@ export function YuiLeft() {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, letterSpacing: '.3em', color: C.t2, fontWeight: 600 }}>
-        <span>ATRIA OS</span>
+        <span>YUI</span>
         <span style={{ width: 3, height: 3, borderRadius: '50%', background: C.t4 }} />
         <span style={{ color, letterSpacing: '.18em' }}>{label}</span>
       </div>
