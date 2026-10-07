@@ -7,7 +7,7 @@ import { join } from 'node:path'
 // PWA: grava a lista de assets do build para o service worker pré-cachear e carimba a versão no sw.js.
 function pwaAssets(): Plugin {
   return {
-    name: 'yui-pwa-assets',
+    name: 'atria-pwa-assets',
     apply: 'build',
     closeBundle() {
       const dist = fileURLToPath(new URL('./dist', import.meta.url))

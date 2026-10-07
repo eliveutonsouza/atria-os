@@ -4,7 +4,7 @@ tags: [execucao, auditoria]
 ---
 # Auditoria 2026-10-03
 
-Auditoria da frente A (delegação, missões, telas sob medida) do [[Yui Console]]. Dia: [[2026-10-03]].
+Auditoria da frente A (delegação, missões, telas sob medida) do [[Atria OS]]. Dia: [[2026-10-03]].
 
 Relatório vivo: achado → correção → evidência. Frente A = delegação, missões, telas sob medida.
 
@@ -14,7 +14,7 @@ Bateria de 61 pedidos reais em pt-BR (59 contam; 2 dependem da frente de workflo
 nenhuma tool executa, só registra. Rodar:
 
 ```
-cd server && EVAL_CONC=3 YUI_DATA_DIR=/tmp/x YUI_WORKSPACE_DIR=/tmp/ws OPENAI_API_KEY=… npx tsx scripts/eval-brain.ts [filtro]
+cd server && EVAL_CONC=3 ATRIA_DATA_DIR=/tmp/x ATRIA_WORKSPACE_DIR=/tmp/ws OPENAI_API_KEY=… npx tsx scripts/eval-brain.ts [filtro]
 ```
 
 | Rodada | Acerto | Observação |

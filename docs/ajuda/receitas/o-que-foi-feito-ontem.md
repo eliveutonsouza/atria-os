@@ -3,7 +3,7 @@ titulo: Saber o que foi feito ontem
 categoria: Conhecimento
 ferramentas: Vault · Execuções · Visão geral
 tempo: 2 min seus
-antes: Nada. O console registra as execuções no vault sozinho.
+antes: Nada. O Atria OS registra as execuções no vault sozinho.
 resultado: A lista do que os agentes fizeram no dia, com links para os relatórios de cada execução.
 frase: "Yui, o que foi feito ontem?"
 ---

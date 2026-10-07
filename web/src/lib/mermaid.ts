@@ -35,7 +35,7 @@ let seq = 0
 
 export async function renderMermaid(code: string): Promise<string> {
   const m = await loadMermaid()
-  const id = `yui-mmd-${++seq}`
+  const id = `atria-mmd-${++seq}`
   try {
     const { svg } = await m.render(id, code)
     return svg

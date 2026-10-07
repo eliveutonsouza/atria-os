@@ -51,8 +51,10 @@ import { agora, saudacao, startAmbiente } from './ambiente.ts';
 import { startLembretes } from './lembretes.ts';
 import { sandboxUrl, sbToken } from './sandbox.ts';
 import { catalog, githubEnabled, startGithub, syncCatalog } from './github.ts';
+import { migrateBrandContent } from './renameAtria.ts';
 
 // ---------- workspace seed (agentes padrão) ----------
+migrateBrandContent();
 const agentsDir = join(config.workspaceDir, '.claude', 'agents');
 if (!existsSync(agentsDir) && existsSync(join(config.seedDir, '.claude', 'agents'))) {
   cpSync(config.seedDir, config.workspaceDir, { recursive: true });
@@ -320,17 +322,18 @@ app.get('/sandbox/:token/:slug/*', async (req, reply) => {
   return readFileSync(file);
 });
 
-// ---------- editor VS Code (sidecar yui-code) ----------
-// Só o console alcança o yui-code (rede interna, sem token próprio): a sessão do Yui é checada aqui,
+// ---------- editor VS Code (sidecar atria-code) ----------
+// Só o Atria OS alcança o atria-code (rede interna, sem token próprio): a sessão do painel é checada aqui,
 // inclusive no upgrade de WebSocket. O helmet do app não vale para /code (o VS Code roda em iframe
-// do próprio console e precisa de eval/workers que o CSP do app proíbe).
+// do próprio painel e precisa de eval/workers que o CSP do app proíbe).
 const codeAuth = async (req: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply) => {
   if (isAuthed(req)) return;
   const nav = req.method === 'GET' && (req.headers.accept ?? '').includes('text/html');
   if (nav) return reply.redirect('/login');
   return reply.code(401).send({ error: 'unauthorized' });
 };
-const stripSid = (cookie: string | undefined) => (cookie ?? '').split(/;\s*/).filter((c) => c && !c.startsWith('yui_sid=')).join('; ');
+// o cookie de sessão (e o yui_sid de antes do Atria OS) nunca chega ao VS Code
+const stripSid = (cookie: string | undefined) => (cookie ?? '').split(/;\s*/).filter((c) => c && !/^(atria|yui)_sid=/.test(c)).join('; ');
 await app.register(httpProxy, {
   upstream: config.codeUrl,
   prefix: '/code',
@@ -343,7 +346,7 @@ await app.register(httpProxy, {
       return cookie ? { ...rest, cookie } : rest;
     },
     onError: (reply) => {
-      reply.code(502).type('text/html').send('<body style="background:#06070d;color:#9aa0bb;font-family:sans-serif;padding:40px">O editor (yui-code) não está respondendo. Tente de novo em alguns segundos.</body>');
+      reply.code(502).type('text/html').send('<body style="background:#06070d;color:#9aa0bb;font-family:sans-serif;padding:40px">O editor (atria-code) não está respondendo. Tente de novo em alguns segundos.</body>');
     },
   },
 });
@@ -372,7 +375,7 @@ if (existsSync(config.webDist)) {
 }
 
 // WebSocket do VS Code: o @fastify/websocket trata todo upgrade; /code passa por aqui antes,
-// com a sessão checada, num túnel TCP cru até o yui-code.
+// com a sessão checada, num túnel TCP cru até o atria-code.
 await app.ready();
 {
   const upgrades = app.server.listeners('upgrade') as ((...a: unknown[]) => void)[];
@@ -394,7 +397,7 @@ await app.ready();
         let v = req.rawHeaders[i + 1];
         if (k.toLowerCase() === 'host') v = up.host;
         if (k.toLowerCase() === 'cookie') {
-          v = v.split(/;\s*/).filter((c) => c && !c.startsWith('yui_sid=')).join('; ');
+          v = v.split(/;\s*/).filter((c) => c && !/^(atria|yui)_sid=/.test(c)).join('; ');
           if (!v) continue;
         }
         lines.push(`${k}: ${v}`);

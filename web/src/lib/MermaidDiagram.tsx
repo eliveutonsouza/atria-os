@@ -21,5 +21,5 @@ export function MermaidDiagram({ code, minHeight = 120 }: { code: string; minHei
   }, [code])
   if (err) return <div style={{ fontSize: 12, color: C.crit, padding: 8 }}>Diagrama inválido: {err}</div>
   if (!svg) return <div style={{ fontSize: 12, color: C.t3, padding: 8, minHeight }}>Desenhando…</div>
-  return <div className="yui-mermaid" style={{ minHeight, overflow: 'auto' }} dangerouslySetInnerHTML={{ __html: svg }} />
+  return <div className="atria-mermaid" style={{ minHeight, overflow: 'auto' }} dangerouslySetInnerHTML={{ __html: svg }} />
 }

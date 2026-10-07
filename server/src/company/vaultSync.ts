@@ -73,7 +73,7 @@ export function writeProfileNote(p: CompanyProfile) {
     '',
     'Documentos da empresa ficam nas subpastas desta (Comercial, Contratos, Marca, Processos, Financeiro, Clientes) e ligam aqui.',
     '',
-    'Relacionadas: [[Yui Console]]',
+    'Relacionadas: [[Atria OS]]',
     '',
   ].filter((l) => l !== null);
   upsertNote('Empresa/Empresa.md', body.join('\n'));

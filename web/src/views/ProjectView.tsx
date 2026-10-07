@@ -8,7 +8,7 @@ import { useYui, type HeaderAction } from '../store/yui'
 import { Field, input } from './kit'
 import { card, ConfirmDeleteModal, Empty, ErrorNote, Eyebrow, Skeleton, useHeader } from './ui'
 
-// GET/PUT /api/projects/:slug/config (yui.json do projeto)
+// GET/PUT /api/projects/:slug/config (atria.json do projeto)
 interface ProjectSettings {
   name?: string
   repo?: string
@@ -29,7 +29,7 @@ export function ProjectView() {
   if (data?.issue) actions.push({ label: 'Pedir correção', primary: true, fn: () => startRun('backend', data.slug, `Investigue e corrija o problema: ${data.issue}`) })
   if (data) {
     actions.push({ label: 'Configurar', fn: () => setEditing(true) })
-    actions.push({ label: 'Remover do console', danger: true, fn: () => setRemoving(true) })
+    actions.push({ label: 'Remover do Atria OS', danger: true, fn: () => setRemoving(true) })
   }
   useHeader('Projeto', data?.name ?? slug ?? 'Projeto', actions, [data])
   if (!slug) return <Empty text="Nenhum projeto ativo." hint="Diga: “Abre o Stoqmate.”" />
@@ -68,7 +68,7 @@ export function ProjectView() {
   )
 }
 
-// Configuração do projeto = yui.json (saúde, container dos logs, preview e comandos que pedem aprovação).
+// Configuração do projeto = atria.json (saúde, container dos logs, preview e comandos que pedem aprovação).
 function ProjectSettingsCard({ slug, editing, setEditing, onSaved, onRemove }: { slug: string; editing: boolean; setEditing: (v: boolean) => void; onSaved: () => void; onRemove: () => void }) {
   const phone = useYui((s) => s.device === 'phone')
   const cfg = useApi<ProjectSettings>(`/api/projects/${encodeURIComponent(slug)}/config`, [slug])
@@ -87,7 +87,7 @@ function ProjectSettingsCard({ slug, editing, setEditing, onSaved, onRemove }: {
         <Eyebrow>Configuração do projeto</Eyebrow>
         {!editing && c && <button className="app-btn small" onClick={() => setEditing(true)}>Editar</button>}
       </div>
-      {cfg.error && <span style={{ fontSize: 13, color: C.t3 }}>Este projeto ainda não está clonado no console.</span>}
+      {cfg.error && <span style={{ fontSize: 13, color: C.t3 }}>Este projeto ainda não está clonado no Atria OS.</span>}
       {!editing && c && (
         <div style={{ display: 'flex', flexDirection: 'column', fontSize: 13 }}>
           {rows.map(([k, v]) => (
@@ -113,7 +113,7 @@ function ProjectSettingsCard({ slug, editing, setEditing, onSaved, onRemove }: {
       {c && !editing && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', paddingTop: 4 }}>
           <span style={{ fontSize: 12, color: C.t3, flex: '1 1 220px' }}>Remover apaga só a cópia local na VPS. O repositório no GitHub não muda.</span>
-          <button className="app-btn small danger" onClick={onRemove}>Remover do console</button>
+          <button className="app-btn small danger" onClick={onRemove}>Remover do Atria OS</button>
         </div>
       )}
     </section>
@@ -183,7 +183,7 @@ function RemoveProject({ slug, name, onClose }: { slug: string; name: string; on
       const s = useYui.getState()
       // limpa a seleção: reabrir o projeto pelo slug clonaria de novo do GitHub
       s.set({ projects: r.projects, appParams: {}, viewParams: {}, ...(s.activeProject === slug ? { activeProject: null } : {}) })
-      s.say(`Removi ${name} do console. O repositório no GitHub continua lá.`)
+      s.say(`Removi ${name} do Atria OS. O repositório no GitHub continua lá.`)
       onClose()
     } catch (e) {
       useYui.getState().say(`Não consegui remover: ${(e as Error).message}.`)
@@ -192,7 +192,7 @@ function RemoveProject({ slug, name, onClose }: { slug: string; name: string; on
   }
   return (
     <ConfirmDeleteModal
-      title={`Remover ${name} do console?`}
+      title={`Remover ${name} do Atria OS?`}
       text="Apaga a pasta local do clone na VPS, inclusive alterações que não foram enviadas ao GitHub. O repositório no GitHub NÃO é afetado: dá para clonar de novo quando quiser."
       rows={[
         { label: 'Pasta', value: `/workspace/${slug}` },

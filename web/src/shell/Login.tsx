@@ -48,7 +48,7 @@ function CreateAccess() {
   }
   return (
     <form onSubmit={submit} style={{ position: 'absolute', left: 0, right: 0, ...formBox(96, 400), zIndex: 25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center' }}>
-      <div style={{ fontSize: 11, letterSpacing: '.32em', color: C.t2, fontWeight: 600 }}>YUI CONSOLE · PRIMEIRO ACESSO</div>
+      <div style={{ fontSize: 11, letterSpacing: '.32em', color: C.t2, fontWeight: 600 }}>ATRIA OS · PRIMEIRO ACESSO</div>
       <div style={{ fontSize: 28, fontWeight: 300, lineHeight: 1.3 }}>Olá. Vamos criar o seu acesso.</div>
       <div style={{ fontSize: 14, color: C.t2, maxWidth: 420, marginBottom: 6 }}>Depois eu te guio para conectar sua conta Claude, o GitHub e a OpenAI aqui mesmo no painel.</div>
       <label style={box(false)}><input aria-label="Seu nome" placeholder="Seu nome" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} style={field} /></label>
@@ -114,7 +114,10 @@ function PasswordLogin() {
         onSubmit={submit}
         style={{ position: 'absolute', left: 0, right: 0, ...formBox(104, 210), zIndex: 25, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center' }}
       >
-        <div style={{ fontSize: 11, letterSpacing: '.32em', color: C.t2, fontWeight: 600 }}>YUI CONSOLE</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, letterSpacing: '.32em', color: C.t2, fontWeight: 600 }}>
+          <img src="/favicon.svg" alt="" width={22} height={22} style={{ borderRadius: 6 }} />
+          ATRIA OS
+        </div>
         <div style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.3 }}>{greeting()} Quem é você?</div>
         <div style={{ width: 'min(420px,100%)', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 7px 7px 16px', background: 'rgba(16,20,42,.78)', border: `1px solid ${err ? 'rgba(240,98,114,.45)' : 'rgba(160,170,255,.14)'}`, borderRadius: 18, backdropFilter: 'blur(16px)', marginTop: 12 }}>
           <input

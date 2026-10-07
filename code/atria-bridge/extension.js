@@ -1,11 +1,11 @@
-// Ponte de arquivos entre o Yui Console e o VS Code (mesmo volume /workspace):
-// - o console grava /workspace/.yui/.editor-open.json {path, line, at} → abrimos o arquivo;
-// - gravamos /workspace/.yui/.editor-state.json {path, at} quando o editor ativo muda.
+// Ponte de arquivos entre o Atria OS e o VS Code (mesmo volume /workspace):
+// - o Atria OS grava /workspace/.atria/.editor-open.json {path, line, at} → abrimos o arquivo;
+// - gravamos /workspace/.atria/.editor-state.json {path, at} quando o editor ativo muda.
 const vscode = require('vscode')
 const fs = require('fs')
 
-const REQ = '/workspace/.yui/.editor-open.json'
-const STATE = '/workspace/.yui/.editor-state.json'
+const REQ = '/workspace/.atria/.editor-open.json'
+const STATE = '/workspace/.atria/.editor-state.json'
 
 function activate(ctx) {
   // painel de chat de IA (barra lateral secundária) não faz parte do editor do vault
@@ -21,7 +21,7 @@ function activate(ctx) {
         ed.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter)
       }
     } catch (e) {
-      console.error('yui-bridge: não abriu', r.path, e && e.message)
+      console.error('atria-bridge: não abriu', r.path, e && e.message)
     }
   }
   const handle = () => {

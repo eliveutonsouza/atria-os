@@ -1,9 +1,9 @@
 {
-  "name": "yui-bridge",
-  "displayName": "Yui Bridge",
-  "description": "Liga o VS Code ao Yui Console: abre a nota escolhida no console e informa qual arquivo está aberto.",
+  "name": "atria-bridge",
+  "displayName": "Atria Bridge",
+  "description": "Liga o VS Code ao Atria OS: abre a nota escolhida no painel e informa qual arquivo está aberto.",
   "version": "0.1.0",
-  "publisher": "yui",
+  "publisher": "atria",
   "engines": {
     "vscode": "^1.80.0"
   },

@@ -46,7 +46,7 @@ export function SchedulePage() {
   const tablet = device === 'tablet'
   const prevWeek = () => setWeek(new Date(week.getTime() - 7 * DAY))
   const nextWeek = () => setWeek(new Date(week.getTime() + 7 * DAY))
-  const newRoutine = { label: '+ Nova rotina', fn: () => document.getElementById('yui-routines')?.scrollIntoView({ behavior: 'smooth' }), primary: true }
+  const newRoutine = { label: '+ Nova rotina', fn: () => document.getElementById('atria-routines')?.scrollIntoView({ behavior: 'smooth' }), primary: true }
   const today = { label: thisWeek ? 'Esta semana' : 'Hoje', fn: () => setWeek(mondayOf(new Date())) }
   // celular: ‹ › ficam na faixa da semana (ícones com aria-label), não no menu ⋯
   useHeader(
@@ -185,7 +185,7 @@ export function SchedulePage() {
         </aside>
       </div>
       <Card title="Rotinas" right="crie, pause, edite ou rode agora" style={{ scrollMarginTop: 20 }}>
-        <div id="yui-routines">
+        <div id="atria-routines">
           <RoutinesView />
         </div>
       </Card>
@@ -207,7 +207,7 @@ function Row({ h, days, cell, coarse }: { h: number; days: Date[]; cell: Map<str
                 <button
                   key={o.routineId + o.at}
                   title={`${o.name} — ${new Date(o.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${o.enabled ? '' : ' (pausada)'}`}
-                  onClick={() => (o.workflow ? openApp('workflows', o.workflow) : document.getElementById('yui-routines')?.scrollIntoView({ behavior: 'smooth' }))}
+                  onClick={() => (o.workflow ? openApp('workflows', o.workflow) : document.getElementById('atria-routines')?.scrollIntoView({ behavior: 'smooth' }))}
                   style={{
                     fontSize: 11, padding: '5px 7px', borderRadius: 8, background: t.bg, border: `1px solid ${t.b}`, color: t.c, lineHeight: 1.3, textAlign: 'left', cursor: 'pointer', overflow: 'hidden',
                     // toque não tem hover para o title: nome em até 2 linhas e alvo de 44px

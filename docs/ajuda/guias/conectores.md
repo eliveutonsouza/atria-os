@@ -12,7 +12,7 @@ frases:
   - "Abre as ferramentas."
 dicas:
   - Os conectores vêm da sua conta Claude. "Autorizar" abre claude.ai/settings/connectors para você liberar.
-  - Depois de autorizar ou instalar algo, clique em "Atualizar capacidades" para o console ler de novo.
+  - Depois de autorizar ou instalar algo, clique em "Atualizar capacidades" para o Atria OS ler de novo.
   - "Testar" faz uma execução curta só de leitura; "Pedir à Yui" manda ela testar com uma consulta rápida.
 erros:
   - Achar que conectar aqui libera ações sem controle. Envio, publicação, pagamento e exclusão continuam pedindo aprovação, a menos que você desligue em Configurações.
@@ -26,7 +26,7 @@ O painel mostra tudo que os agentes podem usar, em abas: Conectores, MCP, Skills
 ## Passo a passo
 1. **Veja o estado.** Na aba Conectores ou MCP, cada item mostra se está ativo, com problema ou pedindo autorização.
 2. **Autorize o que falta.** Clique em **Autorizar**, libere na página do claude.ai e volte.
-3. **Releia.** **Atualizar capacidades** faz o console ler de novo conectores, skills e plugins.
+3. **Releia.** **Atualizar capacidades** faz o Atria OS ler de novo conectores, skills e plugins.
 4. **Teste.** **Testar** ou **Pedir à Yui** num item; os exemplos em chips também mandam um pedido pronto para a Yui.
 5. **Explore skills.** A aba Skills agrupa por origem; clicar abre no terminal do Claude.
 

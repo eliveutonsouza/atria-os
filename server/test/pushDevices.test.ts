@@ -6,12 +6,12 @@ import { join } from 'node:path';
 
 // Dispositivos de notificação: listagem com id e remoção por aparelho.
 // Banco temporário: o env precisa estar pronto antes de importar os módulos.
-const root = mkdtempSync(join(tmpdir(), 'yui-push-'));
-process.env.YUI_DATA_DIR = join(root, 'data');
-process.env.YUI_WORKSPACE_DIR = join(root, 'ws');
-process.env.YUI_SEED_DIR = join(root, 'seed');
+const root = mkdtempSync(join(tmpdir(), 'atria-push-'));
+process.env.ATRIA_DATA_DIR = join(root, 'data');
+process.env.ATRIA_WORKSPACE_DIR = join(root, 'ws');
+process.env.ATRIA_SEED_DIR = join(root, 'seed');
 process.env.VAPID_SUBJECT = 'mailto:teste@example.com';
-mkdirSync(process.env.YUI_DATA_DIR, { recursive: true });
+mkdirSync(process.env.ATRIA_DATA_DIR, { recursive: true });
 
 const { db, now } = await import('../src/db.ts');
 const push = await import('../src/push.ts');

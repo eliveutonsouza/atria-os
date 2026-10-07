@@ -6,7 +6,7 @@ criado: 2026-10-04
 ---
 # Vault & Cérebro
 
-O vault é o cérebro do [[Yui Console]]: tudo que a Yui e os agentes aprendem vira nota em `/workspace/.yui/vault`, no formato do Obsidian.
+O vault é o cérebro do [[Atria OS]]: tudo que a Yui e os agentes aprendem vira nota em `/workspace/.atria/vault`, no formato do Obsidian.
 
 ## Como funciona
 - Editor: [[ADR-006 Editor VS Code open source]] em `/code`, com o vault e os projetos lado a lado.

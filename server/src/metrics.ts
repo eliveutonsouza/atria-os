@@ -81,7 +81,7 @@ export function brief(): Brief {
 }
 
 export function latestReport(): ReportPayload | null {
-  const dir = join(config.workspaceDir, '.yui', 'reports');
+  const dir = join(config.metaDir, 'reports');
   if (!existsSync(dir)) return null;
   const files = readdirSync(dir).filter((f) => f.endsWith('.json')).sort();
   for (const f of files.reverse()) {

@@ -500,7 +500,7 @@ export interface SetupStatus {
   github: boolean;
   openai: boolean;
   push: number; // dispositivos inscritos
-  monitor?: boolean; // monitoramento remoto ligado (opcional, para quem administra várias Yuis)
+  monitor?: boolean; // monitoramento remoto ligado (opcional, para quem administra várias instalações do Atria OS)
   completed: boolean;
 }
 

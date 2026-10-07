@@ -7,11 +7,11 @@ import { parseWorkflowMarkdown, serializeWorkflow } from '../../shared/workflowM
 import { blockedReason } from '../src/safety.ts';
 
 // Aprovações no automático: bloqueio do catastrófico e passo de aprovação de workflow decidido pela Yui.
-const root = mkdtempSync(join(tmpdir(), 'yui-apv-'));
-process.env.YUI_DATA_DIR = join(root, 'data');
-process.env.YUI_WORKSPACE_DIR = join(root, 'ws');
-process.env.YUI_SEED_DIR = join(root, 'seed');
-mkdirSync(process.env.YUI_DATA_DIR, { recursive: true });
+const root = mkdtempSync(join(tmpdir(), 'atria-apv-'));
+process.env.ATRIA_DATA_DIR = join(root, 'data');
+process.env.ATRIA_WORKSPACE_DIR = join(root, 'ws');
+process.env.ATRIA_SEED_DIR = join(root, 'seed');
+mkdirSync(process.env.ATRIA_DATA_DIR, { recursive: true });
 
 const { db } = await import('../src/db.ts');
 const wf = await import('../src/workflows.ts');
@@ -25,7 +25,7 @@ test('bloqueio: catastrófico negado, trabalho normal liberado', () => {
     'git push --force origin main', 'git push -f origin master', 'git push origin +main',
   ]) assert.ok(blockedReason(c), `devia bloquear: ${c}`);
   for (const c of [
-    'git push origin feat/x', 'git push origin main', 'git push --force origin feat/x', 'docker compose -p yui-console logs', 'docker ps',
+    'git push origin feat/x', 'git push origin main', 'git push --force origin feat/x', 'docker compose -p atria-os logs', 'docker ps',
     'docker logs twenty-qcjv-server-1', 'rm -rf node_modules', 'rm -rf ./dist', 'rm -rf /workspace/proj/dist', 'npm run deploy', 'psql -c "select 1"',
     'curl -X POST https://api.exemplo.com',
   ]) assert.equal(blockedReason(c), null, `não devia bloquear: ${c}`);

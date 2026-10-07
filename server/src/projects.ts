@@ -7,10 +7,10 @@ import { config } from './config.ts';
 import { db, kvGet, kvSet } from './db.ts';
 import { containerLogs } from './docker.ts';
 import { sandboxUrl } from './sandbox.ts';
-import { catalog, ensureCloned } from './github.ts';
+import { catalog, ensureCloned, projectConfigFile } from './github.ts';
 import { trustDirs } from './trust.ts';
 
-// Projeto = diretório em /workspace/<slug>. Configuração opcional em /workspace/<slug>/yui.json:
+// Projeto = diretório em /workspace/<slug>. Configuração opcional em /workspace/<slug>/atria.json:
 // { "name": "Stoqmate", "healthUrl": "https://...", "container": "stoqmate-api", "preview": "dist",
 //   "approvalPatterns": ["npm run deploy"] }
 export interface ProjectConfig {
@@ -35,12 +35,12 @@ function localProjects(): ProjectConfig[] {
     .map((slug) => {
       const dir = join(config.workspaceDir, slug);
       let cfg: Partial<ProjectConfig> = {};
-      const f = join(dir, 'yui.json');
+      const f = projectConfigFile(dir);
       if (existsSync(f)) {
         try {
           cfg = JSON.parse(readFileSync(f, 'utf8'));
         } catch {
-          /* yui.json inválido: ignora */
+          /* atria.json inválido: ignora */
         }
       }
       return { ...cfg, slug, dir, cloned: true, name: cfg.name ?? slug } as ProjectConfig;
@@ -199,7 +199,7 @@ export async function projectDetail(p: ProjectConfig): Promise<ProjectDetail> {
 }
 
 export async function projectLogs(p: ProjectConfig): Promise<LogsPayload> {
-  if (!p.container) return { project: p.slug, source: '', summary: 'Este projeto não tem container configurado no yui.json.', lines: [] };
+  if (!p.container) return { project: p.slug, source: '', summary: 'Este projeto não tem container configurado no atria.json.', lines: [] };
   const raw = await containerLogs(p.container, 200);
   const lines = raw.map((l) => {
     const m = /^(\S+)\s(.*)$/.exec(l);
@@ -272,7 +272,7 @@ export async function addProject(input: { repo?: string; url?: string; slug?: st
   if (input.repo) {
     const r = catalog().find((x) => x.name_with_owner === input.repo);
     if (!r) throw new Error(`repositório fora do catálogo: ${input.repo}`);
-    if (localProject(r.slug)) throw new Error(`o projeto ${r.slug} já está no console`);
+    if (localProject(r.slug)) throw new Error(`o projeto ${r.slug} já está no Atria OS`);
     unremove(r.slug);
     await ensureCloned(r.name_with_owner);
     return localProject(r.slug) ?? (() => { throw new Error('clone não apareceu no workspace'); })();
@@ -292,9 +292,9 @@ export async function addProject(input: { repo?: string; url?: string; slug?: st
     throw new Error(`não consegui clonar: ${msg}`);
   }
   const gh = /^https:\/\/github\.com\/([^/]+\/[^/]+?)(?:\.git)?\/?$/i.exec(url)?.[1];
-  writeFileSync(join(dir, 'yui.json'), `${JSON.stringify({ name: slug, ...(gh ? { repo: gh } : {}) }, null, 2)}\n`);
+  writeFileSync(join(dir, 'atria.json'), `${JSON.stringify({ name: slug, ...(gh ? { repo: gh } : {}) }, null, 2)}\n`);
   const exclude = join(dir, '.git', 'info', 'exclude');
-  if (existsSync(exclude) && !readFileSync(exclude, 'utf8').includes('yui.json')) writeFileSync(exclude, `${readFileSync(exclude, 'utf8')}\nyui.json\n`);
+  if (existsSync(exclude) && !readFileSync(exclude, 'utf8').includes('atria.json')) writeFileSync(exclude, `${readFileSync(exclude, 'utf8')}\natria.json\n`);
   trustDirs([dir]);
   return localProject(slug)!;
 }
@@ -306,7 +306,7 @@ export function activeRunsIn(slug: string): number {
 // Remove só a pasta local do clone; o repositório no GitHub não é tocado.
 export function removeProject(slug: string): void {
   const p = localProject(slug);
-  if (!p) throw Object.assign(new Error('projeto não está no console'), { code: 404 });
+  if (!p) throw Object.assign(new Error('projeto não está no Atria OS'), { code: 404 });
   if (activeRunsIn(slug)) throw Object.assign(new Error('há execuções ativas neste projeto; cancele antes de remover'), { code: 409 });
   rmSync(projectDirOf(slug), { recursive: true, force: true });
   healthCache.delete(slug);
@@ -327,7 +327,7 @@ export interface ProjectSettings {
 
 export function readProjectSettings(slug: string): ProjectSettings & { repo?: string } {
   const p = localProject(slug);
-  if (!p) throw Object.assign(new Error('projeto não está no console'), { code: 404 });
+  if (!p) throw Object.assign(new Error('projeto não está no Atria OS'), { code: 404 });
   return { name: p.name, repo: p.repo, healthUrl: p.healthUrl, container: p.container, preview: p.preview, approvalPatterns: p.approvalPatterns ?? [] };
 }
 
@@ -363,17 +363,17 @@ export function validateSettings(b: unknown): { ok: ProjectSettings } | { error:
   return { ok: out };
 }
 
-// Grava no yui.json preservando chaves que o painel não edita (repo etc.).
+// Grava no atria.json preservando chaves que o painel não edita (repo etc.).
 export function writeProjectSettings(slug: string, s: ProjectSettings): ProjectSettings & { repo?: string } {
   const p = localProject(slug);
-  if (!p) throw Object.assign(new Error('projeto não está no console'), { code: 404 });
-  const f = join(p.dir, 'yui.json');
+  if (!p) throw Object.assign(new Error('projeto não está no Atria OS'), { code: 404 });
+  const f = projectConfigFile(p.dir);
   let cfg: Record<string, unknown> = {};
   if (existsSync(f)) {
     try {
       cfg = JSON.parse(readFileSync(f, 'utf8'));
     } catch {
-      /* yui.json inválido: recomeça */
+      /* atria.json inválido: recomeça */
     }
   }
   for (const k of ['healthUrl', 'container', 'preview'] as const) {

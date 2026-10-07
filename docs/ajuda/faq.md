@@ -15,7 +15,7 @@ Ctrl/⌘ J alterna entre os dois. Também dá para passar o mouse na borda esque
 
 ## Segurança
 ### Os agentes podem fazer deploy ou apagar algo sem eu saber?
-Sim, por padrão: workflows, rotinas, missões e projetos rodam no automático, com push, deploy, docker e envios, e tudo fica registrado em Execuções. Eles só param onde você pediu aprovação ("me pede OK antes de publicar", "Sempre me perguntar" no passo do workflow ou yui.json › approvalPatterns). O catastrófico é sempre bloqueado: apagar raiz/workspace/dados inteiros, formatar disco, DROP DATABASE, prune do Docker, stacks de produção protegidos e force push na main. Para voltar a aprovar ações de conectores (enviar, publicar, pagar), ligue em Configurações › Agentes & aprovações.
+Sim, por padrão: workflows, rotinas, missões e projetos rodam no automático, com push, deploy, docker e envios, e tudo fica registrado em Execuções. Eles só param onde você pediu aprovação ("me pede OK antes de publicar", "Sempre me perguntar" no passo do workflow ou atria.json › approvalPatterns). O catastrófico é sempre bloqueado: apagar raiz/workspace/dados inteiros, formatar disco, DROP DATABASE, prune do Docker, stacks de produção protegidos e force push na main. Para voltar a aprovar ações de conectores (enviar, publicar, pagar), ligue em Configurações › Agentes & aprovações.
 
 ### A Yui pode aprovar por mim?
 Não. Ela só mostra o pedido. Quem clica em Aprovar ou Rejeitar é você.
@@ -24,14 +24,14 @@ Não. Ela só mostra o pedido. Quem clica em Aprovar ou Rejeitar é você.
 O agente é avisado, continua sem aquela ação e explica no resultado. Numa missão, a etapa rejeitada é pulada junto com as que dependiam dela. Num workflow, a execução para.
 
 ### Dá para exigir aprovação em outros comandos de um projeto?
-Sim. No arquivo yui.json na raiz do projeto, liste os padrões extras em approvalPatterns, por exemplo "npm run deploy".
+Sim. No arquivo atria.json na raiz do projeto, liste os padrões extras em approvalPatterns, por exemplo "npm run deploy".
 
 ## Celular
 ### Como recebo avisos no celular?
 Instale o app (Configurações › Notificações › Instalar app) e toque em Ativar notificações. No iPhone, primeiro adicione à Tela de Início pelo Safari. Use Enviar teste para confirmar.
 
 ### Por que a notificação não chegou?
-Os avisos só são enviados quando nenhuma tela do console está aberta e ativa. Se o painel está aberto no computador, o aviso aparece nele e não no celular.
+Os avisos só são enviados quando nenhuma tela do Atria OS está aberta e ativa. Se o painel está aberto no computador, o aviso aparece nele e não no celular.
 
 ### Uma aprovação vence se eu demorar?
 Não. Ela espera até você decidir. Só some se a missão ou o workflow dono dela for cancelado.
@@ -61,10 +61,10 @@ Sim. Some o arquivo original, o texto extraído, os trechos de busca e a nota no
 
 ## Vault
 ### Quem escreve no vault?
-Você, a Yui (quando você pede "anota isso") e os agentes, que registram lições e decisões. O console também cria sozinho a nota do dia, a nota de cada projeto e relatórios das execuções que mudaram arquivos ou falharam.
+Você, a Yui (quando você pede "anota isso") e os agentes, que registram lições e decisões. O Atria OS também cria sozinho a nota do dia, a nota de cada projeto e relatórios das execuções que mudaram arquivos ou falharam.
 
 ### Perdi uma mudança numa nota. Dá para recuperar?
-O vault guarda histórico em git. As mudanças viram versão sozinhas em cerca de 2 minutos; o botão Salvar versão grava na hora. Para voltar uma versão antiga, use o terminal na pasta /workspace/.yui/vault.
+O vault guarda histórico em git. As mudanças viram versão sozinhas em cerca de 2 minutos; o botão Salvar versão grava na hora. Para voltar uma versão antiga, use o terminal na pasta /workspace/.atria/vault.
 
 ### Qual a diferença entre o Vault e a Empresa?
 A Empresa guarda documentos oficiais (contratos, preços, marca) que os agentes citam com página. O Vault guarda memória de trabalho: decisões, ideias, lições, diário e relatórios.

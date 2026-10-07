@@ -75,14 +75,14 @@ interface PlannedStep { id: string; title: string; agent: string; instruction: s
 
 function projectContext(slug: string | null): string {
   const p = slug ? findProject(slug) : undefined;
-  if (!p) return 'Sem projeto: as etapas trabalham em /workspace/.yui/scratch.';
+  if (!p) return 'Sem projeto: as etapas trabalham em /workspace/.atria/scratch.';
   const lines = [`Projeto: ${p.name} (${p.slug})${p.repo ? `, repo ${p.repo}` : ''}${p.cloned ? '' : ' — será clonado'}.`];
   if (p.description) lines.push(`Descrição: ${p.description}`);
   for (const f of ['README.md', 'package.json']) {
     const file = join(p.dir, f);
     if (p.cloned && existsSync(file)) lines.push(`${f} (início):\n${readFileSync(file, 'utf8').slice(0, 1200)}`);
   }
-  if (p.preview) lines.push(`Preview do console: pasta "${p.preview}" (build estático).`);
+  if (p.preview) lines.push(`Preview do Atria OS: pasta "${p.preview}" (build estático).`);
   return lines.join('\n');
 }
 
@@ -141,7 +141,7 @@ async function planSteps(goal: string, projectSlug: string | null, opts: PlanOpt
     instructions: `Você planeja missões para uma equipe de agentes Claude Code. Gere de 2 a 8 etapas, cada uma com UM agente da lista.
 - Use dependências (depends_on) só quando a etapa precisa do resultado/arquivos de outra; etapas independentes rodam em paralelo.
 - Instruções em português, completas e autossuficientes (o agente não vê esta conversa); cite arquivos/pastas esperados.
-- Sites e landing pages: Next.js (create-next-app) no diretório do projeto, com build estático exportado para que o console mostre o preview; nunca HTML cru amador.
+- Sites e landing pages: Next.js (create-next-app) no diretório do projeto, com build estático exportado para que o Atria OS mostre o preview; nunca HTML cru amador.
 - Código: termine com uma etapa de QA que valida (testes/build/screenshot).
 - Tudo roda no automático: marque risky=true SOMENTE nas etapas em que o pedido do usuário pede aprovação/permissão/revisão dele antes (ex.: "me pede OK antes de publicar"). Sem pedido explícito, risky=false — inclusive em deploy, publicação e envio.
 - display=blocks apenas para etapas cujo resultado é um conjunto de dados para mostrar (leads, tabela, comparativo).`,

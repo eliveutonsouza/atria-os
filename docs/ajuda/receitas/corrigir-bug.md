@@ -3,7 +3,7 @@ titulo: Corrigir um bug em produção
 categoria: Projetos
 ferramentas: Infra & logs · Projetos · Backend · Aprovações
 tempo: 5 min seus
-antes: O projeto no GitHub e, para ver logs, o container indicado no yui.json do projeto.
+antes: O projeto no GitHub e, para ver logs, o container indicado no atria.json do projeto.
 resultado: A causa encontrada, a correção feita e testada pelo agente, e o push só depois do seu OK.
 frase: "Yui, o <problema> no <projeto> está dando erro, investiga e corrige."
 ---

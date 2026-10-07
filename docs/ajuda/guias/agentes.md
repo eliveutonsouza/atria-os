@@ -16,7 +16,7 @@ dicas:
   - Use Testar depois de mexer: o agente se apresenta e lista as ferramentas que enxerga, sem alterar nada.
   - Restringir Conectores MCP deixa o agente mais focado; "Liberar todos" volta a dar acesso a tudo.
   - Arquivar tira o agente de circulação sem apagar; Reativar traz de volta. Demitir exclui de vez.
-  - Modelo em "Padrão do console" segue o que estiver em Configurações › Modelos; escolha um modelo só se esse agente precisar de outro.
+  - Modelo em "Padrão do Atria OS" segue o que estiver em Configurações › Modelos; escolha um modelo só se esse agente precisar de outro.
 erros:
   - Editar e sair sem clicar em Salvar. O botão do topo mostra "Salvar" enquanto há mudanças.
   - Criar um agente com especialidade parecida com outro. A Yui fica em dúvida; prefira ajustar o existente.
@@ -33,10 +33,10 @@ Cada agente é um Claude Code com papel próprio: Backend, Frontend, QA, DevOps,
 2. **Estatísticas.** Execuções em 30 dias, sucesso, duração média, custo, gráfico de 14 dias e ferramentas mais usadas.
 3. **Configuração.** Edite Nome, Grupo, Modelo, Máx. de turnos, Especialidade, Instruções (prompt), Conectores MCP, Skills e Plugins preferidos. Clique em **Salvar**.
 4. **Teste.** **Testar** roda uma execução curta de apresentação. **Abrir no terminal** abre o agente no Claude Code interativo.
-5. **Modelo.** Deixe em **Padrão do console — …** para seguir o modelo escolhido em Configurações › Modelos (o nome técnico aparece logo abaixo). Escolha outro da lista, ou **Outro…** para digitar um nome exato, só quando esse agente precisar.
+5. **Modelo.** Deixe em **Padrão do Atria OS — …** para seguir o modelo escolhido em Configurações › Modelos (o nome técnico aparece logo abaixo). Escolha outro da lista, ou **Outro…** para digitar um nome exato, só quando esse agente precisar.
 6. **Crie ou duplique.** **+ Novo agente** cria um em branco e abre a Configuração; **Duplicar** copia um existente como ponto de partida.
 7. **Execuções.** A terceira aba lista o que o agente rodou; clique para abrir o detalhe.
-8. **Arquive ou demita.** **Arquivar** pausa o agente sem apagar: ele some da lista e para de receber tarefas, e volta com **Reativar** (filtro **Arquivados**). **Demitir** exclui de vez: o painel mostra onde ele está escalado (rotinas, passos de workflow, etapas de missões em aberto, ferramentas) e pede **Quem assume esses lugares**; ao confirmar, tudo passa para o substituto, o arquivo é apagado (fica uma cópia no histórico de agentes) e ele não volta quando o console reinicia.
+8. **Arquive ou demita.** **Arquivar** pausa o agente sem apagar: ele some da lista e para de receber tarefas, e volta com **Reativar** (filtro **Arquivados**). **Demitir** exclui de vez: o painel mostra onde ele está escalado (rotinas, passos de workflow, etapas de missões em aberto, ferramentas) e pede **Quem assume esses lugares**; ao confirmar, tudo passa para o substituto, o arquivo é apagado (fica uma cópia no histórico de agentes) e ele não volta quando o Atria OS reinicia.
 
 ## O que você vê na tela
 - Acesso deste agente: quais MCP, skills e plugins ele usa ("todos os conectores" quando não há restrição).

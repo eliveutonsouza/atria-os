@@ -1,6 +1,6 @@
 # Arquitetura
 
-Visão interna do Yui Console: como os serviços conversam, onde mora cada responsabilidade no código e onde
+Visão interna do Atria OS: como os serviços conversam, onde mora cada responsabilidade no código e onde
 ficam os dados. Para instalar, veja o [README](../README.md) e a [referência de instalação](instalacao.md).
 
 ## Ideia central
@@ -12,21 +12,21 @@ container, com a conta Claude do dono.
 ```mermaid
 flowchart LR
   U[Navegador / PWA] -- HTTPS --> P[Proxy: Caddy, Traefik ou o seu]
-  P --> C[yui-console<br/>Fastify + painel]
+  P --> C[atria<br/>Fastify + painel]
   U -. WebRTC áudio .-> O[(OpenAI GPT-Live)]
   C -- sideband WS --> O
   C -- Responses API --> B[(OpenAI cérebro)]
   C -- Claude Agent SDK --> A[(Anthropic)]
-  C -- MCP HTTP / CDP --> BR[yui-browser<br/>Chromium + Playwright MCP]
-  C -- proxy /code --> VS[yui-code<br/>openvscode-server]
-  C --> PG[(yui-postgres)]
-  C --> QD[(yui-qdrant)]
-  C --> DL[yui-docling<br/>OCR]
-  C -- leitura --> DP[yui-dockerproxy] --> DS[/docker.sock ro/]
+  C -- MCP HTTP / CDP --> BR[atria-browser<br/>Chromium + Playwright MCP]
+  C -- proxy /code --> VS[atria-code<br/>openvscode-server]
+  C --> PG[(atria-postgres)]
+  C --> QD[(atria-qdrant)]
+  C --> DL[atria-docling<br/>OCR]
+  C -- leitura --> DP[atria-dockerproxy] --> DS[/docker.sock ro/]
 ```
 
-Só o `yui-console` recebe tráfego de fora. Os demais serviços ficam na rede interna do compose; o VS Code e a
-transmissão do navegador passam pelo console, atrás do mesmo login.
+Só o serviço `atria` recebe tráfego de fora. Os demais serviços ficam na rede interna do compose; o VS Code e a
+transmissão do navegador passam pelo Atria OS, atrás do mesmo login.
 
 ## Fluxo de um pedido
 
@@ -40,7 +40,7 @@ transmissão do navegador passam pelo console, atrás do mesmo login.
 4. **Agentes** — `delegate_task` cria uma execução em `server/src/runs.ts`, que roda o Claude Agent SDK no
    projeto (`/workspace/<slug>`), com o prompt do agente (`/workspace/.claude/agents/*.md`) e os servidores MCP
    (navegador, Empresa, conectores da conta Claude). `canUseTool` passa por `safety.ts` (bloqueia só o
-   catastrófico) e pelos `approvalPatterns` do `yui.json` do projeto, que viram aprovação no painel/push.
+   catastrófico) e pelos `approvalPatterns` do `atria.json` do projeto, que viram aprovação no painel/push.
 5. **Resultado** — eventos de execução saem pelo barramento SSE (`bus.ts`, `GET /api/events`) para todas as
    abas abertas; `vaultAuto.ts` registra relatório ou linha de diário no Vault; a Yui narra o desfecho.
 
@@ -68,7 +68,7 @@ de `index.ts`.
 
 React + Vite, instalável como PWA.
 
-- `shell/`, `yui/`, `voice/` — modo console: orbe da Yui, conversa, voz.
+- `shell/`, `yui/`, `voice/` — modo conversa: orbe da Yui, conversa, voz.
 - `app/` — modo dashboard (`/app/*`): `AppShell`, `Sidebar` (desktop), `NavRail` (tablet), `BottomTabs`
   (celular), `MiniOrb`, e `pages/` com uma página por área.
 - `views/` — telas compartilhadas pelos dois modos (execuções, workflows, terminal, agentes…).
@@ -81,20 +81,20 @@ React + Vite, instalável como PWA.
 
 | Onde | O quê |
 |---|---|
-| volume `yui-data` → `/data` | SQLite (`yui.db`: sessões, execuções, aprovações, kv, lembretes, settings), `HOME` com logins do Claude e do GitHub, arquivos da Empresa |
-| volume `yui-workspace` → `/workspace` | projetos clonados, `.claude/agents`, `.yui/` (Vault com git próprio, workflows, toolbox, saídas do navegador) |
-| volume `yui-pg` | Postgres da Empresa: documentos, trechos, campos, fila de processamento |
-| volume `yui-qdrant` | vetores da Empresa |
-| volume `yui-browser-profile` | perfil persistente do Chromium dos agentes |
+| volume `data` → `/data` | SQLite (`atria.db`: sessões, execuções, aprovações, kv, lembretes, settings), `HOME` com logins do Claude e do GitHub, arquivos da Empresa |
+| volume `workspace` → `/workspace` | projetos clonados, `.claude/agents`, `.atria/` (Vault com git próprio, workflows, toolbox, saídas do navegador) |
+| volume `pg` | Postgres da Empresa: documentos, trechos, campos, fila de processamento |
+| volume `qdrant` | vetores da Empresa |
+| volume `browser-profile` | perfil persistente do Chromium dos agentes |
 | `workspace-seed/` (imagem) | Vault, workflows e ferramentas iniciais, copiados uma vez no primeiro boot |
 
-O `yui-console` roda como `node` (uid 1000); o `yui-browser` roda como root e devolve a posse de
-`/workspace/.yui` ao uid 1000 ao subir.
+O `atria` roda como `node` (uid 1000); o `atria-browser` roda como root e devolve a posse de
+`/workspace/.atria` ao uid 1000 ao subir.
 
 ## Segurança
 
 - Um usuário: senha com hash Argon2, cookie de sessão assinado, rate limit no login, Helmet/CSP.
-- Docker só por `yui-dockerproxy` (somente leitura); nenhum serviço interno tem porta publicada.
+- Docker só por `atria-dockerproxy` (somente leitura); nenhum serviço interno tem porta publicada.
 - Agentes no automático, com bloqueio de comandos catastróficos (`safety.ts`) e aprovação explícita onde o
   projeto ou o workflow pedir; exclusões pedidas à Yui sempre passam por aprovação.
 - Imagens de terceiros fixadas por digest; CI roda gitleaks em todo push.

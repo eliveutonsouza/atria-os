@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { SettingsPayload } from '../../shared/protocol.ts';
-import { setSettingsResolver } from './config.ts';
+import { readEnv, setSettingsResolver } from './config.ts';
 import { db, kvGet, kvSet, now } from './db.ts';
 
 // Configurações editáveis pelo painel. Precedência: banco > .env > padrão.
@@ -25,28 +25,28 @@ interface Def {
 
 // Chaves aceitas pelo painel. `auth.passwordHash` não aparece aqui: só muda por /api/auth/password e /api/setup/password.
 export const SETTINGS: Record<string, Def> = {
-  'user.name': { kind: 'string', env: 'YUI_USER_NAME', def: '', maxLen: 60 },
-  'user.email': { kind: 'string', env: 'YUI_USER_EMAIL', def: '', maxLen: 120 },
-  'user.city': { kind: 'string', env: 'YUI_USER_CITY', def: '', maxLen: 80 },
+  'user.name': { kind: 'string', env: 'ATRIA_USER_NAME', def: '', maxLen: 60 },
+  'user.email': { kind: 'string', env: 'ATRIA_USER_EMAIL', def: '', maxLen: 120 },
+  'user.city': { kind: 'string', env: 'ATRIA_USER_CITY', def: '', maxLen: 80 },
   'openai.key': { kind: 'secret', env: 'OPENAI_API_KEY', def: '' },
-  'models.brain': { kind: 'string', env: 'YUI_BRAIN_MODEL', def: 'gpt-6-luna', maxLen: 60 },
-  'models.planner': { kind: 'string', env: 'YUI_PLANNER_MODEL', def: 'gpt-6-sol', maxLen: 60 },
-  'models.live': { kind: 'string', env: 'YUI_LIVE_MODEL', def: 'gpt-live-1', maxLen: 60 },
-  'claude.model': { kind: 'string', env: 'YUI_CLAUDE_MODEL', def: '', maxLen: 60 },
-  'models.embed': { kind: 'string', env: 'YUI_EMBED_MODEL', def: 'text-embedding-3-small', maxLen: 60 },
+  'models.brain': { kind: 'string', env: 'ATRIA_BRAIN_MODEL', def: 'gpt-6-luna', maxLen: 60 },
+  'models.planner': { kind: 'string', env: 'ATRIA_PLANNER_MODEL', def: 'gpt-6-sol', maxLen: 60 },
+  'models.live': { kind: 'string', env: 'ATRIA_LIVE_MODEL', def: 'gpt-live-1', maxLen: 60 },
+  'claude.model': { kind: 'string', env: 'ATRIA_CLAUDE_MODEL', def: '', maxLen: 60 },
+  'models.embed': { kind: 'string', env: 'ATRIA_EMBED_MODEL', def: 'text-embedding-3-small', maxLen: 60 },
   'pricing.openai': { kind: 'string', def: '', maxLen: 4000 },
-  'runs.concurrency': { kind: 'number', env: 'YUI_MAX_CONCURRENT_RUNS', def: 2, min: 1, max: 8 },
-  'voice.name': { kind: 'string', env: 'YUI_VOICE', def: 'marin', maxLen: 40 },
-  'voice.idleMin': { kind: 'number', env: 'YUI_LIVE_IDLE_MIN', def: 5, min: 1, max: 60 },
+  'runs.concurrency': { kind: 'number', env: 'ATRIA_MAX_CONCURRENT_RUNS', def: 2, min: 1, max: 8 },
+  'voice.name': { kind: 'string', env: 'ATRIA_VOICE', def: 'marin', maxLen: 40 },
+  'voice.idleMin': { kind: 'number', env: 'ATRIA_LIVE_IDLE_MIN', def: 5, min: 1, max: 60 },
   'voice.pttKey': { kind: 'enum', def: 'Space', options: ['Space', 'Backquote', 'F8', 'AltRight'] },
   'ui.particleDensity': { kind: 'number', def: 1, min: 0.3, max: 2 },
   'ui.reducedMotion': { kind: 'boolean', def: false },
   'approvals.mcpSensitive': { kind: 'boolean', def: false },
   'notify.types': { kind: 'string', def: 'approval,failed,done', maxLen: 120 },
-  // Monitoramento remoto (Yui Monitor): pulso a cada 30 s + URL de saúde (telemetry.ts)
-  'monitor.enabled': { kind: 'boolean', env: 'YUI_MONITOR_ENABLED', def: false },
-  'monitor.url': { kind: 'string', env: 'YUI_MONITOR_URL', def: '', maxLen: 200 },
-  'monitor.key': { kind: 'secret', env: 'YUI_MONITOR_KEY', def: '', maxLen: 200 },
+  // Monitoramento remoto (Atria Central): pulso a cada 30 s + URL de saúde (telemetry.ts)
+  'monitor.enabled': { kind: 'boolean', env: 'ATRIA_MONITOR_ENABLED', def: false },
+  'monitor.url': { kind: 'string', env: 'ATRIA_MONITOR_URL', def: '', maxLen: 200 },
+  'monitor.key': { kind: 'secret', env: 'ATRIA_MONITOR_KEY', def: '', maxLen: 200 },
 };
 
 /** Endereço do monitor: https, ou http só em localhost/127.0.0.1 (testes). */
@@ -77,7 +77,7 @@ export function setRaw(key: string, value: string | null) {
 // Valor efetivo (banco > .env > padrão) já convertido.
 export function getSetting(key: string): string | number | boolean | null {
   const d = SETTINGS[key];
-  const fromEnv = d?.env ? (envMirror.has(d.env) ? envMirror.get(d.env) : process.env[d.env]) : undefined;
+  const fromEnv = d?.env ? (envMirror.has(d.env) ? envMirror.get(d.env) : readEnv(d.env)) : undefined;
   const raw = rawGet(key) ?? fromEnv ?? null;
   if (!d) return raw;
   if (raw === null || raw === '') return d.def;
@@ -91,7 +91,7 @@ const envMirror = new Map<string, string | undefined>();
 function mirrorEnv(key: string) {
   const d = SETTINGS[key];
   if (!d?.env || d.kind === 'secret') return;
-  if (!envMirror.has(d.env)) envMirror.set(d.env, process.env[d.env]);
+  if (!envMirror.has(d.env)) envMirror.set(d.env, readEnv(d.env));
   const v = rawGet(key);
   if (v !== null && v !== '') process.env[d.env] = v;
   else if (envMirror.get(d.env) !== undefined) process.env[d.env] = envMirror.get(d.env);
@@ -105,7 +105,7 @@ function payload(): SettingsPayload {
     if (d.kind === 'secret') secrets[k] = !!getSetting(k);
     else values[k] = getSetting(k);
   }
-  secrets['auth.passwordHash'] = !!(rawGet('auth.passwordHash') || process.env.YUI_PASSWORD_HASH);
+  secrets['auth.passwordHash'] = !!(rawGet('auth.passwordHash') || readEnv('ATRIA_PASSWORD_HASH'));
   return { values, secrets };
 }
 

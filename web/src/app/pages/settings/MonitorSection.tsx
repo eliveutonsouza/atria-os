@@ -7,7 +7,7 @@ import { useYui } from '../../../store/yui'
 import { input, SmallBtn } from '../../../views/kit'
 import { SaveMsg, Section, useSettings } from './sections'
 
-// Configurações › Sistema › Monitoramento remoto (YuiMonitoramento.dc.html): pulso para o Yui Monitor
+// Configurações › Sistema › Monitoramento remoto (YuiMonitoramento.dc.html): pulso para o Atria Central
 // do administrador, URL de saúde protegida pela mesma chave e a prévia do que sai desta VPS.
 
 interface PulseResult { at: string; ok: boolean; status: number | null; ms: number; error: string | null }
@@ -111,7 +111,7 @@ export function MonitorSection() {
   const statusColor = !st?.enabled ? C.t2 : last?.ok ? C.ok : C.warn
 
   return (
-    <Section title="Monitoramento remoto" hint="Para quem administra várias Yuis: um painel de fora acompanha a saúde desta instância.">
+    <Section title="Monitoramento remoto" hint="Para quem administra várias instalações do Atria OS: um painel de fora acompanha a saúde desta instância.">
       <div>
         <Row label="Monitoramento remoto" hint="Envia um pulso a cada 30 s para o painel do administrador.">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', minHeight: 36 }}>
@@ -120,10 +120,10 @@ export function MonitorSection() {
           </div>
         </Row>
         <Row label="Endereço do monitor">
-          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://monitor.seudominio.com" inputMode="url" autoComplete="off" spellCheck={false} aria-label="Endereço do monitor" style={{ ...input, maxWidth: 460 }} className="mono" />
+          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://central.seudominio.com" inputMode="url" autoComplete="off" spellCheck={false} aria-label="Endereço do monitor" style={{ ...input, maxWidth: 460 }} className="mono" />
         </Row>
-        <Row label="Chave da instância" hint="Gerada no monitor ao cadastrar esta Yui.">
-          <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={hasKey ? '•••••••• guardada (vazio = não mudar)' : 'ymk_…'} autoComplete="off" aria-label="Chave da instância" style={{ ...input, maxWidth: 460 }} className="mono" />
+        <Row label="Chave da instância" hint="Gerada no Atria Central ao cadastrar esta instalação.">
+          <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={hasKey ? '•••••••• guardada (vazio = não mudar)' : 'atk_…'} autoComplete="off" aria-label="Chave da instância" style={{ ...input, maxWidth: 460 }} className="mono" />
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <SmallBtn primary onClick={() => void saveConn()}>Salvar</SmallBtn>
             <SmallBtn disabled={testing} onClick={() => void runTest()}>{testing ? 'Testando…' : 'Testar conexão'}</SmallBtn>

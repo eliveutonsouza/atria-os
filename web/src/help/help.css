@@ -14,7 +14,7 @@ select.hp-input { padding: 0 10px; }
 .hp-ask { padding: 16px 18px; border-radius: 18px; background: linear-gradient(160deg, rgba(103,216,242,.09), rgba(166,140,247,.07)); border: 1px solid rgba(103,216,242,.24); display: flex; flex-direction: column; gap: 10px; }
 .hp-chip { height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid rgba(255,255,255,.1); background: rgba(10,12,29,.5); color: #c9cde0; font-size: 12.5px; cursor: pointer; font-family: inherit; }
 .hp-chip:hover { border-color: rgba(103,216,242,.4); color: #fff; }
-.hp-answer { padding: 14px 16px; border-radius: 14px; background: rgba(6,7,13,.55); border: 1px solid rgba(255,255,255,.08); display: flex; flex-direction: column; gap: 10px; animation: yui-pop .2s ease-out; }
+.hp-answer { padding: 14px 16px; border-radius: 14px; background: rgba(6,7,13,.55); border: 1px solid rgba(255,255,255,.08); display: flex; flex-direction: column; gap: 10px; animation: atria-pop .2s ease-out; }
 .hp-cite { color: #67d8f2; font-family: var(--mono); font-size: 11.5px; background: rgba(103,216,242,.1); padding: 0 5px; border-radius: 4px; }
 .hp-mini { min-height: 32px; padding: 0 12px; border-radius: 9px; border: 1px solid rgba(255,255,255,.12); background: transparent; color: #dfe3f3; font-size: 12.5px; cursor: pointer; font-family: inherit; }
 .hp-mini:hover { background: rgba(255,255,255,.06); }
@@ -26,7 +26,7 @@ select.hp-input { padding: 0 10px; }
 .hp-link:hover { color: #cbbcff; }
 .hp-link-row { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 8px; border-radius: 9px; border: none; background: transparent; color: #dfe3f3; font-size: 13px; text-align: left; cursor: pointer; font-family: inherit; }
 .hp-link-row:hover { background: rgba(255,255,255,.05); }
-.hp-toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 80; padding: 10px 16px; border-radius: 12px; background: #10132a; border: 1px solid rgba(103,216,242,.35); color: #e8eaf4; font-size: 13px; box-shadow: 0 16px 40px rgba(0,0,0,.5); animation: yui-pop .18s ease-out; max-width: calc(100vw - 32px); }
+.hp-toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 80; padding: 10px 16px; border-radius: 12px; background: #10132a; border: 1px solid rgba(103,216,242,.35); color: #e8eaf4; font-size: 13px; box-shadow: 0 16px 40px rgba(0,0,0,.5); animation: atria-pop .18s ease-out; max-width: calc(100vw - 32px); }
 
 /* início */
 .hp-home { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 16px; align-items: start; }

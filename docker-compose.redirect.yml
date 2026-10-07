@@ -1,0 +1,14 @@
+# Domínio antigo → domínio novo (só com Traefik). Ativado pelo install.sh quando ATRIA_OLD_DOMAIN está no .env
+# (COMPOSE_FILE=docker-compose.yml:docker-compose.redirect.yml); para ligar à mão, acrescente esse COMPOSE_FILE ao .env.
+# O Traefik emite o certificado do domínio antigo e responde com redirect permanente para https://ATRIA_DOMAIN/<mesmo caminho>.
+services:
+  atria:
+    labels:
+      - traefik.http.routers.${ATRIA_PROJECT:-atria-os}-old.rule=Host(`${ATRIA_OLD_DOMAIN:?defina ATRIA_OLD_DOMAIN no .env}`)
+      - traefik.http.routers.${ATRIA_PROJECT:-atria-os}-old.entrypoints=${ATRIA_TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.${ATRIA_PROJECT:-atria-os}-old.tls.certresolver=${ATRIA_TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.routers.${ATRIA_PROJECT:-atria-os}-old.middlewares=${ATRIA_PROJECT:-atria-os}-old-redirect
+      - traefik.http.routers.${ATRIA_PROJECT:-atria-os}-old.service=${ATRIA_PROJECT:-atria-os}
+      - traefik.http.middlewares.${ATRIA_PROJECT:-atria-os}-old-redirect.redirectregex.regex=^https?://[^/]+(.*)
+      - traefik.http.middlewares.${ATRIA_PROJECT:-atria-os}-old-redirect.redirectregex.replacement=https://${ATRIA_DOMAIN}$${1}
+      - traefik.http.middlewares.${ATRIA_PROJECT:-atria-os}-old-redirect.redirectregex.permanent=true

@@ -5,7 +5,7 @@ import { C, glow } from '../../lib/colors'
 import { useYui } from '../../store/yui'
 import { useHeader } from '../../views/ui'
 
-// Navegador ao vivo: screencast do Chromium que os agentes usam (sidecar yui-browser, via CDP).
+// Navegador ao vivo: screencast do Chromium que os agentes usam (sidecar atria-browser, via CDP).
 // Assistir é livre; mouse/teclado/URL só com "Assumir controle" ligado.
 
 type Activity = Extract<BrowserServerMsg, { type: 'activity' }>
@@ -146,7 +146,7 @@ export function BrowserPage() {
   const key = (event: 'keyDown' | 'keyUp') => (e: KeyboardEvent) => {
     if (!controlling) return
     e.preventDefault()
-    e.stopPropagation() // Espaço/Esc não acionam atalhos do console enquanto controla o navegador
+    e.stopPropagation() // Espaço/Esc não acionam atalhos do Atria OS enquanto controla o navegador
     send({ type: 'key', event, key: e.key, code: e.code, text: event === 'keyDown' && e.key.length === 1 ? e.key : event === 'keyDown' && e.key === 'Enter' ? '\r' : undefined })
   }
   // Teclado do celular: input invisível. Teclas especiais vêm no keydown; texto vem no input
@@ -274,7 +274,7 @@ export function BrowserPage() {
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center', padding: 24, color: C.t2 }}>
                 <span aria-hidden style={{ width: 54, height: 54, borderRadius: '50%', background: 'radial-gradient(circle at 38% 34%, #fff, #67d8f2 32%, rgba(166,140,247,.75) 75%)', boxShadow: glow(C.cyan, 30), opacity: 0.85 }} />
                 <span style={{ fontSize: 15, color: '#c9cde0' }}>{connected ? 'Nenhum agente navegando agora' : 'Conectando ao navegador dos agentes…'}</span>
-                <span style={{ fontSize: 13, maxWidth: 360 }}>{connected ? 'Peça à Yui para testar um site — você assiste aqui em tempo real.' : 'Se demorar, o serviço yui-browser pode estar reiniciando.'}</span>
+                <span style={{ fontSize: 13, maxWidth: 360 }}>{connected ? 'Peça à Yui para testar um site — você assiste aqui em tempo real.' : 'Se demorar, o serviço atria-browser pode estar reiniciando.'}</span>
               </div>
             )}
             {coarse && (

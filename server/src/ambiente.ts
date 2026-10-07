@@ -72,7 +72,7 @@ function ultimaConversa(offset: number): string {
 // ---------- HTTP com timeout ----------
 
 async function getJson<T>(url: string, ms = 5000): Promise<T> {
-  const r = await fetch(url, { signal: AbortSignal.timeout(ms), headers: { 'user-agent': 'yui-console' } });
+  const r = await fetch(url, { signal: AbortSignal.timeout(ms), headers: { 'user-agent': 'atria-os' } });
   if (!r.ok) throw new Error(`${new URL(url).host} respondeu ${r.status}`);
   return (await r.json()) as T;
 }

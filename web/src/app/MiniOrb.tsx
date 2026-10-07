@@ -76,7 +76,7 @@ export function MiniOrb() {
             position: 'absolute', right: narrow ? 14 : right, bottom: narrow ? bottom + 70 : bottom, zIndex: 46, maxWidth: narrow ? 'min(300px, calc(100dvw - 40px))' : 300, padding: '10px 14px',
             cursor: narrow ? 'pointer' : undefined,
             borderRadius: narrow ? '14px 14px 4px 14px' : '14px 14px 4px 14px', background: 'rgba(16,20,42,.92)', border: '1px solid rgba(160,170,255,.16)', backdropFilter: 'blur(14px)',
-            boxShadow: '0 18px 50px rgba(0,0,0,.4)', fontSize: 12.5, lineHeight: 1.45, color: '#c9cde0', animation: 'yui-pop .28s var(--ease)',
+            boxShadow: '0 18px 50px rgba(0,0,0,.4)', fontSize: 12.5, lineHeight: 1.45, color: '#c9cde0', animation: 'atria-pop .28s var(--ease)',
           }}
         >
           <div style={{ fontSize: 10, letterSpacing: '.22em', color, fontWeight: 600, marginBottom: 4 }}>YUI · {label.toUpperCase()}</div>

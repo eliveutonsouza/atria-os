@@ -81,7 +81,7 @@ export function EmbeddedTerminal({ command, height = 300, onClose }: { command: 
           </button>
         )}
       </div>
-      <div className="yui-terminal" style={{ height, padding: '8px 10px' }}>
+      <div className="atria-terminal" style={{ height, padding: '8px 10px' }}>
         <div ref={hostRef} style={{ width: '100%', height: '100%' }} />
       </div>
       {coarse && (

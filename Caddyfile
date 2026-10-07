@@ -3,10 +3,10 @@
 	email {$ACME_EMAIL}
 }
 
-{$YUI_DOMAIN} {
+{$ATRIA_DOMAIN} {
 	encode zstd gzip
 	# SSE (eventos ao vivo) e WebSocket (terminal, navegador) passam direto, sem buffer.
-	reverse_proxy yui-console:8080 {
+	reverse_proxy atria:8080 {
 		flush_interval -1
 	}
 }

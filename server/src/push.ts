@@ -7,7 +7,7 @@ import { getSetting } from './settings.ts';
 import { config } from './config.ts';
 
 // Notificações push (PWA): aprovações, falhas e conclusões chegam no celular/desktop mesmo com o app fechado.
-// Só envia quando nenhuma tela do console está visível (presença enviada pelo app a cada 30 s).
+// Só envia quando nenhuma tela do Atria OS está visível (presença enviada pelo app a cada 30 s).
 
 db.exec(`CREATE TABLE IF NOT EXISTS push_subscriptions (
   endpoint TEXT PRIMARY KEY,
@@ -153,7 +153,7 @@ export function register(app: FastifyInstance): void {
   });
 
   app.post('/api/push/test', async () => ({
-    sent: await sendPush({ title: 'Yui', body: 'Notificações funcionando neste dispositivo. ✓', url: '/', tag: 'test' }, { force: true }),
+    sent: await sendPush({ title: 'Atria OS', body: 'Notificações funcionando neste dispositivo. ✓', url: '/', tag: 'test' }, { force: true }),
   }));
 
   app.post('/api/push/presence', async (_req, reply) => {

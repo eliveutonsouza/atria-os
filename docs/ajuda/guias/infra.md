@@ -13,9 +13,9 @@ frases:
 dicas:
   - Escolha um projeto em "Logs por projeto" para ver as linhas mais recentes do container dele.
   - Quando há erros, "Pedir correção ao Backend" cria a tarefa já com os logs como ponto de partida.
-  - O console só lê os containers; ele não reinicia nada por esta tela.
+  - O Atria OS só lê os containers; ele não reinicia nada por esta tela.
 erros:
-  - Projeto sem logs. É preciso indicar o container no yui.json do projeto.
+  - Projeto sem logs. É preciso indicar o container no atria.json do projeto.
 relacionados: [projetos, terminal, operacoes]
 ---
 # Infra & logs

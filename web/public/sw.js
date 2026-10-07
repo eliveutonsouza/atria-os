@@ -1,7 +1,7 @@
-// Service worker do Yui Console: app shell offline + notificações push.
+// Service worker do Atria OS: app shell offline + notificações push.
 // Nunca cacheia /api, /sandbox* nem streams (SSE/WebSocket) — dados sempre ao vivo.
 const VERSION = '__BUILD__';
-const SHELL = `yui-shell-${VERSION}`;
+const SHELL = `atria-shell-${VERSION}`;
 const PRECACHE = ['/', '/offline.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/badge-96.png', '/favicon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -22,7 +22,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
-      for (const k of await caches.keys()) if (k.startsWith('yui-shell-') && k !== SHELL) await caches.delete(k);
+      for (const k of await caches.keys()) if ((k.startsWith('atria-shell-') || k.startsWith('yui-shell-')) && k !== SHELL) await caches.delete(k);
       await self.clients.claim();
     })(),
   );
@@ -76,10 +76,10 @@ self.addEventListener('push', (event) => {
   try {
     d = event.data ? event.data.json() : {};
   } catch {
-    d = { title: 'Yui', body: event.data?.text() ?? '' };
+    d = { title: 'Atria OS', body: event.data?.text() ?? '' };
   }
   event.waitUntil(
-    self.registration.showNotification(d.title || 'Yui', {
+    self.registration.showNotification(d.title || 'Atria OS', {
       body: d.body || '',
       icon: '/icons/icon-192.png',
       badge: '/icons/badge-96.png',

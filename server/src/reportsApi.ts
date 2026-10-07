@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ReportPayload } from '../../shared/protocol.ts';
 import { config } from './config.ts';
 
-// Relatórios dos agentes (/workspace/.yui/reports/*.json): listar, abrir um anterior e excluir.
+// Relatórios dos agentes (/workspace/.atria/reports/*.json): listar, abrir um anterior e excluir.
 // /api/reports/latest continua em index.ts (rota estática ganha da paramétrica).
 
 export interface ReportListItem {
@@ -14,7 +14,7 @@ export interface ReportListItem {
   generatedBy: string;
 }
 
-const reportsDir = () => join(config.workspaceDir, '.yui', 'reports');
+const reportsDir = () => join(config.metaDir, 'reports');
 
 // Só nomes simples de arquivo .json: nada de barra, "..", nem arquivo oculto.
 export const validReportName = (name: unknown): name is string => typeof name === 'string' && name.length <= 160 && /^[\w-][\w.-]*\.json$/.test(name) && !name.includes('..');

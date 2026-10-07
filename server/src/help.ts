@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { AppPage, HelpAnswer, HelpDoc, HelpIndex, HelpResults, HelpTaskType } from '../../shared/protocol.ts';
-import { config } from './config.ts';
+import { config, readEnv } from './config.ts';
 import { db, kvGet, kvSet, now } from './db.ts';
 import { emit } from './bus.ts';
 import { openai } from './brain.ts';
@@ -14,7 +14,7 @@ import { Bm25, faqPassages, guideMeta, list, parseDia, parseDoc, parseFaq, passa
 // Ajuda: guias operacionais (docs/ajuda), "Pergunte" (busca + resposta citada) e Resultados
 // (números reais do banco + estimativa de horas economizadas com minutos ajustáveis).
 
-const helpDir = () => process.env.YUI_HELP_DIR || new URL('../../docs/ajuda', import.meta.url).pathname;
+const helpDir = () => readEnv('ATRIA_HELP_DIR') || new URL('../../docs/ajuda', import.meta.url).pathname;
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS help_feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, doc TEXT NOT NULL, util INTEGER NOT NULL, at TEXT NOT NULL);
@@ -123,7 +123,7 @@ export async function ask(pergunta: string, who = 'Painel'): Promise<HelpAnswer>
       const res = await openai.responses.create({
         model: config.brainModel,
         instructions:
-          'Você é a ajuda do Yui Console. Responda em português, em 2 a 4 frases curtas e práticas, usando SÓ os trechos dados. ' +
+          'Você é a ajuda do Atria OS. Responda em português, em 2 a 4 frases curtas e práticas, usando SÓ os trechos dados. ' +
           'Diga onde clicar ou o que pedir à Yui. Cite a fonte no fim de cada informação como [Guia: Título], [Receita: Título] ou [FAQ]. ' +
           'Se os trechos não respondem, comece exatamente com "Não encontrei isso nos guias." e sugira o guia mais próximo.',
         input: `Pergunta: ${q}\n\nTrechos:\n${hits.map((h) => `(${h.p.source.kind === 'guia' ? 'Guia' : h.p.source.kind === 'receita' ? 'Receita' : 'FAQ'}: ${h.p.source.titulo} — ${h.p.section})\n${h.p.text.slice(0, 1800)}`).join('\n\n')}`,
@@ -294,16 +294,16 @@ export function register(app: FastifyInstance) {
 
 // ---------- Yui e agentes ----------
 
-registerRunPrompt(() => '- Guia de uso do Yui Console (o que cada tela faz e como usar): /workspace/.yui/vault/Ajuda.');
+registerRunPrompt(() => '- Guia de uso do Atria OS (o que cada tela faz e como usar): /workspace/.atria/vault/Ajuda.');
 
 registerBrain({
   name: 'help',
-  instructions: `- Dúvida sobre COMO USAR o console ("como eu faço…", "o que é…", "para que serve…", "onde vejo…") => ajuda_consultar e responda curto citando o guia; ofereça abrir a tela.
+  instructions: `- Dúvida sobre COMO USAR o Atria OS ("como eu faço…", "o que é…", "para que serve…", "onde vejo…") => ajuda_consultar e responda curto citando o guia; ofereça abrir a tela.
 - "abre a ajuda/os guias/os resultados/o tempo economizado" => open_help.`,
   tools: [
     {
       type: 'function', name: 'ajuda_consultar', strict: true,
-      description: 'Consulta os guias de uso do Yui Console e devolve a resposta com a fonte e a tela relacionada.',
+      description: 'Consulta os guias de uso do Atria OS e devolve a resposta com a fonte e a tela relacionada.',
       parameters: { type: 'object', additionalProperties: false, required: ['pergunta'], properties: { pergunta: { type: 'string' } } },
     },
     {

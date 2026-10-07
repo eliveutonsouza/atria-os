@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { config } from './config.ts';
 import { db, now } from './db.ts';
@@ -89,7 +89,7 @@ export function ensureCloned(nameWithOwner: string): Promise<string> {
   const p = (async () => {
     console.log(`github: clonando ${nameWithOwner}`);
     await git(['clone', '--filter=blob:none', `https://github.com/${nameWithOwner}.git`, dir]);
-    await writeYuiJson(dir, repo.name, nameWithOwner);
+    await writeProjectJson(dir, repo.name, nameWithOwner);
     trustDirs([dir]);
     return dir;
   })().finally(() => cloning.delete(nameWithOwner));
@@ -104,8 +104,29 @@ export async function refreshClone(dir: string): Promise<void> {
   await git(['pull', '--ff-only', '--quiet'], dir).catch(() => {});
 }
 
-async function writeYuiJson(dir: string, name: string, nameWithOwner: string) {
-  const f = join(dir, 'yui.json');
+/** atria.json do projeto; o yui.json de antes do Atria OS é renomeado na primeira leitura. */
+export function projectConfigFile(dir: string): string {
+  const f = join(dir, 'atria.json');
+  const old = join(dir, 'yui.json');
+  if (!existsSync(f) && existsSync(old)) {
+    try {
+      renameSync(old, f);
+      excludeProjectJson(dir);
+    } catch {
+      return old;
+    }
+  }
+  return f;
+}
+
+// atria.json é config local do Atria OS, não do repo.
+function excludeProjectJson(dir: string) {
+  const exclude = join(dir, '.git', 'info', 'exclude');
+  if (existsSync(exclude) && !readFileSync(exclude, 'utf8').includes('atria.json')) writeFileSync(exclude, `${readFileSync(exclude, 'utf8')}\natria.json\n`);
+}
+
+async function writeProjectJson(dir: string, name: string, nameWithOwner: string) {
+  const f = projectConfigFile(dir);
   const cfg: Record<string, unknown> = existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : {};
   cfg.name ??= name;
   cfg.repo ??= nameWithOwner;
@@ -121,9 +142,7 @@ async function writeYuiJson(dir: string, name: string, nameWithOwner: string) {
     if (c) cfg.container = c.name;
   }
   writeFileSync(f, `${JSON.stringify(cfg, null, 2)}\n`);
-  // yui.json é config local do console, não do repo.
-  const exclude = join(dir, '.git', 'info', 'exclude');
-  if (existsSync(exclude) && !readFileSync(exclude, 'utf8').includes('yui.json')) writeFileSync(exclude, `${readFileSync(exclude, 'utf8')}\nyui.json\n`);
+  excludeProjectJson(dir);
 }
 
 let started = false;
@@ -140,7 +159,7 @@ export async function startGithub(): Promise<void> {
   await initGithub();
   const n = await syncCatalog();
   console.log(`github: ${n} repositórios no catálogo`);
-  // removidos pelo usuário (Projetos › Remover do console) não voltam sozinhos
+  // removidos pelo usuário (Projetos › Remover do Atria OS) não voltam sozinhos
   const removedRaw = db.prepare(`SELECT value FROM kv WHERE key = 'projects_removed'`).get() as { value: string } | undefined;
   const removed = new Set<string>(removedRaw ? JSON.parse(removedRaw.value) : []);
   const recent = catalog().filter((r) => !r.archived && !removed.has(r.slug) && r.pushed_at && Date.now() - new Date(r.pushed_at).getTime() < 30 * 86400_000);

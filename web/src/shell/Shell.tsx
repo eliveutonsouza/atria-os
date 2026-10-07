@@ -205,7 +205,7 @@ function onKey(e: KeyboardEvent) {
     return
   }
   // Dentro do terminal, Esc e demais teclas pertencem ao programa (Claude/vim/etc.).
-  if ((e.target as HTMLElement | null)?.closest?.('.yui-terminal')) return
+  if ((e.target as HTMLElement | null)?.closest?.('.atria-terminal')) return
   if (mod && e.key.toLowerCase() === 'l') {
     e.preventDefault()
     dockInput.el?.focus()

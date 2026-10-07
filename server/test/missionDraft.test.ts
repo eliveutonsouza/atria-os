@@ -6,13 +6,13 @@ import { join } from 'node:path';
 
 // Rascunhos de missão: criação manual, edição de etapas (validação) e início.
 // Banco e workspace temporários: o env precisa estar pronto antes de importar os módulos.
-const root = mkdtempSync(join(tmpdir(), 'yui-mdraft-'));
-process.env.YUI_DATA_DIR = join(root, 'data');
-process.env.YUI_WORKSPACE_DIR = join(root, 'ws');
-process.env.YUI_SEED_DIR = join(root, 'seed');
-mkdirSync(process.env.YUI_DATA_DIR, { recursive: true });
+const root = mkdtempSync(join(tmpdir(), 'atria-mdraft-'));
+process.env.ATRIA_DATA_DIR = join(root, 'data');
+process.env.ATRIA_WORKSPACE_DIR = join(root, 'ws');
+process.env.ATRIA_SEED_DIR = join(root, 'seed');
+mkdirSync(process.env.ATRIA_DATA_DIR, { recursive: true });
 // agentes do seed copiados para o workspace temporário
-cpSync(new URL('../../workspace-seed/.claude/agents', import.meta.url).pathname, join(process.env.YUI_WORKSPACE_DIR, '.claude', 'agents'), { recursive: true });
+cpSync(new URL('../../workspace-seed/.claude/agents', import.meta.url).pathname, join(process.env.ATRIA_WORKSPACE_DIR, '.claude', 'agents'), { recursive: true });
 
 const { db } = await import('../src/db.ts');
 const ms = await import('../src/missions.ts');

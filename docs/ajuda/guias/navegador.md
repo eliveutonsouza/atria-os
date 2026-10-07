@@ -21,7 +21,7 @@ relacionados: [execucoes, projetos, conectores]
 # Navegador ao vivo
 
 ## O que é
-O console tem um Chromium próprio que os agentes usam pelo Playwright. Esta tela transmite esse navegador ao vivo, com as abas abertas, a execução que está usando e a lista de ações do agente.
+O Atria OS tem um Chromium próprio que os agentes usam pelo Playwright. Esta tela transmite esse navegador ao vivo, com as abas abertas, a execução que está usando e a lista de ações do agente.
 
 ## Passo a passo
 1. **Peça um teste.** Fale com a Yui; o agente abre o site no navegador.
@@ -33,7 +33,7 @@ O console tem um Chromium próprio que os agentes usam pelo Playwright. Esta tel
 ## O que você vê na tela
 - Abas do navegador com título.
 - Tela ao vivo com fps.
-- "Navegador desconectado" se o serviço yui-browser não estiver respondendo.
+- "Navegador desconectado" se o serviço atria-browser não estiver respondendo.
 
 ## Exemplos do dia a dia
 - QA testando um checkout → assista e veja onde ele travou.

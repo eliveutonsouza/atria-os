@@ -1,6 +1,6 @@
-# Yui Console
+# Atria OS
 
-Central pessoal de IA que roda na sua VPS. Você conversa com a **Yui** (voz ou texto) e ela organiza o
+O sistema operacional da sua empresa com IA, rodando na sua VPS. Você conversa com a **Yui** (voz ou texto) e ela organiza o
 trabalho de uma equipe de agentes **Claude Code**: abre telas, cria planos, delega tarefas, roda workflows
 agendados, lembra seus compromissos e mostra os resultados. Quando preferir, use o **dashboard** completo
 (sidebar na borda esquerda) — a Yui fica minimizada no canto, esperando você.
@@ -49,7 +49,7 @@ vetores, navegador e VS Code só são alcançados pela rede interna do Docker.
 ## Instalar numa VPS nova
 
 ```bash
-# 1. DNS: crie um registro A  yui.seudominio.com → IP da VPS  (espere propagar)
+# 1. DNS: crie um registro A  atria.seudominio.com → IP da VPS  (espere propagar)
 
 # 2. Docker + compose (pule se já tiver)
 curl -fsSL https://get.docker.com | sudo sh
@@ -57,10 +57,10 @@ curl -fsSL https://get.docker.com | sudo sh
 # 3. Código (repositório privado: precisa de acesso à conta do GitHub)
 sudo apt-get install -y gh git        # ou: https://cli.github.com
 gh auth login                          # GitHub.com → HTTPS → login pelo navegador
-gh repo clone eliveutonsouza/yui-console /opt/yui-console
-cd /opt/yui-console
+gh repo clone eliveutonsouza/atria-os /opt/atria-os
+cd /opt/atria-os
 #   sem gh: crie um token em github.com/settings/tokens (escopo "repo") e use
-#   git clone https://<TOKEN>@github.com/eliveutonsouza/yui-console.git /opt/yui-console
+#   git clone https://<TOKEN>@github.com/eliveutonsouza/atria-os.git /opt/atria-os
 
 # 4. Instalar
 sudo ./install.sh
@@ -79,8 +79,8 @@ Rodar de novo é seguro: valores existentes no `.env` são mantidos.
 **Sem perguntas** (automação):
 
 ```bash
-YUI_DOMAIN=yui.seudominio.com ACME_EMAIL=voce@seudominio.com OPENAI_API_KEY=sk-... \
-TZ=America/Sao_Paulo YUI_USER_NAME="Seu Nome" sudo -E ./install.sh --yes
+ATRIA_DOMAIN=atria.seudominio.com ACME_EMAIL=voce@seudominio.com OPENAI_API_KEY=sk-... \
+TZ=America/Sao_Paulo ATRIA_USER_NAME="Seu Nome" sudo -E ./install.sh --yes
 ```
 
 `./install.sh --env-only` só gera o `.env` para você revisar antes de subir.
@@ -101,36 +101,36 @@ A aba **Primeiros passos** das Configurações mostra o que falta. Uso diário: 
 
 ## Modos de proxy HTTPS
 
-Definido por `YUI_PROXY` (o instalador detecta sozinho com `auto`):
+Definido por `ATRIA_PROXY` (o instalador detecta sozinho com `auto`):
 
 | Modo | Quando usar | O que acontece |
 |---|---|---|
-| `caddy` | VPS sem nada nas portas 80/443 | sobe o `yui-caddy` com certificado Let's Encrypt automático (`ACME_EMAIL` obrigatório) |
-| `traefik` | já existe um Traefik com provider Docker | o `yui-console` publica labels; ajuste `YUI_TRAEFIK_ENTRYPOINT` / `YUI_TRAEFIK_CERTRESOLVER` se os nomes forem outros |
-| `none` | você já tem nginx, Apache, Cloudflare Tunnel… | publica `127.0.0.1:${YUI_HTTP_PORT:-8080}`; aponte seu proxy para lá |
+| `caddy` | VPS sem nada nas portas 80/443 | sobe o `atria-caddy` com certificado Let's Encrypt automático (`ACME_EMAIL` obrigatório) |
+| `traefik` | já existe um Traefik com provider Docker | o serviço `atria` publica labels; ajuste `ATRIA_TRAEFIK_ENTRYPOINT` / `ATRIA_TRAEFIK_CERTRESOLVER` se os nomes forem outros |
+| `none` | você já tem nginx, Apache, Cloudflare Tunnel… | publica `127.0.0.1:${ATRIA_HTTP_PORT:-8080}`; aponte seu proxy para lá |
 
 No modo `none`, o proxy precisa passar **SSE** (eventos ao vivo) e **WebSocket** (terminal, navegador, VS Code)
 sem buffer. Exemplo nginx em [docs/instalacao.md](docs/instalacao.md#outro-proxy-nginx).
 
 ```bash
-YUI_PROXY=none YUI_HTTP_PORT=8080 sudo -E ./install.sh
+ATRIA_PROXY=none ATRIA_HTTP_PORT=8080 sudo -E ./install.sh
 ```
 
 ## O que sobe
 
 | Serviço | Função | Memória (limite) | Volume |
 |---|---|---|---|
-| `yui-console` | painel, API, Yui (cérebro + voz), fila de agentes Claude Code, terminal | 2 GB | `yui-data`, `yui-workspace` |
-| `yui-browser` | Chromium dos agentes (Playwright MCP) + transmissão ao vivo | 1 GB | `yui-browser-profile` |
-| `yui-code` | VS Code (openvscode-server) para Vault e projetos, atrás do login do painel | 1,5 GB | `yui-workspace` |
-| `yui-postgres` | base da Empresa (documentos, trechos, campos) | 512 MB | `yui-pg` |
-| `yui-qdrant` | vetores da busca semântica da Empresa | 768 MB | `yui-qdrant` |
-| `yui-docling` | leitura/OCR de PDFs e imagens | 3 GB | — |
-| `yui-dockerproxy` | leitura de containers e logs (sem escrita) para a tela Infra | 64 MB | socket do Docker (ro) |
-| `yui-caddy` | HTTPS automático (só no modo `caddy`) | 128 MB | `yui-caddy-data`, `yui-caddy-config` |
+| `atria` | painel, API, Yui (cérebro + voz), fila de agentes Claude Code, terminal | 2 GB | `data`, `workspace` |
+| `atria-browser` | Chromium dos agentes (Playwright MCP) + transmissão ao vivo | 1 GB | `browser-profile` |
+| `atria-code` | VS Code (openvscode-server) para Vault e projetos, atrás do login do painel | 1,5 GB | `workspace` |
+| `atria-postgres` | base da Empresa (documentos, trechos, campos) | 512 MB | `pg` |
+| `atria-qdrant` | vetores da busca semântica da Empresa | 768 MB | `qdrant` |
+| `atria-docling` | leitura/OCR de PDFs e imagens | 3 GB | — |
+| `atria-dockerproxy` | leitura de containers e logs (sem escrita) para a tela Infra | 64 MB | socket do Docker (ro) |
+| `atria-caddy` | HTTPS automático (só no modo `caddy`) | 128 MB | `caddy-data`, `caddy-config` |
 
-Os volumes guardam tudo que é seu: `yui-data` (banco SQLite, logins Claude/GitHub, configurações, chaves
-de push), `yui-workspace` (projetos clonados, Vault, workflows, agentes). As imagens são construídas na
+Os volumes guardam tudo que é seu: `data` (banco SQLite, logins Claude/GitHub, configurações, chaves
+de push), `workspace` (projetos clonados, Vault, workflows, agentes). As imagens são construídas na
 própria VPS a partir deste repositório; as imagens de terceiros são multi-arquitetura e fixadas por digest.
 
 ## Configuração (.env)
@@ -140,21 +140,21 @@ editável em **Configurações** no painel, que tem prioridade sobre o `.env`.
 
 | Variável | Para quê |
 |---|---|
-| `YUI_DOMAIN` | domínio do painel |
+| `ATRIA_DOMAIN` | domínio do painel |
 | `ACME_EMAIL` | e-mail do certificado HTTPS (modo caddy) |
-| `SESSION_SECRET`, `YUI_PG_PASSWORD`, `YUI_QDRANT_KEY` | segredos gerados pelo instalador — não troque depois de instalado |
+| `SESSION_SECRET`, `ATRIA_PG_PASSWORD`, `ATRIA_QDRANT_KEY` | segredos gerados pelo instalador — não troque depois de instalado |
 | `TZ` | fuso horário (hora da Yui, cron, lembretes) |
-| `YUI_PROXY`, `YUI_HTTP_PORT`, `YUI_BIND` | modo de proxy e porta do modo `none` |
-| `OPENAI_API_KEY`, `YUI_LIVE_MODEL`, `YUI_BRAIN_MODEL`, `YUI_PLANNER_MODEL`, `YUI_VOICE` | voz e cérebro |
-| `CLAUDE_CODE_OAUTH_TOKEN`, `YUI_CLAUDE_MODEL`, `YUI_MAX_CONCURRENT_RUNS` | alternativa ao login pelo painel; modelo e paralelismo dos agentes |
-| `YUI_USER_NAME`, `YUI_USER_EMAIL`, `YUI_USER_CITY` | dados do dono (também no painel) |
-| `YUI_PROJECT` | nome do projeto Docker; mude só para uma segunda instalação isolada na mesma VPS |
+| `ATRIA_PROXY`, `ATRIA_HTTP_PORT`, `ATRIA_BIND` | modo de proxy e porta do modo `none` |
+| `OPENAI_API_KEY`, `ATRIA_LIVE_MODEL`, `ATRIA_BRAIN_MODEL`, `ATRIA_PLANNER_MODEL`, `ATRIA_VOICE` | voz e cérebro |
+| `CLAUDE_CODE_OAUTH_TOKEN`, `ATRIA_CLAUDE_MODEL`, `ATRIA_MAX_CONCURRENT_RUNS` | alternativa ao login pelo painel; modelo e paralelismo dos agentes |
+| `ATRIA_USER_NAME`, `ATRIA_USER_EMAIL`, `ATRIA_USER_CITY` | dados do dono (também no painel) |
+| `ATRIA_PROJECT` | nome do projeto Docker; mude só para uma segunda instalação isolada na mesma VPS |
 
 ## Atualizar, backup e desinstalar
 
 ```bash
 sudo ./install.sh --update   # git pull + rebuild, esperando execuções em andamento terminarem
-sudo ./install.sh --backup   # ./backups/yui-AAAAMMDD-HHMM.tgz (+ -empresa.pgdump e cópia do .env)
+sudo ./install.sh --backup   # ./backups/atria-AAAAMMDD-HHMM.tgz (+ -empresa.pgdump e cópia do .env)
 ```
 
 O backup leva banco, logins, configurações, projetos, Vault e vetores da Empresa; o Postgres vai num
@@ -179,7 +179,7 @@ server/          API Fastify + Yui (TypeScript rodando direto no Node 24)
 web/             painel React + Vite (PWA)
 shared/          tipos e protocolo comuns
 browser/         entrypoint do Chromium + proxy CDP
-code/            imagem do VS Code com a extensão yui-bridge
+code/            imagem do VS Code com a extensão atria-bridge
 workspace-seed/  Vault, workflows e ferramentas iniciais copiados no primeiro boot
 docs/            instalação, auditorias e guias da Ajuda (docs/ajuda, servidos no painel)
 e2e/             testes Playwright (desktop e 6 aparelhos móveis)
@@ -189,11 +189,11 @@ e2e/             testes Playwright (desktop e 6 aparelhos móveis)
 cd server && npm ci && npm run typecheck && node --test test/*.test.ts
 cd web && npm ci && npm run lint && npm run build
 # cérebro (gasta tokens OpenAI; as ferramentas não executam):
-cd server && YUI_DATA_DIR=$(mktemp -d) YUI_WORKSPACE_DIR=$(mktemp -d) OPENAI_API_KEY=sk-... npx tsx scripts/eval-brain.ts [filtro]
+cd server && ATRIA_DATA_DIR=$(mktemp -d) ATRIA_WORKSPACE_DIR=$(mktemp -d) OPENAI_API_KEY=sk-... npx tsx scripts/eval-brain.ts [filtro]
 ```
 
 Deploy na VPS de produção: `./scripts-deploy.sh` (espera execuções terminarem, rebuild, sobe e roda o e2e —
-precisa de `YUI_E2E_PASSWORD`; `--no-e2e` pula). O **CI** (GitHub Actions) roda em todo push: gitleaks,
+precisa de `ATRIA_E2E_PASSWORD`; `--no-e2e` pula). O **CI** (GitHub Actions) roda em todo push: gitleaks,
 tipos e testes do servidor, lint e build do painel, `docker compose config` nos três modos e build das duas imagens.
 
 Mapa dos módulos, fluxo de um pedido e onde ficam os dados: [docs/arquitetura.md](docs/arquitetura.md).
@@ -203,12 +203,12 @@ Ao mudar uma tela, atualize o guia correspondente em `docs/ajuda/guias/`.
 ## Problemas comuns
 
 - **Certificado não sai** — confira o DNS (`getent hosts <domínio>`) e as portas 80/443 livres (`ss -ltn`).
-  Logs: `docker compose logs yui-caddy`.
-- **"algo já usa a porta 443"** — já existe um proxy na VPS: use `YUI_PROXY=traefik` (se for Traefik) ou `YUI_PROXY=none`.
-- **Painel não fica saudável** — `docker compose logs -f yui-console`.
+  Logs: `docker compose logs atria-caddy`.
+- **"algo já usa a porta 443"** — já existe um proxy na VPS: use `ATRIA_PROXY=traefik` (se for Traefik) ou `ATRIA_PROXY=none`.
+- **Painel não fica saudável** — `docker compose logs -f atria`.
 - **Agentes não rodam** — Configurações › Sistema mostra o estado do Claude; reconecte a conta.
 - **Sem voz** — a chave OpenAI precisa de acesso ao modelo de voz (Configurações › Conexões › Testar chave).
 - **Yui sem clima** — preencha a cidade em Configurações › Conta.
-- **Documentos da Empresa demoram** — o `yui-docling` leva ~40 s para subir e usa até 3 GB; com pouca RAM, ele é o primeiro a sofrer.
+- **Documentos da Empresa demoram** — o `atria-docling` leva ~40 s para subir e usa até 3 GB; com pouca RAM, ele é o primeiro a sofrer.
 
 Referência completa: [docs/instalacao.md](docs/instalacao.md).

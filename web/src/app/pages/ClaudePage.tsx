@@ -252,7 +252,7 @@ function SessionsTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {list.map((s) => {
-        const m = /^yui-(claude|shell)-(.+)$/.exec(s.name)
+        const m = /^atria-(claude|shell)-(.+)$/.exec(s.name)
         const kind = (m?.[1] ?? 'shell') as 'claude' | 'shell'
         const slug = m?.[2] === 'workspace' ? null : m?.[2] ?? null
         return (

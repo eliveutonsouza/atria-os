@@ -5,7 +5,7 @@ import { config } from './config.ts';
 import { db, kvSet, now } from './db.ts';
 import { setRaw } from './settings.ts';
 
-const COOKIE = 'yui_sid';
+const COOKIE = 'atria_sid';
 const TTL_DAYS = 30;
 
 function validSession(token: string | undefined): boolean {
@@ -16,7 +16,7 @@ function validSession(token: string | undefined): boolean {
 
 // Para upgrades crus (WebSocket fora do roteamento do Fastify).
 export function isAuthedCookieHeader(header: string | undefined): boolean {
-  const m = (header ?? '').match(/(?:^|;\s*)yui_sid=([^;]+)/);
+  const m = (header ?? '').match(/(?:^|;\s*)atria_sid=([^;]+)/);
   return validSession(m ? decodeURIComponent(m[1]) : undefined);
 }
 

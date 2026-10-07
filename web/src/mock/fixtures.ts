@@ -1,4 +1,4 @@
-// Dados do design (Yui Console.dc.html) para validar paridade visual sem backend (VITE_MOCK=1).
+// Dados do design (Atria OS.dc.html) para validar paridade visual sem backend (VITE_MOCK=1).
 import { greeting } from '../lib/format'
 import type {
   AgentInfo, ArtifactInfo, Bootstrap, Brief, InfraPayload, LogsPayload, Overview, ProjectDetail, ReportPayload, RunInfo,
@@ -145,7 +145,7 @@ export const report: ReportPayload = {
 export const infra: InfraPayload = {
   cpu: 32, ram: 54, disk: 41, load: [1.21, 1.05, 0.98],
   containers: [
-    { name: 'yui-console', state: 'running', health: 'healthy', tone: 'ok' },
+    { name: 'atria', state: 'running', health: 'healthy', tone: 'ok' },
     { name: 'traefik', state: 'running', health: null, tone: 'ok' },
     { name: 'autocomissao-api', state: 'restarting', health: 'unhealthy', tone: 'warn' },
     { name: 'stoqmate-web', state: 'running', health: 'healthy', tone: 'ok' },

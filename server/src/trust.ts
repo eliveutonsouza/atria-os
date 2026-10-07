@@ -24,7 +24,7 @@ export function trustDirs(dirs: string[]): void {
     }
   }
   if (!changed) return;
-  const tmp = `${file}.yui-tmp`;
+  const tmp = `${file}.atria-tmp`;
   writeFileSync(tmp, `${JSON.stringify(cfg, null, 2)}\n`, { mode: 0o600 });
   renameSync(tmp, file);
 }

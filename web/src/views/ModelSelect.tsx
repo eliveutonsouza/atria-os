@@ -16,7 +16,7 @@ export function ModelSelect({ value, onChange, options, placeholderDefault, allo
   value: string
   onChange: (v: string) => void
   options: ModelOption[]
-  /** rótulo da opção vazia (ex.: "Padrão do console — Claude Opus 5.5"); sem ele não há opção vazia */
+  /** rótulo da opção vazia (ex.: "Padrão do Atria OS — Claude Opus 5.5"); sem ele não há opção vazia */
   placeholderDefault?: string
   allowCustom?: boolean
   ariaLabel: string

@@ -3,7 +3,7 @@ titulo: Usar pelo celular
 grupo: Começar
 pagina: nenhuma
 ordem: 2
-resumo: Instale o Yui Console como app no celular para receber avisos de aprovação, falhas e entregas e decidir na hora.
+resumo: Instale o Atria OS como app no celular para receber avisos de aprovação, falhas e entregas e decidir na hora.
 usar_quando: Quando você está longe do computador e quer acompanhar os agentes, aprovar um deploy ou pedir algo rápido.
 nao_usar_quando: Para editar notas longas, desenhar workflows ou usar o VS Code do vault; isso funciona melhor no computador.
 frases:
@@ -13,7 +13,7 @@ frases:
 dicas:
   - No Android, use Configurações › Notificações › Instalar app. No iPhone, abra no Safari e use Compartilhar › Adicionar à Tela de Início; só assim o iPhone recebe notificações.
   - Depois de instalar, toque em Ativar notificações e em Enviar teste para confirmar que chega.
-  - As notificações só são enviadas quando nenhuma tela do console está aberta e ativa; se você está olhando o painel, o aviso aparece nele.
+  - As notificações só são enviadas quando nenhuma tela do Atria OS está aberta e ativa; se você está olhando o painel, o aviso aparece nele.
 erros:
   - Ativar notificações no navegador do iPhone sem instalar o app. Não funciona; instale primeiro.
   - Esperar notificação com o painel aberto no computador. Feche ou deixe o computador de lado e ela passa a chegar no celular.
@@ -22,10 +22,10 @@ relacionados: [aprovacoes, configuracoes, falar-com-a-yui]
 # Usar pelo celular
 
 ## O que é
-O Yui Console é um app instalável (PWA). No celular ele mostra versões compactas das telas e envia notificações push quando algo precisa de você: aprovação necessária, agente que não conseguiu concluir, entrega pronta, missão ou workflow terminado.
+O Atria OS é um app instalável (PWA). No celular ele mostra versões compactas das telas e envia notificações push quando algo precisa de você: aprovação necessária, agente que não conseguiu concluir, entrega pronta, missão ou workflow terminado.
 
 ## Passo a passo
-1. **Abra o endereço do console no celular** e entre com a sua senha.
+1. **Abra o endereço do Atria OS no celular** e entre com a sua senha.
 2. **Instale o app.** Configurações › Notificações › **Instalar app** (ou ⌘K › "Instalar app (celular/desktop)"). No iPhone: Safari › Compartilhar › Adicionar à Tela de Início.
 3. **Ative os avisos.** Na mesma seção, toque em **Ativar notificações** e depois em **Enviar teste**.
 4. **Responda pelos avisos.** Tocar numa notificação de aprovação abre a tela Aprovações; tocar numa de execução abre o detalhe dela.

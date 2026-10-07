@@ -14,12 +14,12 @@ frases:
 dicas:
   - Os projetos vêm do GitHub sozinhos; repositórios ainda não clonados são clonados quando você abre ou delega algo. Para clonar na hora ou trazer um repositório de fora do seu GitHub, use "+ Adicionar projeto".
   - "Todos do GitHub" mostra também os não clonados; "Só clonados" volta ao que está na VPS.
-  - "Configuração do projeto" (no fim da tela do projeto) edita o yui.json: URL de saúde, container dos logs, pasta de preview e comandos que pedem aprovação.
-  - "Remover do console" apaga só a pasta local na VPS. O repositório no GitHub não muda.
+  - "Configuração do projeto" (no fim da tela do projeto) edita o atria.json: URL de saúde, container dos logs, pasta de preview e comandos que pedem aprovação.
+  - "Remover do Atria OS" apaga só a pasta local na VPS. O repositório no GitHub não muda.
 erros:
   - Lista vazia. Conecte o GitHub em Configurações › Conexões; o catálogo aparece em alguns minutos.
   - "Não consegui remover". Há execução ativa no projeto: cancele em Execuções e tente de novo.
-  - Remover e o projeto voltar. Abrir o projeto ou delegar algo nele clona de novo; repositórios com push recente também são clonados quando o console reinicia.
+  - Remover e o projeto voltar. Abrir o projeto ou delegar algo nele clona de novo; repositórios com push recente também são clonados quando o Atria OS reinicia.
   - "Não consegui clonar" pela URL. Só https, sem usuário/senha na URL; repositório privado fora do GitHub não funciona.
 relacionados: [infra, terminal, claude-code, missoes]
 ---
@@ -36,13 +36,13 @@ Cada projeto é um repositório seu no GitHub, guardado em /workspace/<nome> qua
 5. **Troque o projeto ativo por voz.** "Agora no Stoqmate" faz os próximos pedidos irem para ele.
 6. **Adicione um projeto.** **+ Adicionar projeto** abre o formulário: em **Do GitHub** escolha um repositório do catálogo ainda não clonado; em **URL git** cole um endereço https (e, se quiser, o nome da pasta). **Clonar e adicionar** clona em /workspace/<pasta> e abre o projeto.
 7. **Configure.** Em **Configuração do projeto**, clique em **Editar** (ou **Configurar** no topo), preencha URL de saúde, container dos logs, pasta de preview e um comando por linha em "Comandos que pedem aprovação", e **Salvar configuração**.
-8. **Remova.** **Remover do console** pede confirmação e apaga a pasta local do clone, inclusive alterações não enviadas. O GitHub não é afetado.
+8. **Remova.** **Remover do Atria OS** pede confirmação e apaga a pasta local do clone, inclusive alterações não enviadas. O GitHub não é afetado.
 
 ## O que você vê na tela
 - Ponto colorido e porcentagem de saúde (ou "clonado"/"no GitHub" quando não há medição).
 - Linguagem e quando foi o último push.
 - Atividade recente: execuções e eventos do projeto.
-- Configuração do projeto: o que está no yui.json, com Editar e Remover do console.
+- Configuração do projeto: o que está no atria.json, com Editar e Remover do Atria OS.
 
 ## Exemplos do dia a dia
 - Cliente diz que o site caiu → abra o projeto, veja a saúde, clique em Logs.

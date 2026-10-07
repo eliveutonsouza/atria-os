@@ -6,12 +6,12 @@ import { join } from 'node:path';
 
 // Demitir agente: onde ele é usado, reatribuição ao substituto e o seed que não o traz de volta.
 // Banco e workspace temporários: o env precisa estar pronto antes de importar os módulos.
-const root = mkdtempSync(join(tmpdir(), 'yui-agdel-'));
-process.env.YUI_DATA_DIR = join(root, 'data');
-process.env.YUI_WORKSPACE_DIR = join(root, 'ws');
-process.env.YUI_SEED_DIR = join(root, 'seed');
-mkdirSync(process.env.YUI_DATA_DIR, { recursive: true });
-const seedAgents = join(process.env.YUI_SEED_DIR, '.claude', 'agents');
+const root = mkdtempSync(join(tmpdir(), 'atria-agdel-'));
+process.env.ATRIA_DATA_DIR = join(root, 'data');
+process.env.ATRIA_WORKSPACE_DIR = join(root, 'ws');
+process.env.ATRIA_SEED_DIR = join(root, 'seed');
+mkdirSync(process.env.ATRIA_DATA_DIR, { recursive: true });
+const seedAgents = join(process.env.ATRIA_SEED_DIR, '.claude', 'agents');
 mkdirSync(seedAgents, { recursive: true });
 const realSeed = new URL('../../workspace-seed/.claude/agents/', import.meta.url).pathname;
 for (const f of ['frontend.md', 'designer.md', 'backend.md']) copyFileSync(join(realSeed, f), join(seedAgents, f));
@@ -28,7 +28,7 @@ const { brainExtensions } = await import('../src/extensions.ts');
 const fakeApp = new Proxy({}, { get: () => () => fakeApp });
 admin.register(fakeApp as never);
 
-const agentFile = (id: string) => join(process.env.YUI_WORKSPACE_DIR!, '.claude', 'agents', `${id}.md`);
+const agentFile = (id: string) => join(process.env.ATRIA_WORKSPACE_DIR!, '.claude', 'agents', `${id}.md`);
 const callTool = (name: string, args: Record<string, unknown>) => {
   for (const e of brainExtensions()) {
     const r = e.run(name, args, { dryRun: false });
@@ -102,7 +102,7 @@ test('demitir com substituto reatribui tudo, apaga o arquivo e o seed não volta
   assert.equal(m.steps[1].agentId, 'designer');
   assert.equal(ms.getMission('m2')!.steps[0].agentId, 'frontend');
   assert.deepEqual(admin.agentUsage('frontend'), []);
-  const hist = readdirSync(join(process.env.YUI_WORKSPACE_DIR!, '.yui', 'agents-history'));
+  const hist = readdirSync(join(process.env.ATRIA_WORKSPACE_DIR!, '.atria', 'agents-history'));
   assert.ok(hist.some((f) => f.startsWith('frontend-demitido-')));
 
   admin.seedMissingAgents();

@@ -26,7 +26,7 @@ const roundTrip = (md: string) => {
   return a;
 };
 
-const seedDir = new URL('../../workspace-seed/.yui/workflows/', import.meta.url).pathname;
+const seedDir = new URL('../../workspace-seed/.atria/workflows/', import.meta.url).pathname;
 for (const f of readdirSync(seedDir).filter((f) => f.endsWith('.md'))) {
   test(`seed ${f}: válido e round-trip`, () => {
     const def = roundTrip(readFileSync(join(seedDir, f), 'utf8'));

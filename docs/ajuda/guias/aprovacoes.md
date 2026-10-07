@@ -24,10 +24,10 @@ relacionados: [celular, execucoes, missoes, workflows]
 # Aprovações
 
 ## O que é
-Por padrão tudo roda no automático: agentes fazem push, deploy, docker, enviam e publicam sem perguntar. O console só para em quatro casos:
+Por padrão tudo roda no automático: agentes fazem push, deploy, docker, enviam e publicam sem perguntar. O Atria OS só para em quatro casos:
 - **Passo de Aprovação de workflow** marcado "Sempre me perguntar", ou em que a Yui não teve certeza. Nos demais, ela decide sozinha com base nas suas decisões anteriores naquele workflow.
 - **Etapa de missão** em que você pediu aprovação no pedido.
-- **Padrões do projeto** em yui.json › approvalPatterns.
+- **Padrões do projeto** em atria.json › approvalPatterns.
 - **Exclusão de workflow ou missão** pedida à Yui (cartão vermelho).
 
 Algumas ações nunca rodam, nem com aprovação: apagar a raiz, o home, o workspace ou /data inteiros, formatar disco, DROP DATABASE, prune do Docker, mexer nos stacks de produção protegidos (Twenty qcjv, Twenty jonyxmidia, n8n wesu) e force push na main/master. O agente é avisado e segue sem elas.
@@ -48,4 +48,4 @@ Algumas ações nunca rodam, nem com aprovação: apagar a raiz, o home, o works
 - Workflow do Instagram chegou na revisão e a Yui não teve certeza → leia legenda e imagem e aprove; da próxima vez ela decide sozinha.
 - "Cria uma missão para o site e me pede OK antes do deploy" → só a etapa de deploy para aqui.
 - Você pediu "exclui o workflow teste" → cartão vermelho; Excluir definitivamente apaga.
-- Para pedidos extras de um projeto (ex.: "npm run deploy"), o projeto pode listar padrões em yui.json › approvalPatterns.
+- Para pedidos extras de um projeto (ex.: "npm run deploy"), o projeto pode listar padrões em atria.json › approvalPatterns.

@@ -17,7 +17,7 @@ import { narrate } from './live.ts';
 // Agentes navegáveis e configuráveis: skills, MCP (allowlist), plugins, modelo e turnos por agente,
 // gravados no frontmatter de /workspace/.claude/agents/<id>.md (o mesmo arquivo que o Claude Code lê).
 
-const historyDir = () => join(config.workspaceDir, '.yui', 'agents-history');
+const historyDir = () => join(config.metaDir, 'agents-history');
 
 export function toConfig(a: AgentDef): AgentConfig {
   return {
@@ -129,7 +129,7 @@ export function seedMissingAgents() {
 
 // ---------- demitir (excluir de vez) ----------
 
-const toolboxFile = () => join(config.workspaceDir, '.yui', 'toolbox.json');
+const toolboxFile = () => join(config.metaDir, 'toolbox.json');
 type ToolboxRow = Omit<ToolboxItem, 'status'>;
 function readToolbox(): ToolboxRow[] {
   try {

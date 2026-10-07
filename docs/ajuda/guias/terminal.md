@@ -3,7 +3,7 @@ titulo: Terminal
 grupo: Ferramentas
 pagina: terminal
 ordem: 2
-resumo: Um terminal dentro do console, com o Claude Code interativo ou um shell, em sessões que continuam vivas quando você fecha a tela.
+resumo: Um terminal dentro do Atria OS, com o Claude Code interativo ou um shell, em sessões que continuam vivas quando você fecha a tela.
 usar_quando: Quando quer trabalhar lado a lado com o Claude num projeto, rodar um comando seu ou fazer logins (Claude, GitHub).
 nao_usar_quando: Para tarefas que podem rodar sozinhas, peça à Yui; o agente trabalha em segundo plano e o resultado aparece em Execuções.
 frases:
@@ -22,7 +22,7 @@ relacionados: [claude-code, projetos, infra]
 # Terminal
 
 ## O que é
-O terminal roda dentro do container do console. A aba **Claude** abre o Claude Code interativo no projeto escolhido (ou no workspace); a aba **Shell** abre um bash. As sessões ficam guardadas no servidor (tmux).
+O terminal roda dentro do container do Atria OS. A aba **Claude** abre o Claude Code interativo no projeto escolhido (ou no workspace); a aba **Shell** abre um bash. As sessões ficam guardadas no servidor (tmux).
 
 ## Passo a passo
 1. **Abra.** Pelo menu (Ferramentas › Terminal), por Ctrl/⌘ `, ou por **Claude no projeto**/**Terminal** em Projetos.

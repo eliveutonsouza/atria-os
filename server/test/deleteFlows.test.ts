@@ -6,12 +6,12 @@ import { join } from 'node:path';
 
 // Exclusão de workflows/missões: limpeza no banco e aprovação destrutiva da Yui.
 // Banco e workspace temporários: o env precisa estar pronto antes de importar os módulos.
-const root = mkdtempSync(join(tmpdir(), 'yui-del-'));
-process.env.YUI_DATA_DIR = join(root, 'data');
-process.env.YUI_WORKSPACE_DIR = join(root, 'ws');
-process.env.YUI_SEED_DIR = join(root, 'seed');
-mkdirSync(process.env.YUI_DATA_DIR, { recursive: true });
-const wfDir = join(process.env.YUI_WORKSPACE_DIR, '.yui', 'workflows');
+const root = mkdtempSync(join(tmpdir(), 'atria-del-'));
+process.env.ATRIA_DATA_DIR = join(root, 'data');
+process.env.ATRIA_WORKSPACE_DIR = join(root, 'ws');
+process.env.ATRIA_SEED_DIR = join(root, 'seed');
+mkdirSync(process.env.ATRIA_DATA_DIR, { recursive: true });
+const wfDir = join(process.env.ATRIA_WORKSPACE_DIR, '.atria', 'workflows');
 mkdirSync(wfDir, { recursive: true });
 
 const { db, now } = await import('../src/db.ts');
@@ -24,7 +24,7 @@ const { brainExtensions } = await import('../src/extensions.ts');
 const fakeApp = new Proxy({}, { get: () => () => fakeApp });
 wf.register(fakeApp as never);
 
-const seed = new URL('../../workspace-seed/.yui/workflows/post-instagram.md', import.meta.url).pathname;
+const seed = new URL('../../workspace-seed/.atria/workflows/post-instagram.md', import.meta.url).pathname;
 const callTool = (name: string, args: Record<string, unknown>) => {
   for (const e of brainExtensions()) {
     const r = e.run(name, args, { dryRun: false });

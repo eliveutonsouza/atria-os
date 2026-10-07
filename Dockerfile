@@ -19,15 +19,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ca-certific
   && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
   && apt-get update && apt-get install -y --no-install-recommends gh \
   && rm -rf /var/lib/apt/lists/*
-# versão (git rev-parse --short HEAD) passada pelo install.sh/scripts-deploy.sh; vai na telemetria do Yui Monitor
-ARG YUI_VERSION=dev
-ENV YUI_VERSION=$YUI_VERSION
+# versão (git rev-parse --short HEAD) passada pelo install.sh/scripts-deploy.sh; vai na telemetria do Atria Central
+ARG ATRIA_VERSION=dev
+ENV ATRIA_VERSION=$ATRIA_VERSION
 ENV NODE_ENV=production \
     HOME=/data/home \
-    YUI_DATA_DIR=/data \
-    YUI_WORKSPACE_DIR=/workspace \
-    YUI_SEED_DIR=/app/workspace-seed \
-    YUI_WEB_DIST=/app/web/dist \
+    ATRIA_DATA_DIR=/data \
+    ATRIA_WORKSPACE_DIR=/workspace \
+    ATRIA_SEED_DIR=/app/workspace-seed \
+    ATRIA_WEB_DIST=/app/web/dist \
     PORT=8080
 WORKDIR /app
 COPY --from=deps /app/server/node_modules ./server/node_modules

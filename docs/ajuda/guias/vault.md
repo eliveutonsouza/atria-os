@@ -3,7 +3,7 @@ titulo: Vault
 grupo: Conhecimento
 pagina: vault
 ordem: 2
-resumo: A memória de longo prazo do console em notas no formato Obsidian, onde ficam decisões, lições, relatórios de execução e o diário.
+resumo: A memória de longo prazo do Atria OS em notas no formato Obsidian, onde ficam decisões, lições, relatórios de execução e o diário.
 usar_quando: Para guardar e achar decisões, ideias, lições e o que foi feito em cada dia ou projeto.
 nao_usar_quando: Para contratos, tabelas e documentos oficiais que os agentes devem citar, use Empresa › Documentos.
 frases:
@@ -26,11 +26,11 @@ relacionados: [cerebro, empresa, execucoes]
 # Vault
 
 ## O que é
-Um vault de notas markdown em /workspace/.yui/vault, com pastas como 00-Inbox, 02-Decisoes, 03-Agentes, 04-Execucoes, 05-Projetos, 06-Ideias e Diario. O console escreve sozinho: cada execução que mexe em arquivos ou falha gera um relatório em 04-Execucoes, o dia ganha uma nota em Diario com a lista de execuções e um fechamento às 23h50, e cada projeto tem a sua nota. Os agentes registram lições em 03-Agentes e decisões (ADRs) em 02-Decisoes.
+Um vault de notas markdown em /workspace/.atria/vault, com pastas como 00-Inbox, 02-Decisoes, 03-Agentes, 04-Execucoes, 05-Projetos, 06-Ideias e Diario. O Atria OS escreve sozinho: cada execução que mexe em arquivos ou falha gera um relatório em 04-Execucoes, o dia ganha uma nota em Diario com a lista de execuções e um fechamento às 23h50, e cada projeto tem a sua nota. Os agentes registram lições em 03-Agentes e decisões (ADRs) em 02-Decisoes.
 
 ## Passo a passo
 1. **Ache a nota.** Use "Buscar notas…" na árvore de Arquivos.
-2. **Escolha o modo.** **Editor** (VS Code dentro do console), **Lado a lado** (editor e leitura) ou **Leitura**. **Abrir em aba ↗** abre o VS Code em tela cheia.
+2. **Escolha o modo.** **Editor** (VS Code dentro do Atria OS), **Lado a lado** (editor e leitura) ou **Leitura**. **Abrir em aba ↗** abre o VS Code em tela cheia.
 3. **Crie.** **+ Nova nota**: escolha a pasta, dê um título e clique em **Criar**. Ou peça à Yui "anota isso" (vai para 00-Inbox).
 4. **Navegue pelas ligações.** O painel Conexões mostra Backlinks (quem cita esta nota), Links (quem ela cita) e sugestões da Yui. **Constelação →** abre a nota no Cérebro.
 5. **Organize.** **Nova pasta** (ícone de pasta ao lado de Nova nota) cria uma pasta; use / para criar dentro de outra. No cabeçalho da nota aberta (no celular, no ⋯), **Renomear ou mover** muda o nome ou o caminho e **Excluir nota** manda para a lixeira. Para pastas, use o menu da árvore: **Renomear ou mover pasta** e **Excluir pasta** (leva tudo o que está dentro).

@@ -115,7 +115,7 @@ export function AgentDetailView({ onGone }: { onGone?: () => void } = {}) {
             value={draft.model ?? ''}
             onChange={(v) => set({ model: v.trim() || null })}
             options={models.data?.claude ?? []}
-            placeholderDefault={`Padrão do console — ${defaultLabel}`}
+            placeholderDefault={`Padrão do Atria OS — ${defaultLabel}`}
           />
           <span style={{ fontSize: 12, color: C.t3, overflowWrap: 'anywhere' }}>
             Padrão definido em Configurações › Modelos.{defaultId && <> Hoje: <span className="mono">{defaultId}</span>.</>}
@@ -270,7 +270,7 @@ export function FireAgentModal({ agent, onCancel, onDone }: { agent: { id: strin
       <div style={{ fontSize: 11, letterSpacing: '.2em', color: C.crit, fontWeight: 700 }}>AÇÃO DESTRUTIVA · NÃO DÁ PARA DESFAZER</div>
       <div id="fam-title" style={{ fontSize: 18, fontWeight: 700, overflowWrap: 'anywhere' }}>Demitir o agente {agent.name}?</div>
       <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: '#c9cde0' }}>
-        O arquivo do agente é apagado e ele não volta quando o console reinicia. As execuções antigas continuam no histórico.
+        O arquivo do agente é apagado e ele não volta quando o Atria OS reinicia. As execuções antigas continuam no histórico.
       </p>
       {!usage.data ? (
         <span style={{ fontSize: 13, color: C.t3 }}>{usage.error ? 'Não consegui ver onde ele é usado.' : 'Vendo onde ele é usado…'}</span>

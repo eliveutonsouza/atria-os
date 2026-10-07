@@ -1,4 +1,4 @@
-// Port literal do particle engine do design (Yui Console.dc.html: makeParts/initAnim/target/frame).
+// Port literal do particle engine do design (Atria OS.dc.html: makeParts/initAnim/target/frame).
 import type { YuiState } from '@shared/protocol'
 import type { Mode } from '../store/yui'
 import { useYui } from '../store/yui'

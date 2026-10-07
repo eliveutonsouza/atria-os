@@ -108,7 +108,7 @@ export function SetupSteps({ onGo }: { onGo: (tab: 'connections' | 'notification
     { done: st.openai, t: 'OpenAI conectada', d: 'Voz da Yui (GPT-Live) e o cérebro que decide o que fazer.', go: 'connections' as const },
     { done: st.github, t: 'GitHub conectado', d: 'Opcional: catálogo automático e clone dos seus repositórios.', go: 'connections' as const },
     { done: st.push > 0, t: 'App e notificações', d: 'Opcional: instale no celular/desktop e receba aprovações.', go: 'notifications' as const },
-    { done: !!st.monitor, t: 'Monitoramento (opcional)', d: 'Para quem administra várias Yuis: envia a saúde desta instância para o Yui Monitor.', go: 'system' as const },
+    { done: !!st.monitor, t: 'Monitoramento (opcional)', d: 'Para quem administra várias instalações do Atria OS: envia a saúde desta instância para o Atria Central.', go: 'system' as const },
   ]
   const n = steps.filter((s) => s.done).length
   return (
@@ -446,7 +446,7 @@ export function ModelsSection() {
         <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12.5, color: C.t2 }}>
           <li><span className="mono">in</span> / <span className="mono">out</span>: entrada e saída de texto · <span className="mono">cachedIn</span>: entrada em cache</li>
           <li><span className="mono">audioIn</span> / <span className="mono">audioOut</span>: áudio da voz · <span className="mono">perMinute</span>: voz cobrada por minuto de sessão (US$/min)</li>
-          <li>Vazio = tabela padrão do console. O que você colocar aqui vence a tabela.</li>
+          <li>Vazio = tabela padrão do Atria OS. O que você colocar aqui vence a tabela.</li>
         </ul>
         <textarea
           className="mono"
@@ -480,7 +480,7 @@ export function AgentsApprovalsSection() {
           <li>Bloqueado sempre (negado, sem perguntar): apagar raiz/workspace/dados inteiros, formatar disco, DROP DATABASE, prune do Docker, mexer nos stacks de produção protegidos e force push na main.</li>
           <li>Workflows: a Yui decide os passos de Aprovação com base nas suas decisões anteriores; marque “Sempre me perguntar” no passo para decidir você.</li>
           <li>Missões: só pedem OK nas etapas em que você pediu aprovação.</li>
-          <li>Por projeto: padrões em <span className="mono">yui.json → approvalPatterns</span> pedem aprovação.</li>
+          <li>Por projeto: padrões em <span className="mono">atria.json → approvalPatterns</span> pedem aprovação.</li>
         </ul>
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}>
           <input type="checkbox" checked={on} onChange={(e) => save({ 'approvals.mcpSensitive': e.target.checked })} />
@@ -540,7 +540,7 @@ export function NotificationsSection() {
             </div>
           ))
         )}
-        {devices.length > 0 && <span style={{ fontSize: 12, color: C.t3 }}>Removido aqui, o aparelho para de receber avisos. Para voltar, abra o console nele e ative de novo.</span>}
+        {devices.length > 0 && <span style={{ fontSize: 12, color: C.t3 }}>Removido aqui, o aparelho para de receber avisos. Para voltar, abra o Atria OS nele e ative de novo.</span>}
       </Section>
       {del && (
         <ConfirmDeleteModal
@@ -588,7 +588,7 @@ export function SystemSection() {
   )
   return (
     <>
-      <Section title="Saúde" hint="Cada peça que o Yui Console usa.">
+      <Section title="Saúde" hint="Cada peça que o Atria OS usa.">
         {!h ? (
           <span style={{ fontSize: 13, color: C.t3 }}>Verificando…</span>
         ) : (
@@ -618,15 +618,15 @@ export function SystemSection() {
           {h?.capabilitiesAt && <span style={{ fontSize: 12, color: C.t3 }}>lidas em {new Date(h.capabilitiesAt).toLocaleString('pt-BR')}</span>}
         </div>
       </Section>
-      <Section title="Atualizar e backup" hint="Na VPS, na pasta do Yui Console:">
+      <Section title="Atualizar e backup" hint="Na VPS, na pasta do Atria OS:">
         <div className="mono" style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(0,0,0,.4)', fontSize: 12.5, lineHeight: 1.8, color: '#c9cde0' }}>
           <div>./install.sh --update        <span style={{ color: C.t3 }}># puxa a versão nova, espera execuções e reinicia</span></div>
           <div>./install.sh --backup        <span style={{ color: C.t3 }}># copia banco, workspace e logins para ./backups</span></div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <Chip>sessões: 30 dias</Chip>
-          <Chip>dados: volume yui-data</Chip>
-          <Chip>projetos: volume yui-workspace</Chip>
+          <Chip>dados: volume data</Chip>
+          <Chip>projetos: volume workspace</Chip>
         </div>
       </Section>
     </>

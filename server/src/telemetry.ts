@@ -3,7 +3,7 @@ import { statfsSync } from 'node:fs';
 import { hostname } from 'node:os';
 import type { FastifyInstance } from 'fastify';
 import type { TelemetryEvent, TelemetrySnapshot } from '../../shared/telemetry.ts';
-import { config } from './config.ts';
+import { config, readEnv } from './config.ts';
 import { db, kvGet, kvSet, now } from './db.ts';
 import { onEmit } from './bus.ts';
 import { findAgent } from './agents.ts';
@@ -14,11 +14,11 @@ import { usageReport } from './usage.ts';
 import { healthFull } from './health.ts';
 import { getSetting, onSettingsChange, rawGet, validMonitorUrl } from './settings.ts';
 
-// Telemetria para o Yui Monitor (painel do administrador de várias Yuis). Contrato em shared/telemetry.ts.
+// Telemetria para o Atria Central (painel do administrador de várias instalações do Atria OS). Contrato em shared/telemetry.ts.
 // Só métricas: nada de tarefa, instrução, resultado, mensagem ou documento sai daqui.
 // Dois caminhos com o mesmo JSON: o pulso (POST {monitor}/api/ingest a cada 30 s) e a URL de saúde (GET /api/telemetry).
 
-export const VERSION = process.env.YUI_VERSION || 'dev';
+export const VERSION = readEnv('ATRIA_VERSION') || 'dev';
 const STARTED_AT = new Date(Date.now() - Math.round(process.uptime() * 1000));
 
 function instanceId(): string {
@@ -115,7 +115,7 @@ onEmit((ev) => {
   const prev = kvGet('last_version');
   if (prev && prev !== VERSION) pushEvent({ kind: 'version_changed', level: 'info', text: `Versão ${prev} → ${VERSION}` });
   if (prev !== VERSION) kvSet('last_version', VERSION);
-  pushEvent({ kind: 'boot', level: 'info', text: `Yui iniciou · versão ${VERSION}` });
+  pushEvent({ kind: 'boot', level: 'info', text: `Atria OS iniciou · versão ${VERSION}` });
 }
 
 // ---------- containers ----------
@@ -123,7 +123,7 @@ onEmit((ev) => {
 interface RawContainer { Id: string; Names: string[]; State: string; Labels?: Record<string, string> }
 interface Inspect { RestartCount?: number; State?: { Status?: string; StartedAt?: string; Health?: { Status?: string } } }
 
-let ownProject: string | null | undefined; // projeto compose desta Yui (undefined = ainda não lido)
+let ownProject: string | null | undefined; // projeto compose desta instalação (undefined = ainda não lido)
 const lastSeen = new Map<string, { restarts: number | null; startedAt: string | null }>();
 
 async function containers(): Promise<TelemetrySnapshot['containers']> {
@@ -135,7 +135,7 @@ async function containers(): Promise<TelemetrySnapshot['containers']> {
       const me = await dget(`/containers/${encodeURIComponent(hostname())}/json`).catch(() => null);
       if (me?.ok) ownProject = ((await me.json()) as { Config?: { Labels?: Record<string, string> } }).Config?.Labels?.['com.docker.compose.project'] ?? null;
     }
-    // só os containers da stack desta Yui (outra coisa na VPS não é assunto do monitor)
+    // só os containers da stack desta instalação (outra coisa na VPS não é assunto do monitor)
     const mine = ownProject ? list.filter((c) => c.Labels?.['com.docker.compose.project'] === ownProject) : list;
     const out = await Promise.all(
       mine.map(async (c) => {
@@ -209,6 +209,7 @@ export async function collectTelemetry(opts: { events: 'since' | 'recent'; upto?
       domain: config.domain,
       name: String(getSetting('user.name') ?? '') || null,
       version: VERSION,
+      product: 'atria-os',
       startedAt: STARTED_AT.toISOString(),
       uptimeSec: Math.round(process.uptime()),
       hostUptimeSec: mem.uptimeSec,
@@ -270,8 +271,8 @@ export async function collectTelemetry(opts: { events: 'since' | 'recent'; upto?
 export function monitorConfig(): { enabled: boolean; url: string; key: string } {
   const url = String(getSetting('monitor.url') ?? '').trim();
   const key = String(getSetting('monitor.key') ?? '').trim();
-  // sem escolha explícita (painel ou YUI_MONITOR_ENABLED), endereço + chave no .env já ligam
-  const raw = rawGet('monitor.enabled') ?? process.env.YUI_MONITOR_ENABLED ?? '';
+  // sem escolha explícita (painel ou ATRIA_MONITOR_ENABLED), endereço + chave no .env já ligam
+  const raw = rawGet('monitor.enabled') ?? readEnv('ATRIA_MONITOR_ENABLED') ?? '';
   const enabled = raw === '' ? !!(url && key) : raw === 'true' || raw === '1';
   return { enabled, url, key };
 }

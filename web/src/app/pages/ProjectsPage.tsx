@@ -211,7 +211,7 @@ function AddProject({ repos, onClose, onAdded }: { repos: RepoInfo[]; onClose: (
           <Field label="Buscar no catálogo">
             <input style={input} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={`${repos.length} repositórios ainda não clonados…`} />
           </Field>
-          <Field label="Repositório" hint={repos.length ? undefined : 'Todos os repositórios do catálogo já estão no console. Use “URL git” para outro.'}>
+          <Field label="Repositório" hint={repos.length ? undefined : 'Todos os repositórios do catálogo já estão no Atria OS. Use “URL git” para outro.'}>
             <select style={{ ...input, height: phone ? 44 : 38 }} value={repo} onChange={(e) => setRepo(e.target.value)}>
               <option value="">Escolha…</option>
               {options.map((r) => (
@@ -222,7 +222,7 @@ function AddProject({ repos, onClose, onAdded }: { repos: RepoInfo[]; onClose: (
         </>
       ) : (
         <>
-          <Field label="URL do repositório" hint="Só https. Repositórios privados do GitHub usam o login do gh do console.">
+          <Field label="URL do repositório" hint="Só https. Repositórios privados do GitHub usam o login do gh do Atria OS.">
             <input style={input} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://github.com/dono/repo.git" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} />
           </Field>
           <Field label="Nome da pasta (opcional)" hint={`Fica em /workspace/${slug || guess || '<nome>'}`}>

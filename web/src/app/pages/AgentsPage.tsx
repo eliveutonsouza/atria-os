@@ -28,7 +28,7 @@ async function newAgent() {
     const a = await api.post<AgentConfig>('/api/agents', { name: 'Novo agente', description: 'Descreva a especialidade', group: 'Geral', prompt: 'Instruções de trabalho do agente.' })
     if (a) {
       openApp('agents', a.id)
-      setTimeout(() => window.dispatchEvent(new CustomEvent('yui-agent-tab', { detail: 'config' })), 50)
+      setTimeout(() => window.dispatchEvent(new CustomEvent('atria-agent-tab', { detail: 'config' })), 50)
     }
   } catch {
     useYui.getState().say('Não consegui criar o agente agora.', { state: 'warning' })
@@ -72,8 +72,8 @@ export function AgentsPage() {
   // "+ Novo agente" abre direto a configuração
   useEffect(() => {
     const h = (e: Event) => setTab((e as CustomEvent<Tab>).detail)
-    window.addEventListener('yui-agent-tab', h)
-    return () => window.removeEventListener('yui-agent-tab', h)
+    window.addEventListener('atria-agent-tab', h)
+    return () => window.removeEventListener('atria-agent-tab', h)
   }, [])
 
   const okBy = new Map((ov.data?.byAgent ?? []).map((a) => [a.agentId, a.success]))

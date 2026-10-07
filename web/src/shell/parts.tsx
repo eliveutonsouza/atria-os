@@ -125,7 +125,7 @@ export function TopBar() {
           style={{ display: 'flex', alignItems: 'center', gap: 10, height: coarse ? 44 : 36, padding: '0 12px 0 10px', borderRadius: 12, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.03)', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 600, letterSpacing: '.14em' }}
         >
           <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, #fff, #67d8f2 45%, #a68cf7)' }} />
-          <span>YUI</span>
+          <span>ATRIA OS</span>
           <span className="mono" style={{ fontSize: 11, letterSpacing: 0, color: C.t3, fontWeight: 400 }}>⌘K</span>
         </button>
         {!narrow && (
@@ -204,7 +204,7 @@ export function YuiCenter() {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, letterSpacing: '.32em', color: C.t2, fontWeight: 600 }}>
-        <span>YUI</span>
+        <span>ATRIA OS</span>
         <span style={{ width: 3, height: 3, borderRadius: '50%', background: C.t4 }} />
         <span style={{ color, letterSpacing: '.2em' }}>{label}</span>
       </div>
@@ -254,7 +254,7 @@ export function YuiLeft() {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, letterSpacing: '.3em', color: C.t2, fontWeight: 600 }}>
-        <span>YUI</span>
+        <span>ATRIA OS</span>
         <span style={{ width: 3, height: 3, borderRadius: '50%', background: C.t4 }} />
         <span style={{ color, letterSpacing: '.18em' }}>{label}</span>
       </div>

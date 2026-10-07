@@ -11,11 +11,11 @@ import { registerBrain, registerRunPrompt } from './extensions.ts';
 import { listProjectConfigs } from './projects.ts';
 import { basename, buildIndex, rings, shortestPath, suggest, type VaultIndex } from './vaultIndex.ts';
 
-// Vault Obsidian exclusivo do Yui Console: notas .md em /workspace/.yui/vault, links [[…]] indexados
+// Vault Obsidian exclusivo do Atria OS: notas .md em /workspace/.atria/vault, links [[…]] indexados
 // em memória (grafo do Cérebro), histórico em git local com commit automático.
 
 const exec = promisify(execFile);
-export const vaultRoot = () => join(config.workspaceDir, '.yui', 'vault');
+export const vaultRoot = () => join(config.metaDir, 'vault');
 const MAX_FILE = 2_000_000;
 const HIDDEN = new Set(['.git', '.trash']);
 const NOT_NOTES = new Set(['.obsidian', '_templates', '.git', '.trash']);
@@ -248,7 +248,7 @@ async function ensureGit() {
   if (existsSync(join(vaultRoot(), '.git'))) return;
   await git('init', '-q', '-b', 'main');
   await git('config', 'user.name', 'Yui');
-  await git('config', 'user.email', 'yui@yui-console.local');
+  await git('config', 'user.email', 'yui@atria-os.local');
   await git('config', 'core.quotepath', 'false');
   const gi = join(vaultRoot(), '.gitignore');
   if (!existsSync(gi)) writeFileSync(gi, '.trash/\n.obsidian/workspace*.json\n.obsidian/cache\n.DS_Store\n');
@@ -302,7 +302,7 @@ async function status(): Promise<VaultStatus> {
 // ---------- seed + workspace do VS Code ----------
 
 function seedVault() {
-  const src = join(config.seedDir, '.yui', 'vault');
+  const src = join(config.seedDir, '.atria', 'vault');
   mkdirSync(vaultRoot(), { recursive: true });
   if (!existsSync(src)) return;
   const seeded = new Set<string>(JSON.parse(kvGet('vault_seeded') ?? '[]'));
@@ -324,7 +324,7 @@ function seedVault() {
   if (n) console.log(`vault: ${n} arquivos semeados`);
 }
 
-export const codeWorkspaceFile = () => join(config.workspaceDir, '.yui', 'yui.code-workspace');
+export const codeWorkspaceFile = () => join(config.metaDir, 'atria.code-workspace');
 let lastWorkspaceJson = '';
 
 // Workspace multi-root do VS Code: vault primeiro, depois os projetos clonados.
@@ -332,7 +332,7 @@ export function writeCodeWorkspace() {
   const projects = listProjectConfigs()
     .filter((p) => p.cloned)
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
-    .map((p) => ({ name: p.name, path: relative(join(config.workspaceDir, '.yui'), p.dir) }));
+    .map((p) => ({ name: p.name, path: relative(config.metaDir, p.dir) }));
   const ws = {
     folders: [{ name: 'Vault', path: 'vault' }, ...projects],
     settings: {
@@ -502,20 +502,20 @@ export function register(app: FastifyInstance) {
     })(req, reply),
   );
   app.get('/api/vault/search', (req) => search((req.query as Q).q ?? ''));
-  // Ponte com o VS Code (extensão yui-bridge no yui-code): pedir para abrir e saber o que está aberto.
-  const bridge = (f: string) => join(config.workspaceDir, '.yui', f);
+  // Ponte com o VS Code (extensão atria-bridge no atria-code): pedir para abrir e saber o que está aberto.
+  const bridge = (f: string) => join(config.metaDir, f);
   app.post('/api/vault/open', (req, reply) =>
     wrap(() => {
       const b = (req.body ?? {}) as { path?: string; line?: number };
       const p = safePath(b.path, { mustExist: true });
-      writeFileSync(bridge('.editor-open.json'), JSON.stringify({ path: p.abs.replace(realpathSync(vaultRoot()), join(config.workspaceDir, '.yui', 'vault')), line: Number(b.line) || 0, at: Date.now() }));
+      writeFileSync(bridge('.editor-open.json'), JSON.stringify({ path: p.abs.replace(realpathSync(vaultRoot()), join(config.metaDir, 'vault')), line: Number(b.line) || 0, at: Date.now() }));
       return reply.code(204).send(undefined);
     })(req, reply),
   );
   app.get('/api/vault/editor-state', () => {
     try {
       const st = JSON.parse(readFileSync(bridge('.editor-state.json'), 'utf8')) as { path: string; at: number };
-      const prefix = join(config.workspaceDir, '.yui', 'vault') + '/';
+      const prefix = join(config.metaDir, 'vault') + '/';
       return { path: st.path.startsWith(prefix) ? st.path.slice(prefix.length) : null, abs: st.path, at: st.at };
     } catch {
       return { path: null, abs: null, at: 0 };
@@ -531,8 +531,8 @@ export function register(app: FastifyInstance) {
 
 registerRunPrompt(() =>
   [
-    '- Vault (memória de longo prazo do Yui Console, formato Obsidian): /workspace/.yui/vault. Notas .md com [[links]] por nome de arquivo e #tags.',
-    '  · Antes de decidir algo relevante, procure no vault (rg em /workspace/.yui/vault) se já existe decisão ou lição.',
+    '- Vault (memória de longo prazo do Atria OS, formato Obsidian): /workspace/.atria/vault. Notas .md com [[links]] por nome de arquivo e #tags.',
+    '  · Antes de decidir algo relevante, procure no vault (rg em /workspace/.atria/vault) se já existe decisão ou lição.',
     '  · Lição aprendida (erro que não deve se repetir, truque que funcionou): acrescente em 03-Agentes/<SeuNome>.md na seção "## Lições" uma linha "- AAAA-MM-DD: lição — [[nota relacionada]]".',
     '  · Decisão de arquitetura/produto: crie 02-Decisoes/ADR-NNN <título curto>.md a partir de _templates/ADR.md (próximo número livre) e ligue ao projeto com [[...]].',
     '  · Não apague nem reescreva notas de outros; acrescente. Use links para o projeto ([[<projeto>]]) e para o dia ([[AAAA-MM-DD]]).',

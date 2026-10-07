@@ -1,6 +1,6 @@
 // Bateria de avaliação do cérebro da Yui: pedidos reais em pt-BR → tool(s) esperada(s).
-// Roda think({dryRun:true}) — nenhuma tool executa de verdade. Use com YUI_DATA_DIR/YUI_WORKSPACE_DIR isolados.
-//   cd server && YUI_DATA_DIR=/tmp/x YUI_WORKSPACE_DIR=/tmp/ws OPENAI_API_KEY=... npx tsx scripts/eval-brain.ts [filtro]
+// Roda think({dryRun:true}) — nenhuma tool executa de verdade. Use com ATRIA_DATA_DIR/ATRIA_WORKSPACE_DIR isolados.
+//   cd server && ATRIA_DATA_DIR=/tmp/x ATRIA_WORKSPACE_DIR=/tmp/ws OPENAI_API_KEY=... npx tsx scripts/eval-brain.ts [filtro]
 import { think } from '../src/brain.ts';
 import * as missions from '../src/missions.ts';
 import * as customViews from '../src/customViews.ts';

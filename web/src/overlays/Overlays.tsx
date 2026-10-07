@@ -112,7 +112,7 @@ export function HistoryDrawer() {
       {confirm && (
         <ConfirmDeleteModal
           title="Limpar a conversa?"
-          text="Apaga todo o histórico de mensagens entre você e a Yui guardado no console. Execuções, missões e memórias não são afetadas."
+          text="Apaga todo o histórico de mensagens entre você e a Yui guardado no Atria OS. Execuções, missões e memórias não são afetadas."
           rows={[{ label: 'Mensagens nesta tela', value: String(hist.length) }]}
           busy={busy}
           onCancel={() => setConfirm(false)}
@@ -290,7 +290,7 @@ async function install() {
   const r = await promptInstall()
   if (r === 'ios') s.say('No iPhone: toque em Compartilhar e depois em “Adicionar à Tela de Início”.')
   else if (r === 'unavailable') s.say(isIOS() ? 'Abra no Safari para instalar.' : 'O navegador não ofereceu instalação agora — use o ícone de instalar na barra de endereço.')
-  else if (r === 'accepted') s.say('App instalado. Pode abrir a Yui pela tela inicial.')
+  else if (r === 'accepted') s.say('App instalado. Pode abrir o Atria OS pela tela inicial.')
 }
 
 export function UpdateToast() {
@@ -298,7 +298,7 @@ export function UpdateToast() {
   if (!ready) return null
   return (
     <div role="status" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: 'calc(96px + var(--sab) + var(--kb))', zIndex: 57, display: 'flex', alignItems: 'center', gap: 12, maxWidth: 'calc(100% - 32px)', padding: '10px 10px 10px 16px', borderRadius: 14, background: 'rgba(16,20,42,.94)', border: '1px solid rgba(103,216,242,.3)', backdropFilter: 'blur(16px)', boxShadow: '0 18px 50px rgba(0,0,0,.45)', fontSize: 13, color: C.text }}>
-      Nova versão da Yui disponível
+      Nova versão do Atria OS disponível
       <button onClick={applyUpdate} style={{ height: 30, padding: '0 12px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#67d8f2,#a68cf7)', color: '#0a0c1d', fontWeight: 700, cursor: 'pointer' }}>Atualizar</button>
     </div>
   )

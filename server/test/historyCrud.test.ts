@@ -6,12 +6,12 @@ import { join } from 'node:path';
 
 // Históricos (execuções, conversa, aprovações, inbox) e CRUD local de projetos.
 // Banco e workspace temporários: o env precisa estar pronto antes de importar os módulos.
-const root = mkdtempSync(join(tmpdir(), 'yui-hist-'));
-process.env.YUI_DATA_DIR = join(root, 'data');
-process.env.YUI_WORKSPACE_DIR = join(root, 'ws');
-process.env.YUI_SEED_DIR = join(root, 'seed');
-mkdirSync(process.env.YUI_DATA_DIR, { recursive: true });
-mkdirSync(process.env.YUI_WORKSPACE_DIR, { recursive: true });
+const root = mkdtempSync(join(tmpdir(), 'atria-hist-'));
+process.env.ATRIA_DATA_DIR = join(root, 'data');
+process.env.ATRIA_WORKSPACE_DIR = join(root, 'ws');
+process.env.ATRIA_SEED_DIR = join(root, 'seed');
+mkdirSync(process.env.ATRIA_DATA_DIR, { recursive: true });
+mkdirSync(process.env.ATRIA_WORKSPACE_DIR, { recursive: true });
 
 const { db, now } = await import('../src/db.ts');
 const runs = await import('../src/runs.ts');
@@ -102,17 +102,17 @@ test('conversa: página com before e limpar', () => {
   assert.equal(hist.messagesPage(null, 10).length, 0);
 });
 
-test('projetos: config validada, gravada no yui.json e remoção bloqueada com run ativa', () => {
-  const dir = join(process.env.YUI_WORKSPACE_DIR!, 'site-teste');
+test('projetos: config validada, gravada no atria.json e remoção bloqueada com run ativa', () => {
+  const dir = join(process.env.ATRIA_WORKSPACE_DIR!, 'site-teste');
   mkdirSync(dir);
-  writeFileSync(join(dir, 'yui.json'), JSON.stringify({ name: 'Site', repo: 'eu/site-teste', extra: 1 }));
+  writeFileSync(join(dir, 'atria.json'), JSON.stringify({ name: 'Site', repo: 'eu/site-teste', extra: 1 }));
   assert.ok('error' in proj.validateSettings({ healthUrl: 'ftp://x' }));
   assert.ok('error' in proj.validateSettings({ preview: '../etc' }));
   assert.ok('error' in proj.validateSettings({ approvalPatterns: 'npm' }));
   const v = proj.validateSettings({ healthUrl: 'https://site.test/health', container: 'site-api', preview: 'dist/', approvalPatterns: [' npm run deploy ', ''] });
   assert.ok('ok' in v);
   proj.writeProjectSettings('site-teste', v.ok);
-  const saved = JSON.parse(readFileSync(join(dir, 'yui.json'), 'utf8'));
+  const saved = JSON.parse(readFileSync(join(dir, 'atria.json'), 'utf8'));
   assert.deepEqual(saved, { name: 'Site', repo: 'eu/site-teste', extra: 1, healthUrl: 'https://site.test/health', container: 'site-api', preview: 'dist', approvalPatterns: ['npm run deploy'] });
 
   assert.equal(proj.validGitUrl('https://user:tok@github.com/a/b.git'), null);
@@ -122,7 +122,7 @@ test('projetos: config validada, gravada no yui.json e remoção bloqueada com r
   addRun('busy', 'running', now(), 'site-teste');
   assert.throws(() => proj.removeProject('site-teste'), /execuções ativas/);
   db.prepare(`UPDATE runs SET state = 'done' WHERE id = 'busy'`).run();
-  assert.throws(() => proj.removeProject('site'), /não está no console/); // nunca por aproximação
+  assert.throws(() => proj.removeProject('site'), /não está no Atria OS/); // nunca por aproximação
   proj.removeProject('site-teste');
   assert.equal(existsSync(dir), false);
 });

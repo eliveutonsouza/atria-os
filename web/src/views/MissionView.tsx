@@ -30,7 +30,7 @@ const MST: Record<MissionInfo['status'], { c: string; label: string }> = {
   cancelled: { c: C.t3, label: 'Cancelada' },
 }
 
-// Exclusão de missão pelo console (lista e detalhe): confirmação explícita antes do DELETE.
+// Exclusão de missão pelo Atria OS (lista e detalhe): confirmação explícita antes do DELETE.
 export function DeleteMissionModal({ mission: m, onClose }: { mission: MissionInfo; onClose: () => void }) {
   const [busy, setBusy] = useState(false)
   const active = m.steps.filter((s) => s.status === 'running' || s.status === 'waiting_approval').length

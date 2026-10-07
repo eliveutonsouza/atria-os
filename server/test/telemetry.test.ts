@@ -10,17 +10,17 @@ import rateLimit from '@fastify/rate-limit';
 import type { RunInfo } from '../../shared/protocol.ts';
 import type { TelemetrySnapshot } from '../../shared/telemetry.ts';
 
-// Telemetria do Yui Monitor: privacidade do snapshot, chave da URL de saúde e o pulso (com backoff).
+// Telemetria do Atria Central: privacidade do snapshot, chave da URL de saúde e o pulso (com backoff).
 // Banco e workspace temporários; docker e navegador apontam para uma porta fechada (falha rápida).
-const root = mkdtempSync(join(tmpdir(), 'yui-telemetry-'));
-process.env.YUI_DATA_DIR = join(root, 'data');
-process.env.YUI_WORKSPACE_DIR = join(root, 'ws');
-process.env.YUI_SEED_DIR = join(root, 'seed');
-process.env.YUI_DOCKER_API = 'http://127.0.0.1:9';
-process.env.YUI_BROWSER_MCP = 'http://127.0.0.1:9/mcp';
-process.env.YUI_PG_URL = '';
-mkdirSync(process.env.YUI_DATA_DIR, { recursive: true });
-mkdirSync(process.env.YUI_WORKSPACE_DIR, { recursive: true });
+const root = mkdtempSync(join(tmpdir(), 'atria-telemetry-'));
+process.env.ATRIA_DATA_DIR = join(root, 'data');
+process.env.ATRIA_WORKSPACE_DIR = join(root, 'ws');
+process.env.ATRIA_SEED_DIR = join(root, 'seed');
+process.env.ATRIA_DOCKER_API = 'http://127.0.0.1:9';
+process.env.ATRIA_BROWSER_MCP = 'http://127.0.0.1:9/mcp';
+process.env.ATRIA_PG_URL = '';
+mkdirSync(process.env.ATRIA_DATA_DIR, { recursive: true });
+mkdirSync(process.env.ATRIA_WORKSPACE_DIR, { recursive: true });
 
 const { db, now } = await import('../src/db.ts');
 const { emit } = await import('../src/bus.ts');

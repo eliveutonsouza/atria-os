@@ -3,7 +3,7 @@ import { useYui } from '../store/yui'
 import { ConfirmDeleteModal } from '../views/ui'
 import { send } from './http'
 
-// Exclusão de workflow pelo console (lista e editor): confirmação explícita antes do DELETE.
+// Exclusão de workflow pelo Atria OS (lista e editor): confirmação explícita antes do DELETE.
 
 export function DeleteWorkflowModal({ slug, name, rows, onClose, onDeleted }: {
   slug: string

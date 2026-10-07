@@ -1,28 +1,28 @@
 # Nome do projeto (prefixo de containers, volumes, imagens e router do Traefik). Mude só para rodar
 # uma segunda instalação na mesma VPS (ex.: teste); trocar numa instalação existente cria volumes novos e vazios.
-name: ${YUI_PROJECT:-yui-console}
+name: ${ATRIA_PROJECT:-atria-os}
 
 services:
-  yui-console:
+  atria:
     build:
       context: .
       args:
-        YUI_VERSION: ${YUI_VERSION:-dev}
-    image: ${YUI_PROJECT:-yui-console}:local
+        ATRIA_VERSION: ${ATRIA_VERSION:-dev}
+    image: ${ATRIA_PROJECT:-atria-os}:local
     restart: unless-stopped
     env_file: [.env]
     environment:
       TZ: ${TZ:-America/Sao_Paulo}
-      YUI_DOCKER_API: http://yui-dockerproxy:2375
-      YUI_HOST_PROC: /host/proc
-      YUI_BROWSER_CDP: http://yui-browser:9223
-      YUI_PG_URL: postgres://yui:${YUI_PG_PASSWORD:?defina YUI_PG_PASSWORD}@yui-postgres:5432/yui
-      YUI_QDRANT_URL: http://yui-qdrant:6333
-      YUI_QDRANT_KEY: ${YUI_QDRANT_KEY:?defina YUI_QDRANT_KEY}
-      YUI_DOCLING_URL: http://yui-docling:5001
+      ATRIA_DOCKER_API: http://atria-dockerproxy:2375
+      ATRIA_HOST_PROC: /host/proc
+      ATRIA_BROWSER_CDP: http://atria-browser:9223
+      ATRIA_PG_URL: postgres://yui:${ATRIA_PG_PASSWORD:?defina ATRIA_PG_PASSWORD (instalação antiga com YUI_* = rode ./install.sh --update de novo)}@atria-postgres:5432/yui
+      ATRIA_QDRANT_URL: http://atria-qdrant:6333
+      ATRIA_QDRANT_KEY: ${ATRIA_QDRANT_KEY:?defina ATRIA_QDRANT_KEY (instalação antiga com YUI_* = rode ./install.sh --update de novo)}
+      ATRIA_DOCLING_URL: http://atria-docling:5001
     volumes:
-      - yui-data:/data
-      - yui-workspace:/workspace
+      - data:/data
+      - workspace:/workspace
       - /proc:/host/proc:ro
     expose:
       - "8080"
@@ -31,44 +31,44 @@ services:
     security_opt:
       - no-new-privileges:true
     depends_on:
-      - yui-dockerproxy
-      - yui-code
-      - yui-postgres
-      - yui-qdrant
+      - atria-dockerproxy
+      - atria-code
+      - atria-postgres
+      - atria-qdrant
     labels:
-      # Usadas só quando há um Traefik na VPS (YUI_PROXY=traefik). Com caddy/none, YUI_TRAEFIK_ENABLE=false.
-      - traefik.enable=${YUI_TRAEFIK_ENABLE:-true}
-      - traefik.http.routers.${YUI_PROJECT:-yui-console}.rule=Host(`${YUI_DOMAIN}`)
-      - traefik.http.routers.${YUI_PROJECT:-yui-console}.entrypoints=${YUI_TRAEFIK_ENTRYPOINT:-websecure}
-      - traefik.http.routers.${YUI_PROJECT:-yui-console}.tls.certresolver=${YUI_TRAEFIK_CERTRESOLVER:-letsencrypt}
-      - traefik.http.routers.${YUI_PROJECT:-yui-console}.service=${YUI_PROJECT:-yui-console}
-      - traefik.http.services.${YUI_PROJECT:-yui-console}.loadbalancer.server.port=8080
+      # Usadas só quando há um Traefik na VPS (ATRIA_PROXY=traefik). Com caddy/none, ATRIA_TRAEFIK_ENABLE=false.
+      - traefik.enable=${ATRIA_TRAEFIK_ENABLE:-true}
+      - traefik.http.routers.${ATRIA_PROJECT:-atria-os}.rule=Host(`${ATRIA_DOMAIN}`)
+      - traefik.http.routers.${ATRIA_PROJECT:-atria-os}.entrypoints=${ATRIA_TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.${ATRIA_PROJECT:-atria-os}.tls.certresolver=${ATRIA_TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.routers.${ATRIA_PROJECT:-atria-os}.service=${ATRIA_PROJECT:-atria-os}
+      - traefik.http.services.${ATRIA_PROJECT:-atria-os}.loadbalancer.server.port=8080
 
   # Navegador headless para os agentes (Playwright MCP via HTTP). Perfil persistente: logins feitos
-  # pelos agentes sobrevivem a reinícios. Monta o mesmo workspace: screenshots/PDFs caem no projeto do agente (caminho relativo) ou em /workspace/.yui/browser.
-  yui-browser:
+  # pelos agentes sobrevivem a reinícios. Monta o mesmo workspace: screenshots/PDFs caem no projeto do agente (caminho relativo) ou em /workspace/.atria/browser.
+  atria-browser:
     image: mcr.microsoft.com/playwright/mcp@sha256:77dccc5ce9e94cb8ae7ebea87ddbb6cd54b05760c4d63c54e16accf2726b8734 # v0.0.82
     restart: unless-stopped
-    # Chromium com CDP (9223 via proxy, assistido ao vivo pelo console) + Playwright MCP (8931) ligado a ele.
+    # Chromium com CDP (9223 via proxy, assistido ao vivo pelo Atria OS) + Playwright MCP (8931) ligado a ele.
     entrypoint: ["/bin/sh", "/browser/entrypoint.sh"]
     user: "0" # volume do perfil nasce root; chromium já roda com --no-sandbox num container isolado
     volumes:
-      - yui-browser-profile:/profile
-      - yui-workspace:/workspace
+      - browser-profile:/profile
+      - workspace:/workspace
       - ./browser:/browser:ro
     shm_size: 1g
     mem_limit: 1g
     labels:
       - traefik.enable=false
 
-  # VS Code open source para o Vault e os projetos. Sem porta pública nem Traefik: o yui-console
-  # checa a sessão e repassa /code (HTTP + WebSocket). Mesmo uid (1000) do console no volume.
-  yui-code:
+  # VS Code open source para o Vault e os projetos. Sem porta pública nem Traefik: o serviço atria
+  # checa a sessão e repassa /code (HTTP + WebSocket). Mesmo uid (1000) do serviço atria no volume.
+  atria-code:
     build: ./code
-    image: ${YUI_PROJECT:-yui-console}-code:local
+    image: ${ATRIA_PROJECT:-atria-os}-code:local
     restart: unless-stopped
     volumes:
-      - yui-workspace:/workspace
+      - workspace:/workspace
     environment:
       TZ: ${TZ:-America/Sao_Paulo}
     mem_limit: 1536m
@@ -80,15 +80,17 @@ services:
 
   # Base de conhecimento da Empresa: documentos, páginas, trechos e campos extraídos (Postgres),
   # vetores (Qdrant) e leitura/OCR de arquivos (Docling). Tudo interno, sem porta pública.
-  yui-postgres:
+  atria-postgres:
     image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
     restart: unless-stopped
+    # Usuário/banco "yui" ficam assim de propósito: são gravados quando o volume nasce e os dados
+    # de instalações antigas são copiados como estão.
     environment:
       POSTGRES_USER: yui
       POSTGRES_DB: yui
-      POSTGRES_PASSWORD: ${YUI_PG_PASSWORD:?defina YUI_PG_PASSWORD}
+      POSTGRES_PASSWORD: ${ATRIA_PG_PASSWORD:?defina ATRIA_PG_PASSWORD (instalação antiga com YUI_* = rode ./install.sh --update de novo)}
     volumes:
-      - yui-pg:/var/lib/postgresql/data
+      - pg:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U yui -d yui"]
       interval: 10s
@@ -98,19 +100,19 @@ services:
     labels:
       - traefik.enable=false
 
-  yui-qdrant:
+  atria-qdrant:
     image: qdrant/qdrant@sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10
     restart: unless-stopped
     environment:
-      QDRANT__SERVICE__API_KEY: ${YUI_QDRANT_KEY:?defina YUI_QDRANT_KEY}
+      QDRANT__SERVICE__API_KEY: ${ATRIA_QDRANT_KEY:?defina ATRIA_QDRANT_KEY (instalação antiga com YUI_* = rode ./install.sh --update de novo)}
       QDRANT__TELEMETRY_DISABLED: "true"
     volumes:
-      - yui-qdrant:/qdrant/storage
+      - qdrant:/qdrant/storage
     mem_limit: 768m
     labels:
       - traefik.enable=false
 
-  yui-docling:
+  atria-docling:
     image: quay.io/docling-project/docling-serve-cpu@sha256:225c8586e20d5d0fc6811a9e0e044fa602bcc4393f00389009bad42d6787b58f
     restart: unless-stopped
     environment:
@@ -124,8 +126,8 @@ services:
       - traefik.enable=false
 
   # TLS automático para VPS sem proxy próprio (profile "edge", ativado pelo install.sh quando não há Traefik).
-  # Com Traefik já rodando no host, este serviço fica desligado e valem as labels do yui-console.
-  yui-caddy:
+  # Com Traefik já rodando no host, este serviço fica desligado e valem as labels do serviço atria.
+  atria-caddy:
     image: caddy:2.11-alpine
     profiles: ["edge"]
     restart: unless-stopped
@@ -134,20 +136,20 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      YUI_DOMAIN: ${YUI_DOMAIN}
+      ATRIA_DOMAIN: ${ATRIA_DOMAIN}
       ACME_EMAIL: ${ACME_EMAIL:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - yui-caddy-data:/data
-      - yui-caddy-config:/config
+      - caddy-data:/data
+      - caddy-config:/config
     depends_on:
-      - yui-console
+      - atria
     mem_limit: 128m
     labels:
       - traefik.enable=false
 
   # Docker API somente leitura (lista containers + logs) para Infra/Logs. O app nunca recebe o socket.
-  yui-dockerproxy:
+  atria-dockerproxy:
     image: tecnativa/docker-socket-proxy:v0.4.1
     restart: unless-stopped
     environment:
@@ -161,10 +163,10 @@ services:
       - traefik.enable=false
 
 volumes:
-  yui-pg:
-  yui-qdrant:
-  yui-caddy-data:
-  yui-caddy-config:
-  yui-data:
-  yui-workspace:
-  yui-browser-profile:
+  pg:
+  qdrant:
+  caddy-data:
+  caddy-config:
+  data:
+  workspace:
+  browser-profile:

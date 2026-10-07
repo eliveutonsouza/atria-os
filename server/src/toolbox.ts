@@ -10,16 +10,16 @@ import { registerBrain } from './extensions.ts';
 
 // Caixa de Ferramentas: o mapa das ferramentas do dia a dia do usuário (conectores, skills, stacks,
 // repositórios, URLs) com status vivo e agente padrão. Dá visibilidade ao painel e ao cérebro da Yui.
-// Arquivo editável: /workspace/.yui/toolbox.json (seed em workspace-seed/.yui/toolbox.json).
+// Arquivo editável: /workspace/.atria/toolbox.json (seed em workspace-seed/.atria/toolbox.json).
 
 type ToolDef = Omit<ToolboxItem, 'status'> & { status?: ToolStatus };
 
-const file = () => join(config.workspaceDir, '.yui', 'toolbox.json');
+const file = () => join(config.metaDir, 'toolbox.json');
 
 function ensureFile() {
   const f = file();
   if (existsSync(f)) return;
-  const seed = join(config.seedDir, '.yui', 'toolbox.json');
+  const seed = join(config.seedDir, '.atria', 'toolbox.json');
   if (!existsSync(seed)) return;
   mkdirSync(dirname(f), { recursive: true });
   cpSync(seed, f);

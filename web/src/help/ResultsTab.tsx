@@ -83,7 +83,7 @@ export function ResultsTab() {
           ))}
         </div>
         <span className="print-only" style={{ fontSize: 16, fontWeight: 700 }}>
-          Yui Console — resultados de {fmtDate(r.from)} a {fmtDate(r.to)}
+          Atria OS — resultados de {fmtDate(r.from)} a {fmtDate(r.to)}
         </span>
         <span style={{ fontSize: 12, color: C.t3 }} className="no-print">
           {fmtDate(r.from)} – {fmtDate(r.to)}

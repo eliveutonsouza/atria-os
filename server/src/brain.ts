@@ -12,7 +12,7 @@ import { infra, overview } from './metrics.ts';
 import { createRoutine } from './routines.ts';
 import { brainExtensions, type ToolCtx } from './extensions.ts';
 
-// "Cérebro" da Yui: modelo de texto (Responses API) com as ferramentas do console.
+// "Cérebro" da Yui: modelo de texto (Responses API) com as ferramentas do Atria OS.
 // Recebe pedidos digitados ou delegações do GPT-Live e devolve uma frase curta para ser dita/mostrada.
 
 // 429 (limite de tokens/min da conta) acontece sob carga: o SDK respeita retry-after com backoff.
@@ -40,7 +40,7 @@ export function recentMessages(limit = 24): { who: 'user' | 'yui'; text: string;
 
 // Nome do dono vem das Configurações (pode mudar com o servidor no ar).
 const ownerName = () => (config.userName ? `de ${config.userName}` : 'do usuário');
-const instructionsText = () => `Você é o raciocínio por trás da Yui, a assistente do Yui Console — a central pessoal de IA ${ownerName()}.
+const instructionsText = () => `Você é o raciocínio por trás da Yui, a assistente do Atria OS — a central pessoal de IA ${ownerName()}.
 A Yui conversa (por voz ou texto) e você decide o que fazer usando ferramentas. A força de execução são agentes Claude Code (delegate_task).
 
 Como responder:
@@ -264,7 +264,7 @@ export async function think({ request, dryRun = false, calls }: ThinkInput): Pro
     .map((m) => `${m.who === 'user' ? 'Usuário' : 'Yui'}: ${m.text}`)
     .join('\n');
   let input: OpenAI.Responses.ResponseInput = [
-    { role: 'developer', content: `Contexto do console:\n${snapshot()}\n\nConversa recente:\n${history || '(início)'}` },
+    { role: 'developer', content: `Contexto do Atria OS:\n${snapshot()}\n\nConversa recente:\n${history || '(início)'}` },
     { role: 'user', content: request },
   ];
   let previous: string | undefined;

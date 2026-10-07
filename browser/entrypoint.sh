@@ -1,13 +1,13 @@
 #!/bin/sh
 # Sidecar do navegador dos agentes: um Chromium headless com CDP (9222 local; exposto em 9223 pelo
-# cdp-proxy.mjs, assistível ao vivo pelo console) + Playwright MCP (porta 8931) conectado a ESSE Chromium via --cdp-endpoint.
+# cdp-proxy.mjs, assistível ao vivo pelo Atria OS) + Playwright MCP (porta 8931) conectado a ESSE Chromium via --cdp-endpoint.
 # Assim o que os agentes fazem pelo MCP aparece no screencast da página Navegador.
 set -eu
 CHROME=$(ls -d /ms-playwright/chromium-*/chrome-linux64/chrome | head -1)
-mkdir -p /profile /workspace/.yui/browser 2>/dev/null || true
-# Este sidecar roda como root; o console roda como node (uid 1000) e precisa escrever em /workspace/.yui.
-# Em volume novo o mkdir acima criaria tudo como root e o console morreria com EACCES no seed.
-chown 1000:1000 /workspace /workspace/.yui /workspace/.yui/browser 2>/dev/null || true
+mkdir -p /profile /workspace/.atria/browser 2>/dev/null || true
+# Este sidecar roda como root; o Atria OS roda como node (uid 1000) e precisa escrever em /workspace/.atria.
+# Em volume novo o mkdir acima criaria tudo como root e o Atria OS morreria com EACCES no seed.
+chown 1000:1000 /workspace /workspace/.atria /workspace/.atria/browser 2>/dev/null || true
 rm -f /profile/SingletonLock /profile/SingletonSocket /profile/SingletonCookie
 
 start_chrome() {
@@ -39,6 +39,6 @@ node /browser/cdp-proxy.mjs &
 exec node /app/cli.js \
   --cdp-endpoint http://127.0.0.1:9222 \
   --host 0.0.0.0 --port 8931 \
-  --allowed-hosts 'yui-browser,yui-browser:8931,localhost,127.0.0.1' \
-  --output-dir /workspace/.yui/browser \
+  --allowed-hosts 'atria-browser,atria-browser:8931,localhost,127.0.0.1' \
+  --output-dir /workspace/.atria/browser \
   --viewport-size 1440x900

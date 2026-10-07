@@ -3,7 +3,7 @@ tags: [vault]
 ---
 # Bem-vindo ao vault
 
-Este é o cérebro do [[Yui Console]]. Cada nota é uma estrela no **Cérebro**; cada `[[link]]` vira uma rota de luz entre elas.
+Este é o cérebro do [[Atria OS]]. Cada nota é uma estrela no **Cérebro**; cada `[[link]]` vira uma rota de luz entre elas.
 
 - Notas novas sem lugar certo caem aqui no Inbox.
 - Pastas viram galáxias: [[Vault & Cérebro]] explica a organização.

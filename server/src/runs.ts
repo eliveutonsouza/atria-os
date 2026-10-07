@@ -164,7 +164,7 @@ export function cancelRun(id: string): boolean {
 
 // Runs "running" de um processo anterior morreram com ele.
 export function recoverRuns() {
-  db.prepare(`UPDATE runs SET state = 'failed', finished_at = ?, result = 'Interrompido por reinício do Yui Console.' WHERE state IN ('running','waiting_approval')`).run(now());
+  db.prepare(`UPDATE runs SET state = 'failed', finished_at = ?, result = 'Interrompido por reinício do Atria OS.' WHERE state IN ('running','waiting_approval')`).run(now());
   db.prepare(`UPDATE approvals SET status = 'expired', resolved_at = ? WHERE status = 'pending'`).run(now());
   setImmediate(pump);
 }
@@ -218,7 +218,7 @@ function describeTool(name: string, input: Record<string, unknown>): string {
   }
 }
 
-// Aprovação genérica (modal do console). `ownerId` = run, missão ou execução de workflow.
+// Aprovação genérica (modal do painel). `ownerId` = run, missão ou execução de workflow.
 export async function askApproval(ownerId: string, title: string, rows: ApprovalInfo['rows'], signal?: AbortSignal, opts: { kind?: ApprovalInfo['kind'] } = {}): Promise<boolean> {
   const id = uid();
   db.prepare(`INSERT INTO approvals(id, run_id, title, rows, created_at, kind) VALUES(?, ?, ?, ?, ?, ?)`).run(id, ownerId, title, JSON.stringify(rows), now(), opts.kind ?? null);
@@ -348,7 +348,7 @@ export function purgeRuns(olderThanDays: number): number {
 
 function systemAppend(agent: AgentDef, projectName: string | null): string {
   return [
-    `Você é o ${agent.name}, um agente da força de trabalho da Yui (Yui Console).`,
+    `Você é o ${agent.name}, um agente da força de trabalho da Yui, no Atria OS.`,
     agent.prompt,
     '',
     'Regras de execução:',
@@ -356,9 +356,9 @@ function systemAppend(agent: AgentDef, projectName: string | null): string {
     '- Trabalhe de forma autônoma; não faça perguntas ao usuário. Se algo bloquear, explique no resultado final.',
     '- Você trabalha no automático: não peça confirmação ao usuário, siga até entregar. Comandos catastróficos (apagar raiz/workspace, formatar disco, DROP DATABASE, mexer em stacks de produção protegidos, force push na main) são bloqueados; se um comando for negado, siga sem ele.',
     '- Resposta final: 1 a 3 frases em português, no estilo de status para ser falado em voz alta (o que foi feito, resultado, próximo passo).',
-    projectName ? `- Projeto atual: ${projectName}.` : '- Sem projeto específico: trabalhe em /workspace/.yui/scratch.',
+    projectName ? `- Projeto atual: ${projectName}.` : '- Sem projeto específico: trabalhe em /workspace/.atria/scratch.',
     '- Navegador: use as ferramentas mcp__playwright__* (Chromium headless na VPS) para navegar, testar sites, preencher formulários e tirar screenshots. Use mcp__claude-in-chrome__* só quando precisar do Chrome real do usuário (contas logadas dele) — chame list_connected_browsers antes; se não houver navegador conectado, use o Playwright e diga isso no resultado. Screenshots com filename relativo são salvos no diretório do projeto atual.',
-    '- Relatórios: se pedirem um relatório, grave JSON em /workspace/.yui/reports/<AAAA-MM-DD-HHmm>.json com {title, lead, kpis:[{value,label}], sections:[{heading, tone:"cyan"|"warn"|"ok", items:[...]}]}.',
+    '- Relatórios: se pedirem um relatório, grave JSON em /workspace/.atria/reports/<AAAA-MM-DD-HHmm>.json com {title, lead, kpis:[{value,label}], sections:[{heading, tone:"cyan"|"warn"|"ok", items:[...]}]}.',
   ].join('\n');
 }
 
@@ -381,9 +381,9 @@ async function execute(run: RunRow, ac: AbortController) {
     patch(run.id, { current_op: `Clonando ${project.repo}…` });
     project = await ensureProject(project);
   }
-  const scratch = join(config.workspaceDir, '.yui', 'scratch');
-  const yuiDir = join(config.workspaceDir, '.yui');
-  mkdirSync(join(yuiDir, 'reports'), { recursive: true });
+  const scratch = join(config.metaDir, 'scratch');
+  const metaDir = config.metaDir;
+  mkdirSync(join(metaDir, 'reports'), { recursive: true });
   mkdirSync(scratch, { recursive: true });
   const cwd = project?.dir ?? scratch;
   const extraPatterns = (project?.approvalPatterns ?? []).map((p) => new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
@@ -392,7 +392,7 @@ async function execute(run: RunRow, ac: AbortController) {
     if (toolName === 'Bash') {
       const cmd = String(input.command ?? '');
       // Automático por padrão: só o catastrófico é negado (sem modal) e só os padrões que o usuário
-      // configurou no yui.json do projeto pedem aprovação.
+      // configurou no atria.json do projeto pedem aprovação.
       const blocked = blockedReason(cmd);
       if (blocked) {
         logEvent(run.id, 'system', `Bloqueado por segurança (${blocked}): ${cmd.split('\n')[0].slice(0, 200)}`);
@@ -441,7 +441,7 @@ async function execute(run: RunRow, ac: AbortController) {
     options: {
       cwd,
       abortController: ac,
-      additionalDirectories: [yuiDir],
+      additionalDirectories: [metaDir],
       systemPrompt: {
         type: 'preset',
         preset: 'claude_code',

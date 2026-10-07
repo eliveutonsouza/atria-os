@@ -1,12 +1,47 @@
 import Database from 'better-sqlite3';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, renameSync, rmdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { config } from './config.ts';
 
 mkdirSync(config.dataDir, { recursive: true });
 
-export const db = new Database(join(config.dataDir, 'yui.db'));
+// Instalações de antes do nome Atria OS: /data/yui.db (+ -wal/-shm) e /workspace/.yui viram atria.db e .atria.
+// Roda antes de abrir o banco. O sidecar do navegador pode ter criado .atria/browser antes deste boot,
+// então a pasta antiga é mesclada (move o que falta; conflito fica em .yui e é avisado).
+function mergeInto(src: string, dst: string): number {
+  let left = 0;
+  for (const name of readdirSync(src)) {
+    const s = join(src, name);
+    const d = join(dst, name);
+    if (!existsSync(d)) renameSync(s, d);
+    else if (statSync(s).isDirectory() && statSync(d).isDirectory()) left += mergeInto(s, d);
+    else left++;
+  }
+  if (!left) rmdirSync(src);
+  return left;
+}
+
+function migrateLegacyPaths() {
+  const dbFile = join(config.dataDir, 'atria.db');
+  const oldDb = join(config.dataDir, 'yui.db');
+  if (!existsSync(dbFile) && existsSync(oldDb)) {
+    for (const ext of ['', '-wal', '-shm']) if (existsSync(oldDb + ext)) renameSync(oldDb + ext, dbFile + ext);
+    console.log('banco: yui.db renomeado para atria.db');
+  }
+  const oldMeta = join(config.workspaceDir, '.yui');
+  if (!existsSync(oldMeta)) return;
+  rmSync(join(oldMeta, 'yui.code-workspace'), { force: true }); // o VS Code agora abre atria.code-workspace
+  if (!existsSync(config.metaDir)) renameSync(oldMeta, config.metaDir);
+  else {
+    const left = mergeInto(oldMeta, config.metaDir);
+    if (left) console.error(`workspace: ${left} item(ns) de .yui já existiam em .atria e ficaram em ${oldMeta}`);
+  }
+  console.log('workspace: .yui renomeado para .atria');
+}
+migrateLegacyPaths();
+
+export const db = new Database(join(config.dataDir, 'atria.db'));
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 

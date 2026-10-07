@@ -34,7 +34,8 @@ const noteName = (p: string) => (p.split('/').pop() ?? p).replace(/\.md$/i, '')
 const store = {
   get: (k: string) => {
     try {
-      return localStorage.getItem(k)
+      // reserva: chaves yui.* de antes do Atria OS
+      return localStorage.getItem(k) ?? localStorage.getItem(k.replace(/^atria\./, 'yui.'))
     } catch {
       return null
     }
@@ -104,7 +105,7 @@ function Explorer({ tree, selected, onPick, onCreate, onNewFolder, onMenu, narro
   }
   const [open, setOpen] = useState<Set<string>>(() => {
     try {
-      return new Set(JSON.parse(store.get('yui.vault.open') ?? '["01-Projeto","00-Inbox"]') as string[])
+      return new Set(JSON.parse(store.get('atria.vault.open') ?? '["01-Projeto","00-Inbox"]') as string[])
     } catch {
       return new Set(['01-Projeto', '00-Inbox'])
     }
@@ -115,7 +116,7 @@ function Explorer({ tree, selected, onPick, onCreate, onNewFolder, onMenu, narro
     if (n.has(p)) n.delete(p)
     else n.add(p)
     setOpen(n)
-    store.set('yui.vault.open', JSON.stringify([...n]))
+    store.set('atria.vault.open', JSON.stringify([...n]))
   }
   // garante a pasta da nota selecionada aberta
   useEffect(() => {
@@ -430,8 +431,8 @@ export function VaultPage() {
   const tablet = useYui((s) => s.device === 'tablet')
   const [ctxOpen, setCtxOpen] = useState(false)
   const [initial] = useState(() => useYui.getState().appParams.id)
-  const [selected, setSelected] = useState<string>(() => initial || store.get('yui.vault.note') || DEFAULT_NOTE)
-  const [mode, setMode] = useState<Mode>(() => (store.get('yui.vault.mode') as Mode) || 'edit')
+  const [selected, setSelected] = useState<string>(() => initial || store.get('atria.vault.note') || DEFAULT_NOTE)
+  const [mode, setMode] = useState<Mode>(() => (store.get('atria.vault.mode') as Mode) || 'edit')
   const [file, setFile] = useState<VaultFile | null>(null)
   const [fileErr, setFileErr] = useState<string | null>(null)
   const [status, setStatus] = useState<VaultStatus | null>(null)
@@ -475,7 +476,7 @@ export function VaultPage() {
   }, [selected])
   useEffect(() => {
     loadFile()
-    store.set('yui.vault.note', selected)
+    store.set('atria.vault.note', selected)
     return onVaultChanged((paths) => {
       if (!paths.length || paths.includes(selected)) loadFile()
     })
@@ -489,7 +490,7 @@ export function VaultPage() {
     return onVaultChanged(() => loadStatus())
   }, [loadStatus])
 
-  // escolher nota no console → VS Code abre a mesma nota
+  // escolher nota no Atria OS → VS Code abre a mesma nota
   const pick = useCallback(
     (p: string, line?: number) => {
       setSelected(p)
@@ -506,7 +507,7 @@ export function VaultPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // VS Code → console: segue o arquivo ativo do editor
+  // VS Code → painel: segue o arquivo ativo do editor
   useEffect(() => {
     if (!showEditor) return
     const t = setInterval(() => {
@@ -534,7 +535,7 @@ export function VaultPage() {
 
   const setM = (m: Mode) => {
     setMode(m)
-    store.set('yui.vault.mode', m)
+    store.set('atria.vault.mode', m)
   }
 
   const create = () => {

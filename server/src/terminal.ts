@@ -21,13 +21,13 @@ export function initTerminal() {
   );
 }
 
-const sessionName = (kind: string, slug: string) => `yui-${kind}-${slug}`.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 60);
+const sessionName = (kind: string, slug: string) => `atria-${kind}-${slug}`.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 60);
 
 async function listSessions(): Promise<{ name: string; created: string; attached: boolean }[]> {
   const out = await run('tmux', ['ls', '-F', '#{session_name}\t#{session_created}\t#{session_attached}']).then((r) => r.stdout).catch(() => '');
   return out
     .split('\n')
-    .filter((l) => l.startsWith('yui-'))
+    .filter((l) => l.startsWith('atria-'))
     .map((l) => {
       const [name, created, attached] = l.split('\t');
       return { name, created: new Date(Number(created) * 1000).toISOString(), attached: attached !== '0' };
@@ -87,7 +87,7 @@ export function registerTerminal(app: FastifyInstance) {
 
   app.delete('/api/terminal/sessions/:name', async (req, reply) => {
     const { name } = req.params as { name: string };
-    if (!name.startsWith('yui-')) return reply.code(400).send({ error: 'name' });
+    if (!name.startsWith('atria-')) return reply.code(400).send({ error: 'name' });
     await run('tmux', ['kill-session', '-t', name]).catch(() => {});
     return reply.code(204).send();
   });

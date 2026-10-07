@@ -14,4 +14,4 @@ O catálogo de projetos vem do `gh repo list` (usuário e organizações); repos
 ## Consequências
 Login do gh dentro do container; busca fuzzy por nome.
 
-Relacionadas: [[Yui Console]], [[Projetos]]
+Relacionadas: [[Atria OS]], [[Projetos]]

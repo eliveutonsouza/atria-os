@@ -123,7 +123,7 @@ export const useYui = create<YuiStore>((set, get) => ({
   appPage: 'overview',
   appParams: {},
   sidebarOpen: false,
-  sidebarPinned: (() => { try { return localStorage.getItem('yui.sidebarPinned') === '1' } catch { return false } })(),
+  sidebarPinned: (() => { try { return (localStorage.getItem('atria.sidebarPinned') ?? localStorage.getItem('yui.sidebarPinned')) === '1' } catch { return false } })(),
   updateReady: false,
   pushEnabled: false,
   workflowRuns: {},

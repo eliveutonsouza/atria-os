@@ -16,8 +16,8 @@ import { narrate } from './live.ts';
 import { createRoutine, deleteRoutine, registerRoutineRoutes, routinesForWorkflow, setWorkflowRunner } from './routines.ts';
 import { parseWorkflowMarkdown, serializeWorkflow, slugify, toMermaid, validateWorkflow } from './workflowMarkdown.ts';
 
-// Workflows de decisão: definidos em markdown canônico (/workspace/.yui/workflows/<slug>.md),
-// editados como fluxograma no console e executados passo a passo por agentes (manual ou rotina cron).
+// Workflows de decisão: definidos em markdown canônico (/workspace/.atria/workflows/<slug>.md),
+// editados como fluxograma no Atria OS e executados passo a passo por agentes (manual ou rotina cron).
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS workflow_runs (
@@ -48,12 +48,12 @@ CREATE TABLE IF NOT EXISTS workflow_approval_decisions (
 CREATE INDEX IF NOT EXISTS wad_wf ON workflow_approval_decisions(workflow, created_at);
 `);
 
-const wfDir = () => join(config.workspaceDir, '.yui', 'workflows');
+const wfDir = () => join(config.metaDir, 'workflows');
 
 // ---------- arquivos ----------
 
 function seedWorkflows() {
-  const src = join(config.seedDir, '.yui', 'workflows');
+  const src = join(config.seedDir, '.atria', 'workflows');
   if (!existsSync(src)) return;
   mkdirSync(wfDir(), { recursive: true });
   const row = db.prepare(`SELECT value FROM kv WHERE key = 'workflows_seeded'`).get() as { value: string } | undefined;
@@ -534,7 +534,7 @@ async function approval(ex: Exec, node: WorkflowNode) {
   await humanApproval(ex, node, why);
 }
 
-// Aprovação humana: usa a tabela/fluxo de aprovações do console (modal + inbox + narração da Yui).
+// Aprovação humana: usa a tabela/fluxo de aprovações do Atria OS (modal + inbox + narração da Yui).
 // O run_id da aprovação é o id da execução do workflow; a resolução chega por POST /api/approvals/:id
 // (runs.resolveApproval grava o status) e aqui é observada por polling da tabela.
 async function humanApproval(ex: Exec, node: WorkflowNode, why: string) {
@@ -642,7 +642,7 @@ export async function generateWorkflow(input: { descricao: string; nome?: string
     .join('\n');
   const res = await openai.responses.create({
     model: config.plannerModel,
-    instructions: `Você desenha workflows de trabalho para agentes Claude Code do Yui Console. Gere passos numerados ("1", "2"…) na ordem de execução.
+    instructions: `Você desenha workflows de trabalho para agentes Claude Code do Atria OS. Gere passos numerados ("1", "2"…) na ordem de execução.
 Tipos: task (um agente executa; instrução completa e autossuficiente em português, citando ferramentas/conectores quando útil), decision (condição objetiva + 2 ramos, normalmente "sim"/"não", com "to" = id do passo), approval (revisão do usuário: use SOMENTE quando o pedido disser para pedir aprovação/permissão/revisão dele naquela etapa, e então com ask=true e instruction dizendo o que revisar), parallel (next com 2+ passos em paralelo), end (último passo).
 Use SOMENTE estes agentes (campo agent = id):
 ${agents}

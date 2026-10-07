@@ -59,7 +59,7 @@ export function Sidebar() {
   const togglePin = () => {
     const next = !pinned
     try {
-      localStorage.setItem('yui.sidebarPinned', next ? '1' : '0')
+      localStorage.setItem('atria.sidebarPinned', next ? '1' : '0')
     } catch {
       /* armazenamento indisponível */
     }
@@ -94,9 +94,9 @@ export function Sidebar() {
             title="Conversar com a Yui (Ctrl+J)"
             style={{ display: 'flex', alignItems: 'center', gap: 10, border: 'none', background: 'transparent', color: C.text, cursor: 'pointer', padding: 0 }}
           >
-            <span style={{ width: 22, height: 22, borderRadius: '50%', background: 'radial-gradient(circle at 38% 34%, #ffffff, #67d8f2 34%, #a68cf7 78%)', boxShadow: '0 0 18px rgba(103,216,242,.45)' }} />
-            <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '.18em' }}>YUI</span>
-            <span className="mono" style={{ fontSize: 11, color: C.t3 }}>console</span>
+            <img src="/favicon.svg" alt="" width={24} height={24} style={{ borderRadius: 6 }} />
+            <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '.18em' }}>ATRIA</span>
+            <span className="mono" style={{ fontSize: 11, color: C.t3 }}>OS</span>
           </button>
           {desktop && (
             <button

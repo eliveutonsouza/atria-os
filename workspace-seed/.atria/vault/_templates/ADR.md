@@ -18,4 +18,4 @@ O que foi decidido.
 ## Consequências
 O que muda, o que fica mais difícil.
 
-Relacionadas: [[Yui Console]]
+Relacionadas: [[Atria OS]]

@@ -10,11 +10,12 @@ export interface SimNode extends SimulationNodeDatum {
 }
 export type SimLink = SimulationLinkDatum<SimNode>
 
-const STORE = 'yui.brain.pos.v2'
+const STORE = 'atria.brain.pos.v2'
+const OLD_STORE = 'yui.brain.pos.v2' // antes do Atria OS
 
 export function loadPositions(): Record<string, [number, number]> {
   try {
-    return JSON.parse(localStorage.getItem(STORE) ?? '{}')
+    return JSON.parse(localStorage.getItem(STORE) ?? localStorage.getItem(OLD_STORE) ?? '{}')
   } catch {
     return {}
   }

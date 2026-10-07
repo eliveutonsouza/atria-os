@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS custom_views (
 );
 `);
 
-const viewsDir = () => join(config.workspaceDir, '.yui', 'views');
+const viewsDir = () => join(config.metaDir, 'views');
 
 // ---------- schema ----------
 
@@ -123,12 +123,12 @@ const BLOCKS_DOC = `Blocos aceitos (JSON):
 
 registerRunPrompt((ctx) => {
   if (ctx.display === 'blocks') {
-    return `- MOSTRAR RESULTADO: além da resposta final, grave em /workspace/.yui/views/${ctx.runId}.json uma tela para o usuário no formato
+    return `- MOSTRAR RESULTADO: além da resposta final, grave em /workspace/.atria/views/${ctx.runId}.json uma tela para o usuário no formato
 {"title":"…","eyebrow":"…","blocks":[…]} (1 a 12 blocos, dados reais que você obteve; nada inventado).
 ${BLOCKS_DOC}`;
   }
   if (ctx.display === 'html') {
-    return `- MOSTRAR RESULTADO: crie uma página HTML autocontida (CSS/JS inline, sem CDN externo) em /workspace/.yui/views/${ctx.runId}/index.html,
+    return `- MOSTRAR RESULTADO: crie uma página HTML autocontida (CSS/JS inline, sem CDN externo) em /workspace/.atria/views/${ctx.runId}/index.html,
 visual escuro elegante (fundo #0a0c1d, texto #e8eaf4, acentos #67d8f2 e #a68cf7, fonte Manrope). Ela será exibida num iframe isolado.`;
   }
   return null;

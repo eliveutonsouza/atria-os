@@ -24,7 +24,7 @@ const THEME = {
   brightBlack: '#4c5270', brightRed: '#f6b3ba', brightGreen: '#8af0cc', brightYellow: '#f5c97a', brightBlue: '#9cc7f7', brightMagenta: '#cbbcff', brightCyan: '#a9e9f8', brightWhite: '#ffffff',
 }
 
-const sessionName = (kind: Kind, slug: string | null) => `yui-${kind}-${slug ?? 'workspace'}`.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 60)
+const sessionName = (kind: Kind, slug: string | null) => `atria-${kind}-${slug ?? 'workspace'}`.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 60)
 
 export function TerminalView() {
   const paramKind = useYui((s) => s.viewParams.kind)
@@ -156,7 +156,7 @@ export function TerminalView() {
         </span>
       </div>
       <div
-        className="yui-terminal"
+        className="atria-terminal"
         style={{ flex: 1, minHeight: 0, padding: phone ? '8px 8px' : '12px 14px', borderRadius: 14, background: 'rgba(0,0,0,.45)', border: '1px solid rgba(255,255,255,.06)', overflow: 'hidden' }}
       >
         <div ref={hostRef} style={{ width: '100%', height: '100%' }} />

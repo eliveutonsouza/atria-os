@@ -57,7 +57,7 @@ export function initPwa() {
       dispatchEvent(new PopStateEvent('popstate'))
     }
   })
-  // presença: servidor só manda push quando nenhuma tela do console está visível
+  // presença: servidor só manda push quando nenhuma tela do Atria OS está visível
   const presence = () => {
     if (document.visibilityState === 'visible') api.post('/api/push/presence').catch(() => {})
   }

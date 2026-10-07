@@ -3,7 +3,7 @@ titulo: Achar algo no Cérebro
 categoria: Conhecimento
 ferramentas: Cérebro · Vault · Yui
 tempo: 2 min seus
-antes: Notas no vault (o console já cria relatórios e diário sozinho).
+antes: Notas no vault (o Atria OS já cria relatórios e diário sozinho).
 resultado: A nota que você procurava e tudo que está ligado a ela.
 frase: "Yui, mostra a constelação de <nota>."
 ---

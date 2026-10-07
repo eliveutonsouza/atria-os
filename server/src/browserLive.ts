@@ -4,7 +4,7 @@ import type { BrowserClientMsg, BrowserServerMsg, BrowserTab, RunInfo } from '..
 import { config } from './config.ts';
 import { onEmit } from './bus.ts';
 
-// Navegador ao vivo: o mesmo Chromium que os agentes usam pelo Playwright MCP (sidecar yui-browser)
+// Navegador ao vivo: o mesmo Chromium que os agentes usam pelo Playwright MCP (sidecar atria-browser)
 // é transmitido por CDP screencast para a página Navegador. Um screencast compartilhado, fan-out para
 // todos os clientes; controle (mouse/teclado/URL) só para quem ligou "Assumir controle".
 

@@ -4,8 +4,8 @@
 // Alvos de toque < 40px viram aviso (não reprovam).
 import { chromium, webkit, devices } from 'playwright';
 
-const B = process.env.YUI_URL ?? 'https://yui.eliveutonsouza.cloud';
-const SHOTS = process.env.YUI_SHOTS ?? '/e2e/shots';
+const B = process.env.ATRIA_URL ?? 'https://atria.eliveutonsouza.cloud';
+const SHOTS = process.env.ATRIA_SHOTS ?? '/e2e/shots';
 const ROUTES = ['/app/more', '/app/usage', '/app/reminders', '/app/missions/new', '/', '/agents', '/runs', '/tools', '/claude', '/routines', '/app', '/app/ops', '/app/agents', '/app/agents/backend', '/app/runs', '/app/missions', '/app/workflows', '/app/workflows/post-instagram', '/app/schedule', '/app/projects', '/app/browser', '/app/terminal', '/app/claude', '/app/tools', '/app/inbox', '/app/infra', '/app/settings', '/app/vault', '/app/brain', '/app/company', '/app/company/documentos', '/app/company/busca', '/app/help', '/app/help/guia%3Aworkflows', '/app/help/resultados', '/app/help/faq'];
 const OWN_SCROLL = '.xterm, .react-flow, [data-own-scroll]';
 const fails = [];
@@ -18,7 +18,7 @@ const DEVICES = [
   [webkit, 'iPhone SE', null],
   [webkit, 'iPad (gen 7)', 'ipad'],
   [webkit, 'iPad Pro 11 landscape', 'ipad-deitado'],
-].filter(([, d]) => !process.env.YUI_DEVICES || process.env.YUI_DEVICES.split(',').includes(d));
+].filter(([, d]) => !process.env.ATRIA_DEVICES || process.env.ATRIA_DEVICES.split(',').includes(d));
 let state = null; // sessão reaproveitada entre navegadores (o login tem limite anti-força-bruta)
 
 for (const [engine, device, shotDir] of DEVICES) {
@@ -38,13 +38,13 @@ for (const [engine, device, shotDir] of DEVICES) {
     });
   }
   const page = await ctx.newPage();
-  if (!state && process.env.YUI_E2E_SESSION) {
-    await ctx.addCookies([{ name: 'yui_sid', value: process.env.YUI_E2E_SESSION, url: B, httpOnly: true, secure: B.startsWith('https'), sameSite: 'Strict' }]);
+  if (!state && process.env.ATRIA_E2E_SESSION) {
+    await ctx.addCookies([{ name: 'atria_sid', value: process.env.ATRIA_E2E_SESSION, url: B, httpOnly: true, secure: B.startsWith('https'), sameSite: 'Strict' }]);
     state = await ctx.storageState();
   }
   if (!state) {
     await page.goto(B + '/login');
-    await page.fill('input[type=password]', process.env.YUI_E2E_PASSWORD);
+    await page.fill('input[type=password]', process.env.ATRIA_E2E_PASSWORD);
     await page.keyboard.press('Enter');
     await page.waitForURL((u) => !u.pathname.includes('login'));
     state = await ctx.storageState();

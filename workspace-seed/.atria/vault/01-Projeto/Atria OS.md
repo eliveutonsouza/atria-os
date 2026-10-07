@@ -4,9 +4,9 @@ status: no ar
 tags: [projeto, yui]
 dominio: (o domínio desta instalação)
 ---
-# Yui Console
+# Atria OS
 
-Central pessoal de IA. Você conversa com a **Yui** (voz ou texto) e ela organiza o trabalho de uma equipe de agentes **Claude Code** rodando na VPS: abre telas, cria planos, delega tarefas, roda workflows agendados e mostra os resultados.
+O sistema operacional da sua empresa com IA. Você conversa com a **Yui** (voz ou texto) e ela organiza o trabalho de uma equipe de agentes **Claude Code** rodando na VPS: abre telas, cria planos, delega tarefas, roda workflows agendados e mostra os resultados.
 
 ## Partes
 - Conversa: [[Voz GPT-Live]] (full-duplex) e texto; o cérebro roteia pedidos — ver [[ADR-001 Voz pela OpenAI]].

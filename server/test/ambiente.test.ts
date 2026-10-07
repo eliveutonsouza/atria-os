@@ -5,12 +5,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 // Noção do "agora" (relógio, clima, feriados) e lembretes.
-const root = mkdtempSync(join(tmpdir(), 'yui-amb-'));
-process.env.YUI_DATA_DIR = join(root, 'data');
-process.env.YUI_WORKSPACE_DIR = join(root, 'ws');
-process.env.YUI_SEED_DIR = join(root, 'seed');
+const root = mkdtempSync(join(tmpdir(), 'atria-amb-'));
+process.env.ATRIA_DATA_DIR = join(root, 'data');
+process.env.ATRIA_WORKSPACE_DIR = join(root, 'ws');
+process.env.ATRIA_SEED_DIR = join(root, 'seed');
 process.env.TZ = 'America/Sao_Paulo';
-mkdirSync(process.env.YUI_DATA_DIR, { recursive: true });
+mkdirSync(process.env.ATRIA_DATA_DIR, { recursive: true });
 
 const amb = await import('../src/ambiente.ts');
 const lem = await import('../src/lembretes.ts');

@@ -24,7 +24,7 @@ export function BottomSheet({ label, onClose, children, tone, role = 'dialog', z
           width: '100%', maxHeight: 'calc(var(--vvh) - var(--sat) - 24px)', overflowY: 'auto', overscrollBehavior: 'contain', boxSizing: 'border-box',
           padding: '10px calc(16px + var(--sar)) calc(16px + var(--sab)) calc(16px + var(--sal))', borderRadius: '24px 24px 0 0',
           background: 'linear-gradient(180deg,#14173a,#0e1022)', borderTop: `1px solid ${tone ?? 'rgba(255,255,255,.1)'}`, boxShadow: '0 -20px 60px rgba(0,0,0,.55)',
-          display: 'flex', flexDirection: 'column', gap: 12, animation: 'yui-sheet-in .24s var(--ease)', color: C.text,
+          display: 'flex', flexDirection: 'column', gap: 12, animation: 'atria-sheet-in .24s var(--ease)', color: C.text,
         }}
       >
         <div aria-hidden style={{ width: 40, height: 5, borderRadius: 3, background: 'rgba(255,255,255,.2)', alignSelf: 'center', flexShrink: 0 }} />

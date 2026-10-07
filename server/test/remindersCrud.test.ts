@@ -7,13 +7,13 @@ import Fastify from 'fastify';
 
 // CRUD de lembretes pelo painel, relatórios (nome seguro) e telas sob medida.
 // Banco e workspace temporários: o env precisa estar pronto antes de importar os módulos.
-const root = mkdtempSync(join(tmpdir(), 'yui-rem-'));
-process.env.YUI_DATA_DIR = join(root, 'data');
-process.env.YUI_WORKSPACE_DIR = join(root, 'ws');
-process.env.YUI_SEED_DIR = join(root, 'seed');
-mkdirSync(process.env.YUI_DATA_DIR, { recursive: true });
-const reportsDir = join(process.env.YUI_WORKSPACE_DIR, '.yui', 'reports');
-const viewsDir = join(process.env.YUI_WORKSPACE_DIR, '.yui', 'views');
+const root = mkdtempSync(join(tmpdir(), 'atria-rem-'));
+process.env.ATRIA_DATA_DIR = join(root, 'data');
+process.env.ATRIA_WORKSPACE_DIR = join(root, 'ws');
+process.env.ATRIA_SEED_DIR = join(root, 'seed');
+mkdirSync(process.env.ATRIA_DATA_DIR, { recursive: true });
+const reportsDir = join(process.env.ATRIA_WORKSPACE_DIR, '.atria', 'reports');
+const viewsDir = join(process.env.ATRIA_WORKSPACE_DIR, '.atria', 'views');
 mkdirSync(reportsDir, { recursive: true });
 mkdirSync(viewsDir, { recursive: true });
 

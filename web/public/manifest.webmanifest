@@ -1,7 +1,7 @@
 {
-  "name": "Yui Console",
-  "short_name": "Yui",
-  "description": "Central pessoal de IA — converse com a Yui e acompanhe seus agentes.",
+  "name": "Atria OS",
+  "short_name": "Atria",
+  "description": "O sistema operacional da sua empresa com IA — fale com a Yui.",
   "lang": "pt-BR",
   "id": "/",
   "start_url": "/?source=pwa",

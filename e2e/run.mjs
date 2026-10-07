@@ -1,10 +1,10 @@
-// Regressão ponta a ponta do Yui Console (produção). Rodar via ./scripts-deploy.sh ou:
-// docker run --rm --network host -v $PWD/e2e:/e2e -w /e2e -e YUI_E2E_PASSWORD=… mcr.microsoft.com/playwright:v1.63.0-noble \
+// Regressão ponta a ponta do Atria OS (produção). Rodar via ./scripts-deploy.sh ou:
+// docker run --rm --network host -v $PWD/e2e:/e2e -w /e2e -e ATRIA_E2E_PASSWORD=… mcr.microsoft.com/playwright:v1.63.0-noble \
 //   bash -c "npm i -s playwright@1.63.0 >/dev/null 2>&1; node run.mjs"
 import { chromium } from 'playwright';
 
-const B = process.env.YUI_URL ?? 'https://yui.eliveutonsouza.cloud';
-const SHOTS = process.env.YUI_SHOTS ?? '/e2e/shots';
+const B = process.env.ATRIA_URL ?? 'https://atria.eliveutonsouza.cloud';
+const SHOTS = process.env.ATRIA_SHOTS ?? '/e2e/shots';
 const results = [];
 const errors = [];
 
@@ -36,16 +36,16 @@ async function chat(text) {
 }
 
 await check('login', async () => {
-  // YUI_E2E_SESSION: token de sessão temporário (criado no banco pelo operador) em vez da senha
-  if (process.env.YUI_E2E_SESSION) {
-    await ctx.addCookies([{ name: 'yui_sid', value: process.env.YUI_E2E_SESSION, url: B, httpOnly: true, secure: B.startsWith('https'), sameSite: 'Strict' }]);
+  // ATRIA_E2E_SESSION: token de sessão temporário (criado no banco pelo operador) em vez da senha
+  if (process.env.ATRIA_E2E_SESSION) {
+    await ctx.addCookies([{ name: 'atria_sid', value: process.env.ATRIA_E2E_SESSION, url: B, httpOnly: true, secure: B.startsWith('https'), sameSite: 'Strict' }]);
     await page.goto(B + '/');
     await page.waitForTimeout(1500);
     if (page.url().includes('login')) throw new Error('sessão inválida');
     return;
   }
   await page.goto(B + '/login');
-  await page.fill('input[type=password]', process.env.YUI_E2E_PASSWORD);
+  await page.fill('input[type=password]', process.env.ATRIA_E2E_PASSWORD);
   await page.keyboard.press('Enter');
   await page.waitForURL((u) => !u.pathname.includes('login'), { timeout: 15000 });
 });
@@ -86,8 +86,8 @@ await check('workflow: fluxo em Mermaid (arquivo, aba e colar só Mermaid)', asy
   if (!/```mermaid\nflowchart TD/.test(w.markdown)) throw new Error('arquivo sem bloco mermaid');
   await openRoute('/workflows/post-instagram');
   await page.getByRole('tab', { name: 'Mermaid' }).click();
-  await page.locator('.yui-mermaid svg').first().waitFor({ timeout: 15000 });
-  const nodes = await page.locator('.yui-mermaid svg g.node').count();
+  await page.locator('.atria-mermaid svg').first().waitFor({ timeout: 15000 });
+  const nodes = await page.locator('.atria-mermaid svg g.node').count();
   if (nodes !== w.nodes.length) throw new Error(`${nodes} nós no diagrama, esperado ${w.nodes.length}`);
   await page.screenshot({ path: `${SHOTS}/workflow-mermaid.png` });
   const r = JSON.parse((await api('/api/workflows/parse', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ markdown: 'flowchart TD\n  A["1. Buscar<br/>research"] --> B{"2. Achou?"}\n  B -->|sim| C["3. Avisar<br/>assistente"]\n  B -->|não| D(("4. Fim"))\n  C --> D' }) })).body);
@@ -108,7 +108,7 @@ await check('toolbox com ferramentas', async () => {
 await check('terminal shell executa', async () => {
   await openRoute('/terminal/shell');
   await page.waitForTimeout(2500);
-  await page.locator('.yui-terminal').click();
+  await page.locator('.atria-terminal').click();
   await page.keyboard.type('echo e2e-$((6*7))');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(1500);
@@ -205,12 +205,12 @@ await check('configurações + setup status', async () => {
 // ---------- Vault + VS Code + Cérebro ----------
 const E2E_NOTE = `00-Inbox/E2E ${Date.now()}.md`;
 await check('vault: API cria nota e indexa link/backlink', async () => {
-  const r = await api('/api/vault/file', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: E2E_NOTE, text: '# E2E\n[[Yui Console]] #e2e' }) });
+  const r = await api('/api/vault/file', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: E2E_NOTE, text: '# E2E\n[[Atria OS]] #e2e' }) });
   if (r.status !== 200) throw new Error(`criar ${r.status} ${r.body}`);
   await page.waitForTimeout(800);
   const g = JSON.parse((await api('/api/vault/graph')).body);
-  if (!g.links.some((l) => l.s === E2E_NOTE && l.t === '01-Projeto/Yui Console.md')) throw new Error('link não indexado');
-  const b = JSON.parse((await api(`/api/vault/backlinks?path=${encodeURIComponent('01-Projeto/Yui Console.md')}`)).body);
+  if (!g.links.some((l) => l.s === E2E_NOTE && l.t === '01-Projeto/Atria OS.md')) throw new Error('link não indexado');
+  const b = JSON.parse((await api(`/api/vault/backlinks?path=${encodeURIComponent('01-Projeto/Atria OS.md')}`)).body);
   if (!b.some((x) => x.path === E2E_NOTE)) throw new Error('backlink ausente');
   const bad = await api('/api/vault/file?path=../../etc/passwd');
   if (bad.status !== 400) throw new Error(`path traversal ${bad.status}`);

@@ -222,7 +222,7 @@ export function Universe({ graph }: { graph: VaultGraphPayload }) {
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, pointerEvents: 'auto' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <div style={{ fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: '#67d8f2', fontWeight: 600 }}>Vault · yui-console</div>
+              <div style={{ fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: '#67d8f2', fontWeight: 600 }}>Vault · atria-os</div>
               <h1 style={{ margin: 0, fontSize: narrow ? 20 : 26, fontWeight: 600 }}>Cérebro</h1>
               <div style={{ fontSize: 12.5, color: '#9aa0bb' }}>{stats}</div>
             </div>

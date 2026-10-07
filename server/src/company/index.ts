@@ -27,7 +27,7 @@ const isCat = (c: unknown): c is CompanyCategory => typeof c === 'string' && (CO
 
 async function init() {
   if (!config.pgUrl) {
-    console.error('empresa: YUI_PG_URL não configurado — base de documentos desligada');
+    console.error('empresa: ATRIA_PG_URL não configurado — base de documentos desligada');
     return;
   }
   for (let i = 0; i < 30; i++) {

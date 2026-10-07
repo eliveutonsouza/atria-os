@@ -421,7 +421,7 @@
         },
         {
           "title": "Rotinas da Yui",
-          "what": "Workflows da Yui rodam por cron no próprio console.",
+          "what": "Workflows da Yui rodam por cron no próprio Atria OS.",
           "when": "Rotina com vários agentes e decisões.",
           "example": "Peça: 'cria um workflow de post toda segunda 9h'",
           "kind": "concept"

@@ -14,4 +14,4 @@ Usar o GPT-Live na API (WebRTC no navegador + canal lateral no servidor) e deleg
 ## Consequências
 Voz natural e baixa latência; o GPT-Live às vezes responde sem delegar, o que exigiu o watchdog.
 
-Relacionadas: [[Voz GPT-Live]], [[Yui Console]]
+Relacionadas: [[Voz GPT-Live]], [[Atria OS]]

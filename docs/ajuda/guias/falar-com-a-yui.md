@@ -26,7 +26,7 @@ relacionados: [visao-geral, aprovacoes, missoes, celular]
 # Falar com a Yui
 
 ## O que é
-A Yui é a assistente que conversa com você por voz (OpenAI GPT-Live) ou texto. Ela não faz o trabalho pesado sozinha: decide o que fazer, abre a tela certa e delega para os agentes Claude Code (Backend, Frontend, QA, DevOps, Security, Research, Copy, Designer, Report e Assistente). Antes de afirmar números ou status, ela consulta os dados reais do console.
+A Yui é a assistente que conversa com você por voz (OpenAI GPT-Live) ou texto. Ela não faz o trabalho pesado sozinha: decide o que fazer, abre a tela certa e delega para os agentes Claude Code (Backend, Frontend, QA, DevOps, Security, Research, Copy, Designer, Report e Assistente). Antes de afirmar números ou status, ela consulta os dados reais do Atria OS.
 
 ## Passo a passo
 1. **Escolha como falar.** Digite no campo "Pergunte ou segure espaço para falar…" e tecle Enter, ou segure **Espaço** e fale. O botão de microfone liga a conversa por voz contínua; clique de novo para encerrar.

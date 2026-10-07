@@ -3,7 +3,7 @@ import { emit } from './bus.ts';
 import { addProject, projectSummaries, readProjectSettings, removeProject, validateSettings, writeProjectSettings } from './projects.ts';
 import { loadToolbox } from './toolbox.ts';
 
-// Projetos pelo painel: adicionar (clonar do catálogo ou URL), remover o clone local e editar o yui.json.
+// Projetos pelo painel: adicionar (clonar do catálogo ou URL), remover o clone local e editar o atria.json.
 
 const codeOf = (e: unknown) => (e as { code?: unknown }).code;
 const fail = (e: unknown) => ({ status: typeof codeOf(e) === 'number' ? (codeOf(e) as number) : 400, error: (e as Error).message });

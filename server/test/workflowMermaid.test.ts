@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { parseMermaid, parseWorkflowMarkdown, serializeWorkflow, toMermaid, validateWorkflow } from '../../shared/workflowMarkdown.ts';
 
-const SEED = new URL('../../workspace-seed/.yui/workflows/', import.meta.url);
+const SEED = new URL('../../workspace-seed/.atria/workflows/', import.meta.url);
 const graph = (d: ReturnType<typeof parseWorkflowMarkdown>) =>
   d.nodes.map((n) => `${n.id}:${n.type}:${n.agent ?? ''}>${(n.next ?? []).join(',')}|${(n.branches ?? []).map((b) => `${b.label}=${b.to}`).join(',')}`).join(' ');
 
