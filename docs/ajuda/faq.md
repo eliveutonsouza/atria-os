@@ -13,6 +13,9 @@ O agente não ouve a conversa; ele recebe só a instrução que a Yui monta. Dig
 ### Como volto da Yui para o dashboard e vice-versa?
 Ctrl/⌘ J alterna entre os dois. Também dá para passar o mouse na borda esquerda para abrir o dashboard e clicar no orb do canto para voltar à conversa.
 
+### Os agentes conseguem usar o Claude Design, gerar imagens e vídeos?
+Sim. O agente Designer usa o Claude Design (telas, protótipos, decks/slides, design systems), o Higgsfield para imagens e vídeos e gera páginas que você abre pelo preview. O Atria mantém o login de Design e o acesso liberado sozinho e confere antes de cada execução de design; o estado aparece no topo da tela Claude Code › mapa. Se ficar amarelo, toque em Liberar acesso; se pedir /design-login, rode `docker exec -it atria-os-atria-1 claude` no servidor e digite /design-login.
+
 ## Segurança
 ### Os agentes podem fazer deploy ou apagar algo sem eu saber?
 Sim, por padrão: workflows, rotinas, missões e projetos rodam no automático, com push, deploy, docker e envios, e tudo fica registrado em Execuções. Eles só param onde você pediu aprovação ("me pede OK antes de publicar", "Sempre me perguntar" no passo do workflow ou atria.json › approvalPatterns). O catastrófico é sempre bloqueado: apagar raiz/workspace/dados inteiros, formatar disco, DROP DATABASE, prune do Docker, stacks de produção protegidos e force push na main. Para voltar a aprovar ações de conectores (enviar, publicar, pagar), ligue em Configurações › Agentes & aprovações.

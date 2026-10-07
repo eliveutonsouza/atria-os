@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { ClaudeInitInfo } from '@shared/protocol'
+import { api } from '../api/client'
 import { useApi } from '../api/useApi'
 import { submitText } from '../lib/actions'
 import { C } from '../lib/colors'
@@ -41,6 +42,48 @@ function openInTerminal(c: GuideCard) {
   // Comandos do shell (claude --bg, claude -c…) vão para a aba Shell; slash commands para a aba Claude.
   const shell = c.kind === 'flag' || c.command.startsWith('claude')
   openTerm(shell ? 'shell' : 'claude', c.command)
+}
+
+interface DesignStatus {
+  ready: boolean
+  login: 'ok' | 'missing' | 'expired'
+  consent: 'granted' | 'missing' | 'unknown'
+  grantedAt: string | null
+  checkedAt: string
+  hint: string | null
+  artifactTool: boolean
+}
+
+// Claude Design dos agentes: o servidor confere login + consentimento e conserta sozinho; aqui só o estado e o botão.
+function DesignStatusCard() {
+  const st = useApi<DesignStatus>('/api/claude-design/status')
+  const [busy, setBusy] = useState(false)
+  const [res, setRes] = useState<DesignStatus | null>(null)
+  const d = res ?? st.data
+  if (!d) return null
+  const repair = async () => {
+    setBusy(true)
+    try {
+      setRes(await api.post<DesignStatus>('/api/claude-design/repair'))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <article style={{ ...card, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+      <span style={{ width: 10, height: 10, borderRadius: 5, background: d.ready ? C.ok : C.warn, flex: 'none' }} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, flex: 1 }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Claude Design para os agentes · {d.ready ? 'liberado' : 'indisponível'}</span>
+        <span style={{ fontSize: 12, color: C.t3, lineHeight: 1.5 }}>
+          {d.ready
+            ? `Login de Design ok e acesso concedido${d.grantedAt ? ` em ${new Date(d.grantedAt).toLocaleDateString('pt-BR')}` : ''}. O Atria confere antes de cada execução de design.`
+            : d.hint}
+          {' '}Imagens e vídeos: Higgsfield. {d.artifactTool ? 'Ferramenta Artifact ativa.' : 'Páginas saem pelo preview do Atria.'}
+        </span>
+      </div>
+      <SmallBtn onClick={repair} disabled={busy}>{busy ? 'Verificando…' : d.ready ? 'Verificar' : 'Liberar acesso'}</SmallBtn>
+    </article>
+  )
 }
 
 export function ClaudeGuideView() {
@@ -92,6 +135,8 @@ export function ClaudeGuideView() {
           <span><b style={{ fontSize: 24, fontWeight: 300, color: C.text, marginRight: 6 }}>{init.agents.length}</b>subagentes</span>
         </div>
       )}
+
+      {(!cat || cat === 'design') && !n && <DesignStatusCard />}
 
       {cats.length === 0 && skillsFound.length === 0 && <Empty text="Nada encontrado com essa busca." />}
 

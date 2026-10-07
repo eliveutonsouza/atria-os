@@ -9,6 +9,7 @@ import { emit } from './bus.ts';
 import { findAgent, agentsWorking, type AgentDef } from './agents.ts';
 import { ensureProject, findProject } from './projects.ts';
 import { agentOptions, runPromptExtras } from './extensions.ts';
+import { designInboxItems, designPreflight } from './claudeDesign.ts';
 import { getSetting } from './settings.ts';
 import { blockedReason } from './safety.ts';
 import { saveRateLimit } from './claudeUsage.ts';
@@ -286,6 +287,7 @@ export function inboxItems(): InboxItem[] {
     if (dismissed.has(`failed:${f.id}`)) continue;
     items.push({ id: `failed:${f.id}`, tag: 'Falha', label: f.task, tone: 'crit', action: { type: 'view', view: 'runs', params: { runId: f.id } } });
   }
+  items.push(...designInboxItems());
   return items;
 }
 
@@ -435,6 +437,8 @@ async function execute(run: RunRow, ac: AbortController) {
   let lastContext = 0;
   let turns = 0;
 
+  // Claude Design: login + consentimento conferidos (e consertados) antes de um run de design
+  await designPreflight(agent.skills, run.instruction);
   const { mcpServers: extraMcp, ...perAgent } = agentOptions(agent.id);
   const q = query({
     prompt: run.instruction,

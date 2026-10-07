@@ -536,8 +536,8 @@
         },
         {
           "title": "/design-consent",
-          "what": "Autoriza (ou revoga com /design-revoke) o acesso do Claude ao Claude Design.",
-          "when": "Primeira vez ou para revogar.",
+          "what": "Autoriza (ou revoga com /design-revoke) o acesso dos agentes ao Claude Design. O Atria já faz isso sozinho e confere antes de cada execução de design.",
+          "when": "Só para revogar ou se o card acima ficar amarelo.",
           "example": "/design-consent",
           "kind": "slash",
           "command": "/design-consent",
