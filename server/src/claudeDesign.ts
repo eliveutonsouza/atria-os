@@ -7,12 +7,15 @@ import { kvGet, kvSet, now } from './db.ts';
 import { emit } from './bus.ts';
 import { getSetting } from './settings.ts';
 import { getInit } from './capabilities.ts';
-import { claudeEnv, inboxItems, runBus } from './runs.ts';
+import { claudeEnv, inboxItems } from './runs.ts';
 import { registerRunPrompt } from './extensions.ts';
 import type { InboxItem } from '../../shared/protocol.ts';
 
-// Claude Design sempre disponível para os agentes.
-// A skill `design` e a ferramenta DesignSync do Claude Code só funcionam com duas coisas na conta:
+// Claude Design: saúde do acesso da conta (login de Design + consentimento dos agentes).
+// Criar design/deck/protótipo no Claude Design exige a ferramenta Artifact, que só existe em sessão interativa;
+// a skill `design` é só do usuário (disable-model-invocation). Execuções headless (os agentes) recebem só DesignSync,
+// que sincroniza design systems. Por isso os agentes entregam por outros caminhos (promptLines) e o Claude Design
+// fica para o usuário, no Terminal do Atria ou em claude.ai/design. DesignSync e o uso manual precisam de:
 //  1. login de Design (`designOauth` em ~/.claude/.credentials.json, feito uma vez com /design-login);
 //  2. consentimento "agent_design_projects" gravado no servidor (POST /v1/design/consent).
 // Agente headless não roda /design-consent sozinho e parava com "rode /design consent". Aqui o Atria
@@ -137,34 +140,19 @@ export function designInboxItems(): InboxItem[] {
   return [{ id: 'claude-design', tag: 'Claude Design', label: designHint(s), tone: 'warn', action: { type: 'view', view: 'claude' } }];
 }
 
-// ---------- integração com as execuções ----------
-
-const DESIGN_TASK = /\b(design|deck|slides?|apresenta[çc][ãa]o|prot[óo]tipo|mockup|wireframe|landing|identidade visual|design system|tela|artefato|artifact)\b/i;
-const CONSENT_STUCK = /design[\s-]?consent|sem acesso ao Claude Design|acesso ao Claude Design|Connect to Claude Design/i;
-
-export const isDesignTask = (skills: string[], instruction: string) => skills.includes('design') || skills.includes('design-sync') || DESIGN_TASK.test(instruction);
-
-/** Antes de uma execução de design: garante consentimento (rápido quando o cache está fresco). */
-export async function designPreflight(skills: string[], instruction: string): Promise<void> {
-  if (!isDesignTask(skills, instruction)) return;
-  await checkDesign().catch((e) => console.error('claude-design preflight', (e as Error).message));
-}
+// ---------- prompt dos agentes ----------
 
 const artifactToolAvailable = () => getInit()?.tools?.includes('Artifact') ?? false;
 
 function promptLines(): string {
-  const s = designStatus();
-  const lines = ['Entregas visuais e criativas (use sem pedir permissão):'];
-  if (designReady(s)) lines.push('- Claude Design está conectado e com acesso liberado: telas, protótipos, decks/slides, landing pages e design systems → skill `design` (e `design-sync`/DesignSync para sincronizar). Não peça /design consent ao usuário; devolva o link claude.ai/design.');
-  else if (s) lines.push(`- Claude Design indisponível agora (${s.login}/${s.consent}). Não pare a tarefa: entregue pelo caminho alternativo abaixo e diga no resultado que o design ficou fora do Claude Design. ${designHint(s)}`);
-  lines.push(
+  return [
+    'Entregas visuais e criativas (use sem pedir permissão):',
+    '- Não tente criar no Claude Design: a skill `design` é só do usuário e a ferramenta Artifact não existe em execução de agente. Não peça /design ao usuário; entregue pelos caminhos abaixo. Se o pedido exigir o Claude Design, entregue a peça assim mesmo e diga no fim que dá para refazer lá numa sessão interativa (Terminal do Atria › Claude ou claude.ai/design).',
     '- Imagem, vídeo, áudio/voz → conector Higgsfield (generate_image, generate_video, generate_audio; acompanhe com jobs_wait) e devolva as URLs.',
+    '- Tela, protótipo, landing, página ou deck interativo → código no projeto (landing em Next.js, dashboard em Vite, deck em HTML/React com navegação) e entregue pelo preview do Atria.',
     '- Slides em arquivo → skill pptx; documento → docx/pdf; arte estática (pôster, post) → canvas-design; gráficos → dataviz.',
-    artifactToolAvailable()
-      ? '- Página/artefato interativo → ferramenta Artifact (publica em claude.ai).'
-      : '- Página/artefato interativo → gere HTML/Vite no projeto (ou em .atria/scratch) e entregue pelo preview do Atria; a ferramenta Artifact do claude.ai não existe nesta sessão.',
-  );
-  return lines.join('\n');
+    designReady(designStatus()) ? '- Sincronizar componentes do código com um design system do claude.ai/design → skill design-sync (ferramenta DesignSync).' : '',
+  ].filter(Boolean).join('\n');
 }
 
 export function register(app: FastifyInstance): void {
@@ -178,17 +166,6 @@ export function register(app: FastifyInstance): void {
   });
 
   registerRunPrompt(() => promptLines());
-
-  // Run que mesmo assim parou pedindo consentimento: conserta na hora e avisa para pedir de novo.
-  runBus.on('finished', (info) => {
-    if (!info.result || !CONSENT_STUCK.test(info.result)) return;
-    void checkDesign({ force: true }).then((s) => {
-      if (!designReady(s)) return;
-      void import('./push.ts').then(({ sendPush }) =>
-        sendPush({ title: 'Claude Design liberado', body: `"${info.task.slice(0, 60)}" parou no acesso ao Claude Design; já liberei. Peça de novo.`, url: '/app/runs', tag: 'claude-design' }, { force: true }),
-      );
-    });
-  });
 
   setTimeout(() => void checkDesign({ force: true }).catch(() => {}), 15_000).unref();
   setInterval(() => void checkDesign({ force: true }).catch(() => {}), PERIOD_MS).unref();

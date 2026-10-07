@@ -4,14 +4,14 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-// Claude Design: leitura do token de Design, interpretação do consentimento e roteamento dos runs de design.
+// Claude Design: leitura do token de Design, interpretação do consentimento e aviso no Inbox.
 const root = mkdtempSync(join(tmpdir(), 'atria-design-'));
 process.env.ATRIA_DATA_DIR = join(root, 'data');
 process.env.ATRIA_WORKSPACE_DIR = join(root, 'ws');
 process.env.ATRIA_SEED_DIR = join(root, 'seed');
 mkdirSync(process.env.ATRIA_DATA_DIR, { recursive: true });
 
-const { interpretConsent, readDesignToken, designReady, isDesignTask, designInboxItems } = await import('../src/claudeDesign.ts');
+const { interpretConsent, readDesignToken, designReady, designInboxItems } = await import('../src/claudeDesign.ts');
 const { kvSet } = await import('../src/db.ts');
 
 test('interpretConsent: concedido, faltando, token vencido e sem escopo', () => {
@@ -29,13 +29,6 @@ test('readDesignToken: lê designOauth e ignora credencial sem Design', () => {
   writeFileSync(p, JSON.stringify({ claudeAiOauth: { accessToken: 'a' } }));
   assert.equal(readDesignToken(p), null);
   assert.equal(readDesignToken(join(root, 'nao-existe.json')), null);
-});
-
-test('isDesignTask: skill do agente ou pedido visual', () => {
-  assert.ok(isDesignTask(['design'], 'qualquer coisa'));
-  assert.ok(isDesignTask([], 'faz um deck de 6 slides sobre o Stoqmate'));
-  assert.ok(isDesignTask([], 'cria um protótipo da tela de login'));
-  assert.ok(!isDesignTask(['backend'], 'corrige o bug do endpoint /api/users'));
 });
 
 test('Inbox: aviso só quando o Claude Design não está pronto', () => {

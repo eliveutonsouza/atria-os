@@ -124,7 +124,7 @@
     "id": "claude-design",
     "name": "Claude Design",
     "category": "Design",
-    "purpose": "Criar telas, protótipos, decks/slides, artefatos visuais e design systems no claude.ai/design (skills design e design-sync, ferramenta DesignSync). O Atria mantém o login e o consentimento de Design ativos sozinho.",
+    "purpose": "Criar telas, protótipos, decks/slides, artefatos visuais e design systems no claude.ai/design (skills design e design-sync, ferramenta DesignSync). Criação só em sessão interativa do usuário (Terminal › Claude); agentes só sincronizam design systems.",
     "access": {
       "type": "skill",
       "ref": "design"
@@ -134,7 +134,7 @@
       "Faz um deck sobre o meu produto",
       "Cria um protótipo da tela de login",
       "Sincroniza meus componentes com o design system",
-      "Gera uma imagem de capa para o post"
+      "Abre o Claude no terminal para fazer um deck no Claude Design"
     ]
   },
   {

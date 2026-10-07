@@ -13,8 +13,8 @@ O agente não ouve a conversa; ele recebe só a instrução que a Yui monta. Dig
 ### Como volto da Yui para o dashboard e vice-versa?
 Ctrl/⌘ J alterna entre os dois. Também dá para passar o mouse na borda esquerda para abrir o dashboard e clicar no orb do canto para voltar à conversa.
 
-### Os agentes conseguem usar o Claude Design, gerar imagens e vídeos?
-Sim. O agente Designer usa o Claude Design (telas, protótipos, decks/slides, design systems), o Higgsfield para imagens e vídeos e gera páginas que você abre pelo preview. O Atria mantém o login de Design e o acesso liberado sozinho e confere antes de cada execução de design; o estado aparece no topo da tela Claude Code › mapa. Se ficar amarelo, toque em Liberar acesso; se pedir /design-login, rode `docker exec -it atria-os-atria-1 claude` no servidor e digite /design-login.
+### Os agentes conseguem criar no Claude Design, gerar imagens e vídeos?
+Imagens, vídeos e peças sim: o Designer usa o Higgsfield para imagem e vídeo, gera telas, landings e decks em código que você abre pelo preview, e faz .pptx/PDF. Criar dentro do Claude Design, não: isso só funciona numa sessão interativa sua (Terminal do Atria › Claude, ou claude.ai/design), porque a ferramenta que cria designs não existe nas execuções dos agentes. O Atria mantém o login de Design e o acesso da conta ativos (card no topo de Claude Code › mapa), o que serve para você e para sincronizar design systems.
 
 ## Segurança
 ### Os agentes podem fazer deploy ou apagar algo sem eu saber?

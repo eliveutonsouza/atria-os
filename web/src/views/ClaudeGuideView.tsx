@@ -54,7 +54,8 @@ interface DesignStatus {
   artifactTool: boolean
 }
 
-// Claude Design dos agentes: o servidor confere login + consentimento e conserta sozinho; aqui só o estado e o botão.
+// Claude Design da conta: o servidor confere login + consentimento e conserta sozinho; aqui só o estado e o botão.
+// Criar no Claude Design é só em sessão interativa (Terminal › Claude); agentes entregam por código/Higgsfield.
 function DesignStatusCard() {
   const st = useApi<DesignStatus>('/api/claude-design/status')
   const [busy, setBusy] = useState(false)
@@ -73,12 +74,12 @@ function DesignStatusCard() {
     <article style={{ ...card, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
       <span style={{ width: 10, height: 10, borderRadius: 5, background: d.ready ? C.ok : C.warn, flex: 'none' }} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, flex: 1 }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Claude Design para os agentes · {d.ready ? 'liberado' : 'indisponível'}</span>
+        <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Claude Design · {d.ready ? 'conectado' : 'indisponível'}</span>
         <span style={{ fontSize: 12, color: C.t3, lineHeight: 1.5 }}>
           {d.ready
-            ? `Login de Design ok e acesso concedido${d.grantedAt ? ` em ${new Date(d.grantedAt).toLocaleDateString('pt-BR')}` : ''}. O Atria confere antes de cada execução de design.`
+            ? `Login de Design ok e acesso concedido${d.grantedAt ? ` em ${new Date(d.grantedAt).toLocaleDateString('pt-BR')}` : ''}. Para criar designs e decks, abra o Claude no terminal e use /design ou peça um design.`
             : d.hint}
-          {' '}Imagens e vídeos: Higgsfield. {d.artifactTool ? 'Ferramenta Artifact ativa.' : 'Páginas saem pelo preview do Atria.'}
+          {' '}Os agentes entregam em código com preview, Higgsfield (imagem e vídeo) e .pptx/PDF.
         </span>
       </div>
       <SmallBtn onClick={repair} disabled={busy}>{busy ? 'Verificando…' : d.ready ? 'Verificar' : 'Liberar acesso'}</SmallBtn>

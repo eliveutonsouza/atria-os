@@ -536,7 +536,7 @@
         },
         {
           "title": "/design-consent",
-          "what": "Autoriza (ou revoga com /design-revoke) o acesso dos agentes ao Claude Design. O Atria já faz isso sozinho e confere antes de cada execução de design.",
+          "what": "Autoriza (ou revoga com /design-revoke) o acesso do Claude ao Claude Design. O Atria mantém isso ligado sozinho.",
           "when": "Só para revogar ou se o card acima ficar amarelo.",
           "example": "/design-consent",
           "kind": "slash",
@@ -545,7 +545,7 @@
         },
         {
           "title": "Agente Designer",
-          "what": "Na Yui, peça 'faz um design/deck/protótipo' e o Designer usa o Claude Design.",
+          "what": "Na Yui, peça 'faz um design/deck/protótipo' e o Designer entrega em código com preview, Higgsfield ou .pptx. Dentro do Claude Design, só você, no terminal.",
           "when": "Do dia a dia, por voz.",
           "example": "'Yui, cria um protótipo da tela de login'",
           "kind": "concept"
