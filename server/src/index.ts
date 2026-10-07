@@ -7,7 +7,7 @@ import websocket from '@fastify/websocket';
 import httpProxy from '@fastify/http-proxy';
 import { timingSafeEqual } from 'node:crypto';
 import { connect } from 'node:net';
-import { cpSync, existsSync, readFileSync, statSync, statfsSync } from 'node:fs';
+import { cpSync, existsSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import type { Bootstrap, ChatContext } from '../../shared/protocol.ts';
 import { config } from './config.ts';
@@ -44,6 +44,8 @@ import * as remindersApi from './remindersApi.ts';
 import * as reportsApi from './reportsApi.ts';
 import * as historyApi from './historyApi.ts';
 import * as projectsApi from './projectsApi.ts';
+import * as telemetry from './telemetry.ts';
+import { healthFull } from './health.ts';
 import { startClaudeUsage } from './claudeUsage.ts';
 import { agora, saudacao, startAmbiente } from './ambiente.ts';
 import { startLembretes } from './lembretes.ts';
@@ -83,7 +85,7 @@ await app.register(websocket);
 registerAuth(app);
 initTerminal();
 registerTerminal(app);
-for (const mod of [missions, customViews, toolbox, agentsAdmin, workflows, push, stats, browserLive, settings, onboarding, vault, company, help, usage, models, remindersApi, reportsApi, historyApi, projectsApi]) mod.register(app);
+for (const mod of [missions, customViews, toolbox, agentsAdmin, workflows, push, stats, browserLive, settings, onboarding, vault, company, help, usage, models, remindersApi, reportsApi, historyApi, projectsApi, telemetry]) mod.register(app);
 vaultAuto.register();
 startAmbiente();
 startLembretes((text) => narrate(text, { speak: true }));
@@ -91,39 +93,12 @@ startLembretes((text) => narrate(text, { speak: true }));
 app.get('/api/health', async () => ({ ok: true }));
 
 // Saúde detalhada (autenticada): cada dependência com status para o painel e para a auditoria.
-app.get('/api/health/full', async () => {
-  const check = async (fn: () => Promise<unknown>) => fn().then(() => true).catch(() => false);
-  const [docker, browser] = await Promise.all([
-    check(() => fetch(`${config.dockerApi}/_ping`, { signal: AbortSignal.timeout(3000) }).then((r) => { if (!r.ok) throw new Error(); })),
-    check(() => fetch(config.browserMcpUrl, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'health', version: '1' } } }), signal: AbortSignal.timeout(4000) }).then((r) => { if (!r.ok) throw new Error(); })),
-  ]);
-  let disk: number | null = null;
-  try {
-    const st = statfsSync(config.workspaceDir);
-    disk = Math.round((1 - st.bavail / st.blocks) * 100);
-  } catch {
-    /* ignora */
-  }
-  const init = getInit();
-  return {
-    openai: !!config.openaiKey,
-    claudeAuth: claudeLoggedIn() ? 'claude.ai' : config.claudeToken ? 'token' : 'none',
-    github: githubEnabled(),
-    repos: catalog().length,
-    dockerProxy: docker,
-    browser,
-    live: liveActive(),
-    capabilitiesAt: init?.at ?? null,
-    mcpConnected: init?.mcp.filter((m) => m.status === 'connected').length ?? null,
-    workspaceDiskPct: disk,
-    queue: db.prepare(`SELECT state, COUNT(*) AS n FROM runs WHERE state IN ('queued','running','waiting_approval') GROUP BY state`).all(),
-  };
-});
+app.get('/api/health/full', () => healthFull());
 
-// Tudo em /api (exceto auth/health) exige sessão.
+// Tudo em /api (exceto auth/health e a URL de saúde do monitor, que tem chave própria) exige sessão.
 app.addHook('preHandler', async (req, reply) => {
   const url = req.url.split('?')[0];
-  if (!url.startsWith('/api/') || url.startsWith('/api/auth/') || url === '/api/health') return;
+  if (!url.startsWith('/api/') || url.startsWith('/api/auth/') || url === '/api/health' || url === '/api/telemetry') return;
   await requireAuth(req, reply);
 });
 
@@ -444,6 +419,7 @@ startRoutines();
 startGithub().catch((e) => console.error('github', e));
 startCapabilities();
 startClaudeUsage();
+telemetry.startMonitor();
 trustDirs(listProjectConfigs().filter((p) => p.cloned).map((p) => p.dir));
 emit({ type: 'agents.updated', agentsWorking: agentsWorking() });
 await app.listen({ port: config.port, host: config.host });

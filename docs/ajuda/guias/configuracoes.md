@@ -37,7 +37,7 @@ Tem as seções Primeiros passos, Conta, Conexões, Yui & voz, Modelos, Agentes 
 5. **Modelos.** Escolha em listas: **Voz em tempo real**, **Cérebro da Yui**, **Planejador**, **Embeddings** (lidos da sua conta OpenAI) e **Claude Code (agentes)** (lido do Claude Code logado; a primeira opção, "Padrão da conta", deixa a conta decidir). O modelo salvo aparece sempre, mesmo fora da lista. **Outro…** abre um campo para digitar o nome exato, com **Testar** para conferir se a conta tem acesso. **Atualizar lista** relê os modelos na hora; **Restaurar padrões** volta os cinco para o padrão do console. Em **Preços da OpenAI** cole um JSON como `{"gpt-6-luna":{"in":1.25,"out":10}}` — valores em US$ por 1 milhão de tokens (in, out, cachedIn, audioIn, audioOut) ou `perMinute` para voz cobrada por minuto; o nome vale como prefixo. Serve para o Consumo calcular custo de modelos novos. Agentes ao mesmo tempo também fica aqui.
 6. **Agentes & aprovações.** Lista do que sempre pede aprovação e a opção "Pedir aprovação para ações sensíveis em conectores".
 7. **Notificações.** Instalar app, Ativar notificações, Enviar teste e Dispositivos inscritos. Cada aparelho da lista tem **Remover** (pede confirmação); ele para de receber avisos até você ativar de novo nele.
-8. **Sistema.** Saúde de cada peça e os comandos de atualizar e de backup na VPS.
+8. **Sistema.** Saúde de cada peça, os comandos de atualizar e de backup na VPS e o **Monitoramento remoto** (opcional, ver o guia Monitoramento remoto).
 
 ## O que você vê na tela
 - Selo de estado em cada conexão (conectado ou o que falta).

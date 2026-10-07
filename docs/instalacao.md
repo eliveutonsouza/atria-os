@@ -102,6 +102,32 @@ Tudo que está em **Configurações** (nome, e-mail, cidade, voz, modelos, conco
 fica salvo no banco e tem prioridade sobre o `.env`. O `.env` é só o ponto de partida da instalação.
 Variáveis comentadas no [`.env.example`](../.env.example).
 
+## Monitoramento remoto (opcional)
+
+Para quem administra várias Yuis: cada instância manda um pulso a cada 30 s para o **Yui Monitor**
+do administrador e expõe uma URL de saúde. Só vão métricas (CPU, RAM, disco, containers, contagem de
+execuções, limites e custo de IA, erros técnicos); conversas, tarefas, resultados e documentos nunca saem da VPS.
+
+1. No Yui Monitor, cadastre a instância e copie o endereço do monitor e a chave `ymk_…`.
+2. Na instalação, informe os dois quando o `install.sh` perguntar, ou passe por variável:
+
+   ```bash
+   sudo YUI_MONITOR_URL=https://monitor.seudominio.com YUI_MONITOR_KEY=ymk_... ./install.sh --yes
+   ```
+
+   Com endereço e chave no `.env`, o pulso liga sozinho.
+3. Ou depois, pelo painel: **Configurações › Sistema › Monitoramento remoto** (liga/desliga, endereço,
+   chave, **Testar conexão**, status do último envio e a prévia "O que é enviado").
+
+| Caminho | O que faz |
+|---|---|
+| `POST <monitor>/api/ingest` | pulso a cada 30 s (timeout 10 s; em falha espera 30 s, 60 s, 120 s… até 5 min) |
+| `GET https://<domínio>/api/telemetry` | URL de saúde: o mesmo JSON, com os últimos 50 eventos |
+
+As duas usam `Authorization: Bearer <chave>`. Sem a chave certa a URL de saúde responde 401; com o
+monitoramento desligado, 503. A versão mostrada no monitor é o commit do build (`install.sh` e `--update`
+passam `YUI_VERSION` sozinhos).
+
 ## Atualizar
 
 ```bash

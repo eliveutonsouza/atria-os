@@ -12,6 +12,7 @@ import {
   SystemSection,
   VoiceSection,
 } from './settings/sections'
+import { MonitorSection } from './settings/MonitorSection'
 
 // Configurações (Settings.dc.html): menu de seções à esquerda, conteúdo à direita.
 // A seção ativa mora na URL: /app/settings/<seção>.
@@ -44,7 +45,7 @@ export function SettingsPage() {
     case 'models': body = <ModelsSection />; break
     case 'agents': body = <AgentsApprovalsSection />; break
     case 'notifications': body = <NotificationsSection />; break
-    case 'system': body = <SystemSection />; break
+    case 'system': body = <><SystemSection /><MonitorSection /></>; break
     default: body = <SetupSteps onGo={go} />
   }
 

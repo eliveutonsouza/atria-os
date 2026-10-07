@@ -19,6 +19,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ca-certific
   && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
   && apt-get update && apt-get install -y --no-install-recommends gh \
   && rm -rf /var/lib/apt/lists/*
+# versão (git rev-parse --short HEAD) passada pelo install.sh/scripts-deploy.sh; vai na telemetria do Yui Monitor
+ARG YUI_VERSION=dev
+ENV YUI_VERSION=$YUI_VERSION
 ENV NODE_ENV=production \
     HOME=/data/home \
     YUI_DATA_DIR=/data \

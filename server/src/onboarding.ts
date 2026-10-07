@@ -7,6 +7,7 @@ import { claudeLoggedIn } from './runs.ts';
 import { githubEnabled } from './github.ts';
 import { getSetting, onSettingsChange, setRaw } from './settings.ts';
 import { refreshOpenAI } from './brain.ts';
+import { monitorConfig } from './telemetry.ts';
 
 // Primeiro acesso e "Primeiros passos": numa instalação nova não há senha — quem abre o painel cria o acesso,
 // depois conecta Claude, GitHub e OpenAI pelo próprio painel (terminal embutido).
@@ -17,7 +18,8 @@ function status(): SetupStatus {
   const push = (db.prepare('SELECT COUNT(*) AS n FROM sqlite_master WHERE name = ?').get('push_subscriptions') as { n: number }).n
     ? (db.prepare('SELECT COUNT(*) AS n FROM push_subscriptions').get() as { n: number }).n
     : 0;
-  return { needsPassword: !hasPassword(), claude, github: githubEnabled(), openai, push, completed: hasPassword() && claude !== 'none' && openai };
+  const m = monitorConfig();
+  return { needsPassword: !hasPassword(), claude, github: githubEnabled(), openai, push, monitor: m.enabled && !!m.url && !!m.key, completed: hasPassword() && claude !== 'none' && openai };
 }
 
 export function register(app: FastifyInstance): void {

@@ -105,6 +105,8 @@ export function latestReport(): ReportPayload | null {
 }
 
 let lastCpu: { idle: number; total: number } | null = null;
+let cpuPct: number | null = null; // última amostra do intervalo de 5 s (telemetria lê sem mexer na base)
+export const cpuNow = () => cpuPct;
 function cpuPercent(): number | null {
   try {
     const line = readFileSync(join(config.hostProc, 'stat'), 'utf8').split('\n')[0];
@@ -113,25 +115,36 @@ function cpuPercent(): number | null {
     const total = n.reduce((a, b) => a + b, 0);
     const prev = lastCpu;
     lastCpu = { idle, total };
-    if (!prev || total === prev.total) return null;
-    return Math.round((1 - (idle - prev.idle) / (total - prev.total)) * 100);
+    if (!prev || total === prev.total) return cpuPct;
+    cpuPct = Math.round((1 - (idle - prev.idle) / (total - prev.total)) * 100);
+    return cpuPct;
   } catch {
     return null;
   }
 }
 setInterval(cpuPercent, 5000).unref();
 
-export async function infra(): Promise<InfraPayload> {
+/** RAM (% usada e total), carga e uptime do host, lidos de /host/proc. */
+export function hostMem(): { ram: number | null; memTotalMb: number | null; load: number[]; uptimeSec: number | null } {
   let ram: number | null = null;
+  let memTotalMb: number | null = null;
   let load: number[] = [];
+  let uptimeSec: number | null = null;
   try {
     const mem = readFileSync(join(config.hostProc, 'meminfo'), 'utf8');
     const kb = (k: string) => Number(new RegExp(`^${k}:\\s+(\\d+)`, 'm').exec(mem)?.[1] ?? 0);
     ram = Math.round((1 - kb('MemAvailable') / kb('MemTotal')) * 100);
+    memTotalMb = Math.round(kb('MemTotal') / 1024);
     load = readFileSync(join(config.hostProc, 'loadavg'), 'utf8').split(' ').slice(0, 3).map(Number);
+    uptimeSec = Math.round(Number(readFileSync(join(config.hostProc, 'uptime'), 'utf8').split(' ')[0])) || null;
   } catch {
     /* sem /proc do host */
   }
+  return { ram, memTotalMb, load, uptimeSec };
+}
+
+export async function infra(): Promise<InfraPayload> {
+  const { ram, load } = hostMem();
   let disk: number | null = null;
   try {
     const s = statfsSync('/');

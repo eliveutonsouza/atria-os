@@ -9,7 +9,7 @@ export interface ContainerSummary {
   health: string | null;
 }
 
-async function dget(path: string): Promise<Response> {
+export async function dget(path: string): Promise<Response> {
   return fetch(`${config.dockerApi}${path}`, { signal: AbortSignal.timeout(5000) });
 }
 

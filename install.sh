@@ -8,6 +8,7 @@
 #   sudo ./install.sh --backup     # copia banco, workspace e logins para ./backups/
 #
 # Variáveis aceitas (instalação sem perguntas): YUI_DOMAIN ACME_EMAIL OPENAI_API_KEY YUI_USER_NAME TZ
+#   YUI_MONITOR_URL YUI_MONITOR_KEY (opcional: monitoramento remoto pelo Yui Monitor do administrador)
 #   YUI_PROXY=auto|traefik|caddy|none (auto: usa o Traefik que já estiver rodando; senão sobe o Caddy;
 #     none: sem HTTPS próprio, publica 127.0.0.1:YUI_HTTP_PORT para o seu proxy)
 #   YUI_PROJECT (padrão yui-console; outro nome = segunda instalação isolada na mesma VPS)
@@ -44,6 +45,7 @@ ask() { # ask VAR "pergunta" [padrão]
 ENV_FILE="$ROOT/.env"
 # Valores passados explicitamente por variável de ambiente sobrescrevem o .env (os perguntados só preenchem vazios).
 EXPLICIT_DOMAIN="${YUI_DOMAIN:-}"; EXPLICIT_EMAIL="${ACME_EMAIL:-}"; EXPLICIT_OPENAI="${OPENAI_API_KEY:-}"
+EXPLICIT_MONITOR_URL="${YUI_MONITOR_URL:-}"; EXPLICIT_MONITOR_KEY="${YUI_MONITOR_KEY:-}"
 # Lê um valor do .env (sem executar o arquivo).
 env_get() { [ -f "$ENV_FILE" ] && sed -n "s/^$1=//p" "$ENV_FILE" | tail -1 | sed "s/^'\(.*\)'$/\1/" || true; }
 # Grava KEY=VALUE no .env só se a chave não existir ou estiver vazia (idempotente; nunca sobrescreve o que você editou).
@@ -72,6 +74,8 @@ env_put() {
 PROJECT="${YUI_PROJECT:-$(env_get YUI_PROJECT)}"; PROJECT="${PROJECT:-yui-console}"
 export YUI_PROJECT="$PROJECT"
 C="$PROJECT-yui-console-1"
+# versão do build (aparece no Yui Monitor); sem git fica "dev"
+yui_version() { export YUI_VERSION; YUI_VERSION="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo dev)"; }
 busy_runs() {
   docker exec "$C" node -e "const D=require('/app/server/node_modules/better-sqlite3');const db=new D('/data/yui.db',{readonly:true});console.log(db.prepare(\"SELECT COUNT(*) n FROM runs WHERE state IN ('running','waiting_approval')\").get().n)" 2>/dev/null || echo 0
 }
@@ -108,6 +112,7 @@ if [ "$ACTION" = update ]; then
   say "atualizar"
   if [ -d .git ] && git remote get-url origin >/dev/null 2>&1; then git pull --ff-only && ok "código atualizado ($(git log -1 --format=%h))"; else warn "sem git remoto — usando o código desta pasta"; fi
   for _ in $(seq 1 80); do n=$(busy_runs); [ "$n" = 0 ] && break; echo "  aguardando $n execução(ões) terminarem…"; sleep 15; done
+  yui_version
   docker compose up -d --build
   wait_healthy
   exit 0
@@ -146,14 +151,26 @@ ask ACME_EMAIL "e-mail para os certificados HTTPS (Let's Encrypt)"
 OPENAI_API_KEY="${OPENAI_API_KEY:-$(env_get OPENAI_API_KEY)}"
 ask OPENAI_API_KEY "chave da OpenAI (voz e cérebro da Yui; Enter = configurar depois no painel)"
 YUI_USER_NAME="${YUI_USER_NAME:-$(env_get YUI_USER_NAME)}"
+# monitoramento remoto (opcional): endereço e chave gerados no Yui Monitor do administrador
+YUI_MONITOR_URL="${YUI_MONITOR_URL:-$(env_get YUI_MONITOR_URL)}"
+ask YUI_MONITOR_URL "endereço do Yui Monitor (opcional; Enter = sem monitoramento remoto)"
+if [ -n "${YUI_MONITOR_URL:-}" ]; then
+  case "$YUI_MONITOR_URL" in https://*) ;; *) die "o endereço do monitor precisa começar com https://" ;; esac
+  YUI_MONITOR_KEY="${YUI_MONITOR_KEY:-$(env_get YUI_MONITOR_KEY)}"
+  ask YUI_MONITOR_KEY "chave desta Yui no monitor (ymk_…)"
+fi
 # troca o exemplo pelo domínio real; valores passados explicitamente sempre valem
 if [ -n "$EXPLICIT_DOMAIN" ] || [ "$(env_get YUI_DOMAIN)" = yui.example.com ]; then env_set YUI_DOMAIN "$YUI_DOMAIN"; fi
 [ -n "$EXPLICIT_EMAIL" ] && env_set ACME_EMAIL "$EXPLICIT_EMAIL"
 [ -n "$EXPLICIT_OPENAI" ] && env_set OPENAI_API_KEY "$EXPLICIT_OPENAI"
+[ -n "$EXPLICIT_MONITOR_URL" ] && env_set YUI_MONITOR_URL "$EXPLICIT_MONITOR_URL"
+[ -n "$EXPLICIT_MONITOR_KEY" ] && env_set YUI_MONITOR_KEY "$EXPLICIT_MONITOR_KEY"
 env_put YUI_DOMAIN "$YUI_DOMAIN"
 env_put ACME_EMAIL "${ACME_EMAIL:-}"
 env_put OPENAI_API_KEY "${OPENAI_API_KEY:-}"
 env_put YUI_USER_NAME "${YUI_USER_NAME:-}"
+env_put YUI_MONITOR_URL "${YUI_MONITOR_URL:-}"
+env_put YUI_MONITOR_KEY "${YUI_MONITOR_KEY:-}"
 env_put TZ "$TZ_VAL"
 [ "$PROJECT" != yui-console ] && env_set YUI_PROJECT "$PROJECT"
 env_put SESSION_SECRET "$(openssl rand -hex 32)"
@@ -201,6 +218,7 @@ env_set YUI_PROXY "$YUI_PROXY"
 
 # ── 4. subir ────────────────────────────────────────────────────────────
 say "4/4 build e subida (primeira vez leva alguns minutos)"
+yui_version
 docker compose up -d --build
 wait_healthy
 if [ "$YUI_PROXY" = none ]; then

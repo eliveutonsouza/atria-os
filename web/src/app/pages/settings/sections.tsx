@@ -99,7 +99,7 @@ const bigBtn = (primary = false) =>
 
 // ---------- Primeiros passos ----------
 
-export function SetupSteps({ onGo }: { onGo: (tab: 'connections' | 'notifications') => void }) {
+export function SetupSteps({ onGo }: { onGo: (tab: 'connections' | 'notifications' | 'system') => void }) {
   const { st } = useSetupStatus()
   if (!st) return null
   const steps = [
@@ -108,6 +108,7 @@ export function SetupSteps({ onGo }: { onGo: (tab: 'connections' | 'notification
     { done: st.openai, t: 'OpenAI conectada', d: 'Voz da Yui (GPT-Live) e o cérebro que decide o que fazer.', go: 'connections' as const },
     { done: st.github, t: 'GitHub conectado', d: 'Opcional: catálogo automático e clone dos seus repositórios.', go: 'connections' as const },
     { done: st.push > 0, t: 'App e notificações', d: 'Opcional: instale no celular/desktop e receba aprovações.', go: 'notifications' as const },
+    { done: !!st.monitor, t: 'Monitoramento (opcional)', d: 'Para quem administra várias Yuis: envia a saúde desta instância para o Yui Monitor.', go: 'system' as const },
   ]
   const n = steps.filter((s) => s.done).length
   return (

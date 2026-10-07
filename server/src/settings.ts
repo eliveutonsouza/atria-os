@@ -43,7 +43,22 @@ export const SETTINGS: Record<string, Def> = {
   'ui.reducedMotion': { kind: 'boolean', def: false },
   'approvals.mcpSensitive': { kind: 'boolean', def: false },
   'notify.types': { kind: 'string', def: 'approval,failed,done', maxLen: 120 },
+  // Monitoramento remoto (Yui Monitor): pulso a cada 30 s + URL de saúde (telemetry.ts)
+  'monitor.enabled': { kind: 'boolean', env: 'YUI_MONITOR_ENABLED', def: false },
+  'monitor.url': { kind: 'string', env: 'YUI_MONITOR_URL', def: '', maxLen: 200 },
+  'monitor.key': { kind: 'secret', env: 'YUI_MONITOR_KEY', def: '', maxLen: 200 },
 };
+
+/** Endereço do monitor: https, ou http só em localhost/127.0.0.1 (testes). */
+export function validMonitorUrl(s: string): boolean {
+  try {
+    const u = new URL(s);
+    if (u.username || u.password) return false;
+    return u.protocol === 'https:' || (u.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(u.hostname));
+  } catch {
+    return false;
+  }
+}
 
 const SECRET_KEYS = new Set(['auth.passwordHash', ...Object.entries(SETTINGS).filter(([, d]) => d.kind === 'secret').map(([k]) => k)]);
 
@@ -137,6 +152,7 @@ function validate(key: string, v: unknown): string | null {
       if (d.maxLen && s.length > d.maxLen) throw new Error(`${key}: até ${d.maxLen} caracteres`);
       if (key === 'user.email' && s && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) throw new Error('e-mail inválido');
       if (key === 'pricing.openai' && s) validatePricing(s);
+      if (key === 'monitor.url' && s && !validMonitorUrl(s)) throw new Error('endereço do monitor: use https://');
       if (key === 'openai.key' && s &&!/^sk-[A-Za-z0-9_-]{20,}$/.test(s)) throw new Error('chave OpenAI inválida (começa com sk-)');
       return s;
     }

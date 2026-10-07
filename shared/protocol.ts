@@ -500,6 +500,7 @@ export interface SetupStatus {
   github: boolean;
   openai: boolean;
   push: number; // dispositivos inscritos
+  monitor?: boolean; // monitoramento remoto ligado (opcional, para quem administra várias Yuis)
   completed: boolean;
 }
 

@@ -17,7 +17,7 @@ if [ "$FORCE" = 0 ]; then
     echo "aguardando $n execução(ões) terminarem…"; sleep 15
   done
 fi
-docker compose -p "$PROJECT" up -d --build
+YUI_VERSION="$(git rev-parse --short HEAD 2>/dev/null || echo dev)" docker compose -p "$PROJECT" up -d --build
 for i in $(seq 1 30); do
   st=$(docker inspect -f '{{.State.Health.Status}}' "$C" 2>/dev/null || echo starting)
   [ "$st" = healthy ] && break; sleep 3

@@ -4,7 +4,10 @@ name: ${YUI_PROJECT:-yui-console}
 
 services:
   yui-console:
-    build: .
+    build:
+      context: .
+      args:
+        YUI_VERSION: ${YUI_VERSION:-dev}
     image: ${YUI_PROJECT:-yui-console}:local
     restart: unless-stopped
     env_file: [.env]
