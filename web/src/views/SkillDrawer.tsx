@@ -206,8 +206,8 @@ export function SkillDrawer({ source, skillId, installed, presetAgents, onClose,
   )
 
   const footer = (
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', flexDirection: phone ? 'column-reverse' : 'row' }}>
-      {!phone && <span style={{ fontSize: 12, color: C.t3, marginRight: 'auto' }}>Baixa do GitHub do autor e vale na próxima execução.</span>}
+    <div style={{ display: 'flex', gap: 8, flexWrap: phone ? 'wrap' : 'nowrap', justifyContent: 'flex-end', alignItems: 'center', flexDirection: phone ? 'column-reverse' : 'row' }}>
+      {!phone && <span style={{ fontSize: 12, color: C.t3, marginRight: 'auto', flex: '1 1 160px', minWidth: 0 }}>Baixa do GitHub do autor e vale na próxima execução.</span>}
       {installed && (
         <button onClick={() => setConfirmDel(true)} disabled={!!busy} style={{ ...btn, width: phone ? '100%' : undefined, color: '#f39aa4', borderColor: 'rgba(240,98,114,.35)' }}>
           Remover
