@@ -12,7 +12,7 @@ export function pickPrimary(actions: HeaderAction[]): HeaderAction | null {
 }
 
 // Telas cujo `id` é um detalhe aberto a partir de uma lista: no celular ganham ‹ Voltar.
-const NO_BACK = new Set(['overview', 'more', 'tools', 'company', 'settings'])
+const NO_BACK = new Set(['overview', 'more', 'tools', 'company', 'settings', 'skills'])
 
 export function PageHeader({ extra }: { extra?: ReactNode }) {
   const header = useYui((s) => s.header)

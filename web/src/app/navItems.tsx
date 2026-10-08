@@ -27,6 +27,7 @@ export const NAV_ICON: Record<AppPage, string> = {
     'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z',
   more: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
   usage: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
+  skills: 'M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8zM18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9zM5 15l.6 1.4L7 17l-1.4.6L5 19l-.6-1.4L3 17l1.4-.6z',
   reminders: 'M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0',
 }
 
@@ -75,6 +76,7 @@ export function useNavGroups(active = true): { name: string; items: NavItem[] }[
         { id: 'browser', label: 'Navegador' },
         { id: 'terminal', label: 'Terminal' },
         { id: 'claude', label: 'Claude Code' },
+        { id: 'skills', label: 'Skills' },
         { id: 'tools', label: 'Conectores & MCP' },
       ],
     },

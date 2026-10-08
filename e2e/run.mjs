@@ -359,6 +359,25 @@ await check('ajuda: índice, guia, pergunte e resultados', async () => {
   if (!decodeURIComponent(page.url()).includes('guia:vault')) throw new Error(`? abriu ${page.url()}`);
 });
 
+await check('skills: loja do skills.sh, ficha e aba instaladas', async () => {
+  const cat = JSON.parse((await api('/api/skills/catalog?view=all')).body);
+  if (!(cat.skills?.length > 50)) throw new Error(`ranking com ${cat.skills?.length} skills`);
+  await openRoute('/app/skills');
+  const first = cat.skills[0].skillId;
+  await page.getByRole('button', { name: first, exact: true }).first().click();
+  const drawer = page.getByRole('dialog', { name: `Skill ${first}` });
+  await drawer.getByText('Onde instalar').waitFor({ timeout: 8000 });
+  await drawer.getByText('SKILL.md · o que o Claude vai aprender').waitFor({ timeout: 8000 });
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: `${SHOTS}/skills-ficha.png` });
+  await page.keyboard.press('Escape');
+  await page.screenshot({ path: `${SHOTS}/skills.png` });
+  await openRoute('/app/skills/installed');
+  await page.getByRole('tab', { name: /Instaladas/ }).waitFor({ timeout: 6000 });
+  const s = JSON.parse((await api('/api/skills/search?q=react')).body);
+  if (!s.skills?.length) throw new Error('busca vazia');
+});
+
 await check('mobile centro', async () => {
   const m = await browser.newContext({ viewport: { width: 390, height: 844 }, storageState: await ctx.storageState() });
   const mp = await m.newPage();

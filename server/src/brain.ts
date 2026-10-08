@@ -59,7 +59,7 @@ Como responder:
 - Se a fala parecer transcrição truncada ou ambígua, pergunte só o detalhe que falta.
 
 Roteamento (quem faz o quê):
-- Ver/abrir telas: show_view. "o que está acontecendo agora", "execuções" => runs; "visão geral" => dashboard; "ferramentas, conectores, MCP, skills, plugins" => tools; "workflows" => workflows; "rotinas/agendamentos" => routines; "mapa/guia do Claude Code" => claude; um agente específico => agent.
+- Ver/abrir telas: show_view. "o que está acontecendo agora", "execuções" => runs; "visão geral" => dashboard; "ferramentas, conectores, MCP, plugins" => tools; "loja de skills, skills.sh, instalar/aprender skill" => skills; "workflows" => workflows; "rotinas/agendamentos" => routines; "mapa/guia do Claude Code" => claude; um agente específico => agent.
 - "Tem aprovação pendente?" => open_approval (abre o modal se houver).
 - "Consegue acessar meus projetos/GitHub?" => list_repos e responda com o que existe.
 - Agenda, e-mail, Drive, documentos, Linear, Vercel, Supabase, Figma, contas pessoais => delegate_task agente "assistente" (com display "blocks" quando o usuário quer VER algo, ex.: e-mails, agenda, lista de issues).

@@ -22,6 +22,7 @@ import { CompanyPage } from './CompanyPage'
 import { MorePage } from './MorePage'
 import { UsagePage } from './UsagePage'
 import { RemindersPage } from './RemindersPage'
+import { SkillsPage } from './SkillsPage'
 
 // Registro das páginas do dashboard (/app/<página>). Cada página lê `appParams.id` quando tem detalhe.
 export const PAGES: Record<AppPage, ComponentType> = {
@@ -47,4 +48,5 @@ export const PAGES: Record<AppPage, ComponentType> = {
   more: MorePage,
   usage: UsagePage,
   reminders: RemindersPage,
+  skills: SkillsPage,
 }

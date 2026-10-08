@@ -11,6 +11,7 @@ import { card, Empty, ErrorNote, Skeleton, useHeader } from './ui'
 import { Chip, Field, input, mcpStatusMeta, SearchBox, SmallBtn, StatusPill } from './kit'
 import { ModelSelect } from './ModelSelect'
 import { BottomSheet } from './Sheet'
+import { AgentSkills } from './AgentSkills'
 
 // Ficha do agente: prompt, skills, conectores MCP (allowlist), plugins, modelo e turnos — salvos no
 // frontmatter de /workspace/.claude/agents/<id>.md, aplicados a cada execução.
@@ -188,6 +189,14 @@ export function AgentDetailView({ onGone }: { onGone?: () => void } = {}) {
               </Chip>
             ))}
         </div>
+      </section>
+
+      <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+          <span className="eyebrow">Skills do skills.sh</span>
+          <span style={{ fontSize: 12, color: C.t3 }}>conhecimento extra instalado com 1 clique</span>
+        </div>
+        <AgentSkills agentId={id} agentName={draft.name} pluginSkills={init?.skills.length ?? 0} />
       </section>
 
       <section style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

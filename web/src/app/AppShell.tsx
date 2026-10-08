@@ -25,6 +25,7 @@ export const PAGE_TITLES: Record<AppPage, [string, string]> = {
   terminal: ['Terminal', 'Terminal'],
   claude: ['Claude Code', 'Central de comandos'],
   tools: ['Ferramentas', 'Conectores, MCP, skills e plugins'],
+  skills: ['Ferramentas · skills.sh', 'Skills'],
   inbox: ['Aprovações', 'O que precisa de você'],
   infra: ['Infra & logs', 'Minha VPS'],
   settings: ['Configurações', 'Configurações'],

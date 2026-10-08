@@ -34,7 +34,8 @@ export type ViewName =
   | 'vault'
   | 'brain'
   | 'company'
-  | 'help';
+  | 'help'
+  | 'skills';
 
 export const VIEW_NAMES: ViewName[] = [
   'brief',
@@ -60,6 +61,7 @@ export const VIEW_NAMES: ViewName[] = [
   'brain',
   'company',
   'help',
+  'skills',
 ];
 
 export interface ViewParams {
@@ -382,6 +384,44 @@ export interface ClaudeInitInfo {
   agents: string[];
 }
 
+// ---------- skills.sh (loja de skills) ----------
+export type SkillHubView = 'all' | 'trending' | 'hot';
+export interface HubSkill {
+  source: string; // owner/repo no GitHub (ou domínio, quando não é GitHub)
+  skillId: string;
+  name: string;
+  installs: number;
+  weekly?: number[]; // instalações das últimas 8 semanas (só no ranking "all")
+  change?: number; // variação em 24 h (hot)
+  official?: boolean;
+}
+export interface SkillAudit {
+  name: string; // Gen Agent Trust Hub, Socket, Snyk…
+  result: 'pass' | 'warn' | 'fail' | 'unknown';
+}
+export interface HubSkillDetail extends HubSkill {
+  description: string;
+  audits: SkillAudit[];
+  skillMd: string;
+  files: number;
+  bytes: number;
+  installable: boolean;
+  reason?: string; // por que não dá para instalar
+}
+export interface InstalledSkill {
+  name: string; // nome da pasta (o que o Claude enxerga)
+  source: string;
+  skillId: string;
+  scope: 'platform' | 'agents';
+  agents: string[]; // ids dos agentes quando scope = agents
+  description: string;
+  treeSha: string;
+  audits: SkillAudit[];
+  installedAt: string;
+  updatedAt?: string;
+  updateAvailable?: boolean;
+}
+
 // ---------- agentes configuráveis ----------
 export interface AgentConfig {
   id: string;
@@ -453,7 +493,7 @@ export interface RoutineInfo {
 export type AppPage =
   | 'overview' | 'ops' | 'agents' | 'runs' | 'missions' | 'workflows' | 'schedule' | 'projects'
   | 'browser' | 'terminal' | 'claude' | 'tools' | 'inbox' | 'infra' | 'settings'
-  | 'vault' | 'brain' | 'company' | 'help' | 'more' | 'usage' | 'reminders';
+  | 'vault' | 'brain' | 'company' | 'help' | 'more' | 'usage' | 'reminders' | 'skills';
 
 export interface StatsOverview {
   kpis: { runsToday: number; runsYesterday: number; success7d: number | null; failed7d: number; agentsActive: number; agentsTotal: number; approvals: number; cost7d: number; tokens7d: number };

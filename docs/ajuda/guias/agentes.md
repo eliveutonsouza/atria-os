@@ -31,7 +31,7 @@ Cada agente é um Claude Code com papel próprio: Backend, Frontend, QA, DevOps,
 ## Passo a passo
 1. **Escolha o agente** na lista. O ponto azul indica que está trabalhando; a porcentagem é o sucesso recente.
 2. **Estatísticas.** Execuções em 30 dias, sucesso, duração média, custo, gráfico de 14 dias e ferramentas mais usadas.
-3. **Configuração.** Edite Nome, Grupo, Modelo, Máx. de turnos, Especialidade, Instruções (prompt), Conectores MCP, Skills e Plugins preferidos. Clique em **Salvar**.
+3. **Configuração.** Edite Nome, Grupo, Modelo, Máx. de turnos, Especialidade, Instruções (prompt), Conectores MCP, Skills e Plugins preferidos. Clique em **Salvar**. Em **Skills do skills.sh**, busque e adicione skills que só este agente vai enxergar (veja o guia Skills).
 4. **Teste.** **Testar** roda uma execução curta de apresentação. **Abrir no terminal** abre o agente no Claude Code interativo.
 5. **Modelo.** Deixe em **Padrão do Atria OS — …** para seguir o modelo escolhido em Configurações › Modelos (o nome técnico aparece logo abaixo). Escolha outro da lista, ou **Outro…** para digitar um nome exato, só quando esse agente precisar.
 6. **Crie ou duplique.** **+ Novo agente** cria um em branco e abre a Configuração; **Duplicar** copia um existente como ponto de partida.

@@ -33,6 +33,7 @@ export const GUIDE_FOR_PAGE: Partial<Record<AppPage, string>> = {
   terminal: 'terminal',
   claude: 'claude-code',
   tools: 'conectores',
+  skills: 'skills',
   infra: 'infra',
   settings: 'configuracoes',
 }
@@ -54,6 +55,7 @@ export const PAGE_LABEL: Partial<Record<AppPage, string>> = {
   terminal: 'Terminal',
   claude: 'Claude Code',
   tools: 'Conectores & MCP',
+  skills: 'Skills',
   infra: 'Infra & logs',
   settings: 'Configurações',
   help: 'Ajuda',
