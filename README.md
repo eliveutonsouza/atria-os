@@ -76,6 +76,18 @@ O instalador:
 
 Rodar de novo é seguro: valores existentes no `.env` são mantidos.
 
+**Por imagem pronta (instalação de cliente).** No Atria Central, ao cadastrar a instância, o botão de
+instalação gera um comando de uso único (vale 24 h):
+
+```bash
+curl -fsSL https://<central>/i/<token> | sudo bash
+```
+
+Ele baixa o compose da release, grava a chave do Central, a versão e o acesso às imagens privadas do GHCR e
+roda o [`deploy/install-release.sh`](deploy/install-release.sh): instala o Docker se faltar, pergunta domínio e
+proxy, gera os segredos, puxa as imagens (sem git nem build) e sobe tudo em `/opt/atria-os`, já com o
+**atualizador** ligado. Detalhes: [docs/instalacao.md](docs/instalacao.md#instalação-por-imagem-1-comando).
+
 **Sem perguntas** (automação):
 
 ```bash
@@ -128,10 +140,12 @@ ATRIA_PROXY=none ATRIA_HTTP_PORT=8080 sudo -E ./install.sh
 | `atria-docling` | leitura/OCR de PDFs e imagens | 3 GB | — |
 | `atria-dockerproxy` | leitura de containers e logs (sem escrita) para a tela Infra | 64 MB | socket do Docker (ro) |
 | `atria-caddy` | HTTPS automático (só no modo `caddy`) | 128 MB | `caddy-data`, `caddy-config` |
+| `atria-updater` | atualização remota pelo Atria Central (só na instalação por imagem, profile `updater`) | 256 MB | `updater-state`, socket do Docker |
 
 Os volumes guardam tudo que é seu: `data` (banco SQLite, logins Claude/GitHub, configurações, chaves
-de push), `workspace` (projetos clonados, Vault, workflows, agentes). As imagens são construídas na
-própria VPS a partir deste repositório; as imagens de terceiros são multi-arquitetura e fixadas por digest.
+de push), `workspace` (projetos clonados, Vault, workflows, agentes). Na instalação a partir do código as
+imagens são construídas na própria VPS (`docker-compose.build.yml`); na instalação por imagem vêm prontas do
+GHCR na versão `ATRIA_TAG`. As imagens de terceiros são multi-arquitetura e fixadas por digest.
 
 ## Configuração (.env)
 
@@ -149,8 +163,15 @@ editável em **Configurações** no painel, que tem prioridade sobre o `.env`.
 | `CLAUDE_CODE_OAUTH_TOKEN`, `ATRIA_CLAUDE_MODEL`, `ATRIA_MAX_CONCURRENT_RUNS` | alternativa ao login pelo painel; modelo e paralelismo dos agentes |
 | `ATRIA_USER_NAME`, `ATRIA_USER_EMAIL`, `ATRIA_USER_CITY` | dados do dono (também no painel) |
 | `ATRIA_PROJECT` | nome do projeto Docker; mude só para uma segunda instalação isolada na mesma VPS |
+| `ATRIA_TAG`, `GHCR_USER`, `GHCR_TOKEN`, `ATRIA_UPDATER_TOKEN`, `ATRIA_STACK_DIR` | instalação por imagem: versão, acesso ao GHCR e atualizador (o `install-release.sh` preenche) |
 
 ## Atualizar, backup e desinstalar
+
+Instalação por imagem: a atualização vem do **Atria Central** (agora ou agendada). O Atria OS espera as
+execuções terminarem e o `atria-updater` troca a versão; se ela não ficar saudável em 3 min, volta sozinha
+para a anterior. O cliente pode recusar em Configurações › Suporte e atualizações.
+
+Instalação a partir do código:
 
 ```bash
 sudo ./install.sh --update   # git pull + rebuild, esperando execuções em andamento terminarem
@@ -180,6 +201,8 @@ web/             painel React + Vite (PWA)
 shared/          tipos e protocolo comuns
 browser/         entrypoint do Chromium + proxy CDP
 code/            imagem do VS Code com a extensão atria-bridge
+updater/         atria-updater: troca a versão das imagens e reverte se não ficar saudável (Node, sem dependências)
+deploy/          install-release.sh (instalação por imagem, publicado em cada release)
 workspace-seed/  Vault, workflows e ferramentas iniciais copiados no primeiro boot
 docs/            instalação, auditorias e guias da Ajuda (docs/ajuda, servidos no painel)
 e2e/             testes Playwright (desktop e 6 aparelhos móveis)
@@ -188,13 +211,20 @@ e2e/             testes Playwright (desktop e 6 aparelhos móveis)
 ```bash
 cd server && npm ci && npm run typecheck && node --test test/*.test.ts
 cd web && npm ci && npm run lint && npm run build
+cd updater && npm ci && npm run typecheck && node --test test/*.test.ts
 # cérebro (gasta tokens OpenAI; as ferramentas não executam):
 cd server && ATRIA_DATA_DIR=$(mktemp -d) ATRIA_WORKSPACE_DIR=$(mktemp -d) OPENAI_API_KEY=sk-... npx tsx scripts/eval-brain.ts [filtro]
 ```
 
-Deploy na VPS de produção: `./scripts-deploy.sh` (espera execuções terminarem, rebuild, sobe e roda o e2e —
-precisa de `ATRIA_E2E_PASSWORD`; `--no-e2e` pula). O **CI** (GitHub Actions) roda em todo push: gitleaks,
-tipos e testes do servidor, lint e build do painel, `docker compose config` nos três modos e build das duas imagens.
+Deploy na VPS de produção: `./scripts-deploy.sh` (espera execuções terminarem, rebuild com o
+`docker-compose.build.yml`, sobe e roda o e2e — precisa de `ATRIA_E2E_PASSWORD`; `--no-e2e` pula). O **CI**
+(GitHub Actions) roda em todo push: gitleaks, tipos e testes do servidor e do atualizador, lint e build do painel,
+`docker compose config` nos três modos (por imagem e a partir do código) e build das três imagens.
+
+**Release:** `git tag v1.2.0 && git push origin v1.2.0` dispara o `release.yml`: imagens `atria-os`, `atria-code`
+e `atria-updater` (amd64 + arm64) privadas em `ghcr.io/eliveutonsouza/…:v1.2.0` e `:latest`, com
+`ATRIA_VERSION` = tag, e a GitHub Release com notas geradas e os assets `docker-compose.release.yml` e
+`install-release.sh`. Daí o Atria Central oferece a versão para as instâncias.
 
 Mapa dos módulos, fluxo de um pedido e onde ficam os dados: [docs/arquitetura.md](docs/arquitetura.md).
 

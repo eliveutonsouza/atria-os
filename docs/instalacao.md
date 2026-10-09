@@ -14,6 +14,7 @@ Resumo e passo a passo rápido no [README](../README.md). Aqui ficam os detalhes
 | `atria-docling` | leitura e OCR de arquivos (PDF, imagem, Office) | 3 GB |
 | `atria-dockerproxy` | leitura de containers e logs (somente leitura, sem POST) | 64 MB |
 | `atria-caddy` | HTTPS automático — só no modo `caddy` (profile `edge`) | 128 MB |
+| `atria-updater` | atualização remota pelo Atria Central — só na instalação por imagem (profile `updater`) | 256 MB |
 
 Os limites são tetos; em repouso o conjunto usa ~3 GB. Picos acontecem ao processar documentos (docling)
 e com vários agentes rodando.
@@ -29,7 +30,20 @@ Volumes (prefixo = nome do projeto, padrão `atria-os_`):
 | `caddy-data`, `caddy-config` | certificados (modo caddy) |
 
 Arquivos do repositório usados em tempo de execução: `.env`, `Caddyfile`, `browser/` (montado no navegador),
-`docker-compose.yml` e `docker-compose.port.yml` (modo `none`).
+`docker-compose.yml`, `docker-compose.port.yml` (modo `none`), `docker-compose.redirect.yml` (domínio antigo) e,
+na instalação a partir do código, `docker-compose.build.yml`.
+
+**Dois modos de instalação**, com o mesmo `docker-compose.yml`:
+
+| | A partir do código (`install.sh`) | Por imagem (`deploy/install-release.sh`) |
+|---|---|---|
+| Imagens | buildadas na VPS (`atria-os:local`…) — `COMPOSE_FILE` inclui `docker-compose.build.yml` | prontas do GHCR, `ghcr.io/eliveutonsouza/atria-os:${ATRIA_TAG}` |
+| Precisa | clone do repositório | `GHCR_USER`/`GHCR_TOKEN` (pacotes privados) |
+| Atualizar | `sudo ./install.sh --update` | pelo Atria Central (atualizador) |
+| Pasta | onde você clonou | `/opt/atria-os` (`ATRIA_DIR`) |
+
+O `docker-compose.release.yml` publicado em cada release é o próprio `docker-compose.yml` (que já é o modo
+imagem); não existe um segundo arquivo no repositório.
 
 ## Passo a passo
 
@@ -46,6 +60,68 @@ Arquivos do repositório usados em tempo de execução: `.env`, `Caddyfile`, `br
 
 Arquitetura: x86_64 e ARM64. O Dockerfile liga o binário `claude` do pacote da arquitetura certa e todas
 as imagens de terceiros têm as duas variantes.
+
+## Instalação por imagem (1 comando)
+
+Para instalações de clientes. No Atria Central, cadastre a instância e gere o comando de instalação (uso
+único, 24 h):
+
+```bash
+curl -fsSL https://<central>/i/<token> | sudo bash
+```
+
+O script do Central grava `/opt/atria-os/docker-compose.yml` (asset da release) e `/opt/atria-os/.env.central`
+(`ATRIA_MONITOR_URL`, `ATRIA_MONITOR_KEY`, `ATRIA_TAG`, `GHCR_USER`, `GHCR_TOKEN`, `ATRIA_UPDATER_TOKEN`) e roda
+o `install-release.sh` da mesma release, que:
+
+1. instala `curl`/`openssl` e o Docker (get.docker.com) se faltarem;
+2. faz `docker login ghcr.io`, baixa a imagem do atualizador da versão e copia dela os arquivos do compose
+   (`browser/`, `Caddyfile`, overrides, `.env.example`) — a release só precisa de dois assets;
+3. pergunta domínio, fuso, e-mail e chave OpenAI; gera `SESSION_SECRET` e as senhas do Postgres/Qdrant como o
+   `install.sh`; junta o `.env.central` ao `.env` (e apaga o `.env.central`); grava `ATRIA_STACK_DIR`;
+4. escolhe o proxy (`caddy`/`traefik`/`none`, mesma detecção do `install.sh`) e liga o profile `updater`
+   (`COMPOSE_PROFILES=updater`, ou `edge,updater` com Caddy);
+5. `docker compose pull` + `up -d`, espera o painel ficar saudável e mostra o endereço.
+
+Sem perguntas (ou sem terminal), tudo por variável:
+
+```bash
+sudo ATRIA_TAG=v1.0.0 GHCR_USER=… GHCR_TOKEN=… ATRIA_DOMAIN=atria.cliente.com ACME_EMAIL=ti@cliente.com \
+  ATRIA_PROXY=auto bash install-release.sh --yes
+```
+
+Aceita também `ATRIA_DIR`, `ATRIA_PROJECT`, `ATRIA_HTTP_PORT`, `ATRIA_OLD_DOMAIN`, `ATRIA_MONITOR_URL`/`KEY`,
+`ATRIA_UPDATER_TOKEN` (senão gera) e `ATRIA_REGISTRY` (outro registro, para testes). Rodar de novo é seguro:
+mantém o `.env` e sobe a versão de `ATRIA_TAG`.
+
+## Releases e atualização remota
+
+- **Release**: tag `vX.Y.Z` no GitHub → `.github/workflows/release.yml` publica `atria-os`, `atria-code` e
+  `atria-updater` (amd64 + arm64, privadas) em `ghcr.io/eliveutonsouza/<imagem>:<tag>` e `:latest`, com
+  `ATRIA_VERSION` = tag, e cria a GitHub Release (notas geradas + `docker-compose.release.yml` e `install-release.sh`).
+- **Atualizador** (`atria-updater`, pasta `updater/`): só na rede interna do compose (porta 8787, nunca publicada),
+  com `Authorization: Bearer ${ATRIA_UPDATER_TOKEN}`. Sem token configurado, recusa tudo (503).
+
+  | Rota | O que faz |
+  |---|---|
+  | `GET /status` | `{status: ready\|busy\|error, tag, previousTag, step, version, job}` |
+  | `POST /update {tag, commandId, jobId}` | 202 aceito · 409 ocupado · 400 tag fora de `vX.Y.Z` |
+  | `POST /ack {commandId}` | marca o resultado do job como entregue ao Central |
+
+  Passos: guarda a tag anterior → `docker login` (GHCR_USER/GHCR_TOKEN lidos do `.env` na hora) → grava
+  `ATRIA_TAG` no `.env` → `docker compose pull atria atria-code` → `up -d atria atria-code` → espera
+  `<projeto>-atria-1` ficar *healthy* com a imagem da tag nova (até 180 s; *unhealthy* encerra antes).
+  Falhou: volta a tag anterior, `pull`/`up` de novo e o resultado é `rolled_back` (ou `failed` se nem a anterior
+  subir). Deu certo e a imagem do próprio atualizador mudou: um container auxiliar da imagem nova roda
+  `compose up -d atria-updater` (o resultado já ficou gravado em `/state/updater.json`, volume `updater-state`).
+- **Por que um profile**: o atualizador precisa da imagem privada do GHCR, do socket do Docker e do
+  `ATRIA_STACK_DIR`; numa instalação a partir do código nada disso existe, e o `docker compose up` falharia ao
+  puxar a imagem. Com o profile `updater`, ele só sobe onde o `install-release.sh` ligou.
+- **`ATRIA_STACK_DIR`**: caminho absoluto da pasta do compose no host, montado no mesmo caminho dentro do
+  atualizador — assim `./browser` e `./Caddyfile` resolvem para os caminhos certos no host.
+- **Limites**: o atualizador troca só as imagens; mudanças no `docker-compose.yml` de uma versão nova (serviço ou
+  variável nova) exigem rodar o `install-release.sh` daquela versão de novo. O `GHCR_TOKEN` fica no `.env`
+  (o cliente consegue lê-lo; use um token só `read:packages` de uma conta-máquina).
 
 ## Proxy HTTPS
 
@@ -134,11 +210,15 @@ passam `ATRIA_VERSION` sozinhos).
 
 ## Atualizar
 
+Instalação por imagem: pelo Atria Central (veja [Releases e atualização remota](#releases-e-atualização-remota)).
+Instalação a partir do código:
+
 ```bash
 sudo ./install.sh --update
 ```
 
-`git pull --ff-only`, espera execuções em andamento terminarem (até 20 min) e reconstrói.
+`git pull --ff-only`, espera execuções em andamento terminarem (até 20 min) e reconstrói (o `--update` também
+acrescenta o `docker-compose.build.yml` ao `COMPOSE_FILE` de instalações antigas).
 Migrações de banco rodam sozinhas no boot.
 
 **Instalação de antes do nome Atria OS (Yui Console).** Rode `sudo ./install.sh --update` duas vezes se a

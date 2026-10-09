@@ -266,6 +266,7 @@ export type ServerEvent =
   | { type: 'company.doc.updated'; doc: CompanyDoc }
   | { type: 'company.doc.deleted'; id: string }
   | { type: 'company.profile.updated'; profile: CompanyProfile }
+  | { type: 'support.updated' } // suporte remoto, avisos ou atualização mudaram: a faixa e Configurações releem
   | { type: 'ping' };
 
 // ---------- REST ----------

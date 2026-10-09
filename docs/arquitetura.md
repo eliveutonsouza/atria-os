@@ -23,6 +23,7 @@ flowchart LR
   C --> QD[(atria-qdrant)]
   C --> DL[atria-docling<br/>OCR]
   C -- leitura --> DP[atria-dockerproxy] --> DS[/docker.sock ro/]
+  C -- token interno --> UP[atria-updater<br/>só instalação por imagem] --> DS2[/docker.sock/]
 ```
 
 Só o serviço `atria` recebe tráfego de fora. Os demais serviços ficam na rede interna do compose; o VS Code e a
@@ -77,6 +78,15 @@ React + Vite, instalável como PWA.
 
 `shared/` guarda o que os dois lados usam: `protocol.ts` (tipos de eventos e API) e `workflowMarkdown.ts`.
 
+## Versões e atualização
+
+Uma tag `vX.Y.Z` publica as imagens no GHCR (`.github/workflows/release.yml`). Na instalação por imagem
+(`deploy/install-release.sh`), o `docker-compose.yml` usa `ghcr.io/eliveutonsouza/<imagem>:${ATRIA_TAG}`; a de
+código soma o `docker-compose.build.yml` e builda na VPS. O Atria Central manda o comando `update` pelo pulso; o
+Atria OS drena as execuções e chama o `atria-updater` (`updater/src`: `updater.ts` faz os passos e o rollback
+com um executor de comandos injetável, `server.ts` é a API HTTP, `exec.ts` roda o docker CLI). Depois do
+reinício, o Atria OS lê `GET /status`, informa o resultado ao Central e confirma com `POST /ack`.
+
 ## Dados
 
 | Onde | O quê |
@@ -94,7 +104,9 @@ O `atria` roda como `node` (uid 1000); o `atria-browser` roda como root e devolv
 ## Segurança
 
 - Um usuário: senha com hash Argon2, cookie de sessão assinado, rate limit no login, Helmet/CSP.
-- Docker só por `atria-dockerproxy` (somente leitura); nenhum serviço interno tem porta publicada.
+- Docker só por `atria-dockerproxy` (somente leitura); nenhum serviço interno tem porta publicada. A exceção
+  com escrita é o `atria-updater` (instalação por imagem): rede interna, token, só aceita tags `vX.Y.Z` e só
+  roda `pull`/`up` dos serviços do próprio compose.
 - Agentes no automático, com bloqueio de comandos catastróficos (`safety.ts`) e aprovação explícita onde o
   projeto ou o workflow pedir; exclusões pedidas à Yui sempre passam por aprovação.
 - Imagens de terceiros fixadas por digest; CI roda gitleaks em todo push.
@@ -102,7 +114,8 @@ O `atria` roda como `node` (uid 1000); o `atria-browser` roda como root e devolv
 ## Testes
 
 - `server/test/*.test.ts` (`node --test`): Vault, workflows, Ajuda, exclusões, etc.
+- `updater/test/*.test.ts` (`node --test`): passos do atualizador, rollback e API, com executor falso.
 - `server/scripts/eval-brain.ts`: bateria de pedidos reais contra o cérebro (gasta tokens).
 - `e2e/run.mjs` e `e2e/mobile.mjs`: Playwright contra uma instância rodando (desktop e 6 aparelhos).
-- CI (`.github/workflows/ci.yml`): gitleaks, tipos e testes, lint e build do painel, `docker compose config`
-  nos três modos de proxy e build das imagens.
+- CI (`.github/workflows/ci.yml`): gitleaks, tipos e testes (servidor e atualizador), lint e build do painel,
+  `docker compose config` nos três modos de proxy (por imagem e a partir do código) e build das três imagens.

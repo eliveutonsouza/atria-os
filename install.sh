@@ -118,6 +118,11 @@ migrate_volumes() {
   done
   warn "volumes antigos (${LEGACY_PROJECT}_yui-*) mantidos para rollback; apague-os depois de conferir"
 }
+# Instalação a partir do código: o docker-compose.build.yml builda aqui (sem ele o compose puxaria as imagens do GHCR).
+ensure_build_override() {
+  local cf; cf="$(env_get COMPOSE_FILE)"; cf="${cf:-docker-compose.yml}"
+  case ":$cf:" in *:docker-compose.build.yml:*) ;; *) env_set COMPOSE_FILE "$cf:docker-compose.build.yml" ;; esac
+}
 busy_runs() {
   docker exec "$C" node -e "const D=require('/app/server/node_modules/better-sqlite3');const db=new D('/data/atria.db',{readonly:true});console.log(db.prepare(\"SELECT COUNT(*) n FROM runs WHERE state IN ('running','waiting_approval')\").get().n)" 2>/dev/null || echo 0
 }
@@ -154,6 +159,7 @@ if [ "$ACTION" = update ]; then
   say "atualizar"
   if [ -d .git ] && git remote get-url origin >/dev/null 2>&1; then git pull --ff-only && ok "código atualizado ($(git log -1 --format=%h))"; else warn "sem git remoto — usando o código desta pasta"; fi
   migrate_volumes
+  ensure_build_override
   for _ in $(seq 1 80); do n=$(busy_runs); [ "$n" = 0 ] && break; echo "  aguardando $n execução(ões) terminarem…"; sleep 15; done
   atria_version
   docker compose up -d --build
@@ -262,6 +268,7 @@ case "$ATRIA_PROXY" in
   *) die "ATRIA_PROXY inválido: $ATRIA_PROXY (auto|traefik|caddy|none)" ;;
 esac
 env_set ATRIA_PROXY "$ATRIA_PROXY"
+ensure_build_override
 
 [ "$ENV_ONLY" = 1 ] && { say "pronto: revise $ENV_FILE e rode sudo ./install.sh"; exit 0; }
 

@@ -1,0 +1,84 @@
+# Release: tag vX.Y.Z → imagens multi-arch (amd64 + arm64) privadas no GHCR e GitHub Release com notas geradas.
+#   ghcr.io/eliveutonsouza/atria-os|atria-code|atria-updater:<tag> e :latest (ATRIA_VERSION = tag)
+# Assets da release (baixados pelo Atria Central no "instalar em 1 comando"):
+#   docker-compose.release.yml (= docker-compose.yml, modo imagem) e install-release.sh (= deploy/install-release.sh)
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io/eliveutonsouza
+
+jobs:
+  imagens:
+    name: Imagem ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: atria-os
+            context: .
+            file: Dockerfile
+          - name: atria-code
+            context: ./code
+            file: code/Dockerfile
+          - name: atria-updater
+            context: .
+            file: updater/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - name: tag no formato vX.Y.Z
+        run: |
+          echo "$GITHUB_REF_NAME" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || { echo "tag inválida (use vX.Y.Z): $GITHUB_REF_NAME"; exit 1; }
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: ATRIA_VERSION=${{ github.ref_name }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ matrix.name }}:${{ github.ref_name }}
+            ${{ env.REGISTRY }}/${{ matrix.name }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=release-${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=release-${{ matrix.name }}
+
+  release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    needs: [imagens]
+    steps:
+      - uses: actions/checkout@v4
+      - name: assets
+        run: |
+          mkdir -p dist
+          cp docker-compose.yml dist/docker-compose.release.yml
+          cp deploy/install-release.sh dist/install-release.sh
+      - name: criar release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/docker-compose.release.yml dist/install-release.sh \
+            --title "$GITHUB_REF_NAME" --generate-notes --verify-tag

@@ -12,6 +12,7 @@ import { toggleApp } from '../app/nav'
 import type { AppPage } from '@shared/protocol'
 import { useYui, type Mode } from '../store/yui'
 import { CanvasPanel } from './CanvasPanel'
+import { SupportBanners } from './SupportBanners'
 import { Dock, dockInput, OrbButton, OrbLayer, TopBar, YuiCenter, YuiLeft } from './parts'
 
 // ---------- rotas espelho (§80) ----------
@@ -223,6 +224,7 @@ function onKey(e: KeyboardEvent) {
 export function Shell() {
   const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight })
   const authed = useYui((s) => s.authed)
+  const [bannerH, setBannerH] = useState(0) // faixas de suporte/aviso empurram o app para baixo
   const nav = useNavigate()
   useRouteSync()
 
@@ -262,20 +264,23 @@ export function Shell() {
   )
 
   return (
-    <main style={{ position: 'fixed', inset: 0, overflow: 'clip', overscrollBehavior: 'none', background: 'radial-gradient(120% 90% at 50% 28%, #0f1533 0%, #0a0c1d 45%, #06070d 100%)' }}>
-      <OrbLayer />
-      <TopBar />
-      <AppShell />
-      <CanvasPanel />
-      <YuiCenter />
-      <YuiLeft />
-      <OrbButton w={size.w} h={size.h} />
-      <Dock />
-      <Inbox />
-      <HistoryDrawer />
-      <CommandPalette />
-      <ApprovalModal />
-      <UpdateToast />
-    </main>
+    <>
+      <SupportBanners onHeight={setBannerH} />
+      <main style={{ position: 'fixed', inset: 0, top: bannerH, overflow: 'clip', overscrollBehavior: 'none', background: 'radial-gradient(120% 90% at 50% 28%, #0f1533 0%, #0a0c1d 45%, #06070d 100%)' }}>
+        <OrbLayer />
+        <TopBar />
+        <AppShell />
+        <CanvasPanel />
+        <YuiCenter />
+        <YuiLeft />
+        <OrbButton w={size.w} h={size.h} />
+        <Dock />
+        <Inbox />
+        <HistoryDrawer />
+        <CommandPalette />
+        <ApprovalModal />
+        <UpdateToast />
+      </main>
+    </>
   )
 }

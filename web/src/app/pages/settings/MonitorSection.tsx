@@ -31,7 +31,7 @@ function Row({ label, hint, children, last }: { label: string; hint?: string; ch
   )
 }
 
-function Switch({ on, label, onChange }: { on: boolean; label: string; onChange: (v: boolean) => void }) {
+export function Switch({ on, label, onChange }: { on: boolean; label: string; onChange: (v: boolean) => void }) {
   return (
     <button
       type="button"

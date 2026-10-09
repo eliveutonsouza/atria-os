@@ -2,13 +2,13 @@
 # uma segunda instalação na mesma VPS (ex.: teste); trocar numa instalação existente cria volumes novos e vazios.
 name: ${ATRIA_PROJECT:-atria-os}
 
+# Imagens prontas do GHCR na versão ATRIA_TAG (vX.Y.Z; o atualizador troca esse valor no .env).
+# ATRIA_REGISTRY troca o registro (padrão ghcr.io/eliveutonsouza; útil para testes com um registro local).
+# Instalação a partir do código (install.sh, scripts-deploy.sh) soma o docker-compose.build.yml, que builda aqui
+# com imagens :local. Instalação por imagem (deploy/install-release.sh) usa este arquivo como está.
 services:
   atria:
-    build:
-      context: .
-      args:
-        ATRIA_VERSION: ${ATRIA_VERSION:-dev}
-    image: ${ATRIA_PROJECT:-atria-os}:local
+    image: ${ATRIA_REGISTRY:-ghcr.io/eliveutonsouza}/atria-os:${ATRIA_TAG:-latest}
     restart: unless-stopped
     env_file: [.env]
     environment:
@@ -20,6 +20,9 @@ services:
       ATRIA_QDRANT_URL: http://atria-qdrant:6333
       ATRIA_QDRANT_KEY: ${ATRIA_QDRANT_KEY:?defina ATRIA_QDRANT_KEY (instalação antiga com YUI_* = rode ./install.sh --update de novo)}
       ATRIA_DOCLING_URL: http://atria-docling:5001
+      # Atualização remota pelo Atria Central (só responde com o profile "updater" ligado)
+      ATRIA_UPDATER_URL: ${ATRIA_UPDATER_URL:-http://atria-updater:8787}
+      ATRIA_UPDATER_TOKEN: ${ATRIA_UPDATER_TOKEN:-}
     volumes:
       - data:/data
       - workspace:/workspace
@@ -64,8 +67,7 @@ services:
   # VS Code open source para o Vault e os projetos. Sem porta pública nem Traefik: o serviço atria
   # checa a sessão e repassa /code (HTTP + WebSocket). Mesmo uid (1000) do serviço atria no volume.
   atria-code:
-    build: ./code
-    image: ${ATRIA_PROJECT:-atria-os}-code:local
+    image: ${ATRIA_REGISTRY:-ghcr.io/eliveutonsouza}/atria-code:${ATRIA_TAG:-latest}
     restart: unless-stopped
     volumes:
       - workspace:/workspace
@@ -148,6 +150,35 @@ services:
     labels:
       - traefik.enable=false
 
+  # Atualizador (profile "updater", ligado pelo deploy/install-release.sh): troca ATRIA_TAG no .env, puxa e
+  # recria atria/atria-code e volta para a tag anterior se não ficar saudável em 3 min. Só na rede interna,
+  # com token (ATRIA_UPDATER_TOKEN). Tem o socket do Docker e a pasta do compose montada no MESMO caminho do
+  # host (ATRIA_STACK_DIR), para os caminhos relativos do compose (./browser, ./Caddyfile) continuarem certos.
+  atria-updater:
+    image: ${ATRIA_REGISTRY:-ghcr.io/eliveutonsouza}/atria-updater:${ATRIA_TAG:-latest}
+    profiles: ["updater"]
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-America/Sao_Paulo}
+      ATRIA_UPDATER_TOKEN: ${ATRIA_UPDATER_TOKEN:-}
+      GHCR_USER: ${GHCR_USER:-}
+      GHCR_TOKEN: ${GHCR_TOKEN:-}
+      ATRIA_PROJECT: ${ATRIA_PROJECT:-atria-os}
+      ATRIA_STACK_DIR: ${ATRIA_STACK_DIR:-/opt/atria-os}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${ATRIA_STACK_DIR:-/opt/atria-os}:${ATRIA_STACK_DIR:-/opt/atria-os}
+      - updater-state:/state
+    expose:
+      - "8787"
+    # com atualização em andamento ele termina o job antes de sair
+    stop_grace_period: 10m
+    mem_limit: 256m
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      - traefik.enable=false
+
   # Docker API somente leitura (lista containers + logs) para Infra/Logs. O app nunca recebe o socket.
   atria-dockerproxy:
     image: tecnativa/docker-socket-proxy:v0.4.1
@@ -170,3 +201,4 @@ volumes:
   data:
   workspace:
   browser-profile:
+  updater-state:

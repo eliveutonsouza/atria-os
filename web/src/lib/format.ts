@@ -32,3 +32,14 @@ export function greeting(): string {
 export function fmtTokens(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
 }
+
+/** "hoje 09:12", "ontem 16:20" ou "02/10 10:05". */
+export function dayTime(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const diff = Math.round((day(new Date()) - day(d)) / 86400_000)
+  const prefix = diff === 0 ? 'hoje' : diff === 1 ? 'ontem' : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+  return `${prefix} ${hhmm(iso)}`
+}

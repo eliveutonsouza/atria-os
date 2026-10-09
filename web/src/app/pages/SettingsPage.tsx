@@ -13,6 +13,7 @@ import {
   VoiceSection,
 } from './settings/sections'
 import { MonitorSection } from './settings/MonitorSection'
+import { SupportSection } from './settings/SupportSection'
 
 // Configurações (Settings.dc.html): menu de seções à esquerda, conteúdo à direita.
 // A seção ativa mora na URL: /app/settings/<seção>.
@@ -26,6 +27,7 @@ const TABS = [
   { id: 'agents', label: 'Agentes & aprovações' },
   { id: 'notifications', label: 'Notificações' },
   { id: 'system', label: 'Sistema' },
+  { id: 'support', label: 'Suporte e atualizações' },
 ] as const
 type TabId = (typeof TABS)[number]['id']
 
@@ -46,6 +48,7 @@ export function SettingsPage() {
     case 'agents': body = <AgentsApprovalsSection />; break
     case 'notifications': body = <NotificationsSection />; break
     case 'system': body = <><SystemSection /><MonitorSection /></>; break
+    case 'support': body = <SupportSection />; break
     default: body = <SetupSteps onGo={go} />
   }
 

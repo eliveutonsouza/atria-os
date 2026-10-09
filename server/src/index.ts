@@ -47,6 +47,8 @@ import * as projectsApi from './projectsApi.ts';
 import * as telemetry from './telemetry.ts';
 import * as claudeDesign from './claudeDesign.ts';
 import * as skillsHub from './skillsHub.ts';
+import * as central from './central.ts';
+import * as support from './support.ts';
 import { healthFull } from './health.ts';
 import { startClaudeUsage } from './claudeUsage.ts';
 import { agora, saudacao, startAmbiente } from './ambiente.ts';
@@ -89,7 +91,7 @@ await app.register(websocket);
 registerAuth(app);
 initTerminal();
 registerTerminal(app);
-for (const mod of [missions, customViews, toolbox, agentsAdmin, workflows, push, stats, browserLive, settings, onboarding, vault, company, help, usage, models, remindersApi, reportsApi, historyApi, projectsApi, telemetry, claudeDesign, skillsHub]) mod.register(app);
+for (const mod of [missions, customViews, toolbox, agentsAdmin, workflows, push, stats, browserLive, settings, onboarding, vault, company, help, usage, models, remindersApi, reportsApi, historyApi, projectsApi, telemetry, central, support, claudeDesign, skillsHub]) mod.register(app);
 // skill nova/removida na plataforma: relê as capacidades do Claude para aparecer nas listas
 skillsHub.setPlatformChangeHook(() => void captureInit());
 vaultAuto.register();

@@ -16,6 +16,13 @@ export function onCompanyEvent(fn: (ev: CompanyEvent) => void): () => void {
   return () => companyListeners.delete(fn)
 }
 
+// Suporte remoto, avisos e atualização: a faixa do topo e Configurações releem ao receber.
+const supportListeners = new Set<() => void>()
+export function onSupportUpdated(fn: () => void): () => void {
+  supportListeners.add(fn)
+  return () => supportListeners.delete(fn)
+}
+
 export function onVaultChanged(fn: VaultListener): () => void {
   vaultListeners.add(fn)
   return () => vaultListeners.delete(fn)
@@ -126,6 +133,9 @@ export function applyEvent(ev: ServerEvent) {
       break
     case 'vault.changed':
       for (const fn of vaultListeners) fn(ev.paths, ev.at)
+      break
+    case 'support.updated':
+      for (const fn of supportListeners) fn()
       break
     case 'ping':
       break

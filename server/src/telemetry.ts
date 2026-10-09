@@ -2,7 +2,7 @@ import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { statfsSync } from 'node:fs';
 import { hostname } from 'node:os';
 import type { FastifyInstance } from 'fastify';
-import type { TelemetryEvent, TelemetrySnapshot } from '../../shared/telemetry.ts';
+import type { IngestResponse, TelemetryEvent, TelemetrySnapshot } from '../../shared/telemetry.ts';
 import { config, readEnv } from './config.ts';
 import { db, kvGet, kvSet, now } from './db.ts';
 import { onEmit } from './bus.ts';
@@ -21,7 +21,7 @@ import { getSetting, onSettingsChange, rawGet, validMonitorUrl } from './setting
 export const VERSION = readEnv('ATRIA_VERSION') || 'dev';
 const STARTED_AT = new Date(Date.now() - Math.round(process.uptime() * 1000));
 
-function instanceId(): string {
+export function instanceId(): string {
   let id = kvGet('instance_id');
   if (!id) {
     id = randomUUID();
@@ -159,6 +159,20 @@ async function containers(): Promise<TelemetrySnapshot['containers']> {
   }
 }
 
+// ---------- canal de comandos (central.ts se inscreve) ----------
+// O que a instância anuncia além das métricas (capabilities, suporte, atualizador) e o que fazer com
+// os comandos que o Central devolve na resposta do pulso. Sem inscrito = só telemetria, como antes.
+
+type InstanceExtras = Pick<TelemetrySnapshot['instance'], 'capabilities' | 'supportAllowed' | 'updatesAllowed' | 'updater'>;
+let extrasProvider: (() => Promise<InstanceExtras>) | null = null;
+let commandsHandler: ((res: IngestResponse, central: { url: string; key: string }) => void) | null = null;
+export function setInstanceExtras(fn: () => Promise<InstanceExtras>) {
+  extrasProvider = fn;
+}
+export function onIngestCommands(fn: (res: IngestResponse, central: { url: string; key: string }) => void) {
+  commandsHandler = fn;
+}
+
 // ---------- coleta ----------
 
 const diskPct = (path: string) => {
@@ -183,7 +197,7 @@ export async function collectTelemetry(opts: { events: 'since' | 'recent'; upto?
   const d24 = new Date(nowMs - 24 * 3600_000).toISOString();
   const dayStart = new Date();
   dayStart.setHours(0, 0, 0, 0);
-  const [h, ctrs] = await Promise.all([healthFull({ light: true }), containers()]);
+  const [h, ctrs, extras] = await Promise.all([healthFull({ light: true }), containers(), extrasProvider ? extrasProvider().catch(() => ({})) : Promise.resolve({})]);
   const mem = hostMem();
 
   const states = Object.fromEntries((db.prepare(`SELECT state, COUNT(*) AS n FROM runs WHERE state IN ('queued','running','waiting_approval') GROUP BY state`).all() as { state: string; n: number }[]).map((r) => [r.state, r.n]));
@@ -214,6 +228,7 @@ export async function collectTelemetry(opts: { events: 'since' | 'recent'; upto?
       uptimeSec: Math.round(process.uptime()),
       hostUptimeSec: mem.uptimeSec,
       tz: config.timezone,
+      ...extras,
     },
     host: {
       cpu: cpuNow(),
@@ -300,7 +315,17 @@ export function sendPulse(override?: { url?: string; key?: string }): Promise<Pu
       try {
         const body = JSON.stringify(await collectTelemetry({ events: 'since', upto }));
         const r = await fetch(`${url}/api/ingest`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` }, body, signal: AbortSignal.timeout(10_000) });
-        await r.body?.cancel();
+        // 200 com JSON = comandos do Central (204 = nada pendente). Corpo ruim não derruba o pulso.
+        if (r.status === 200 && (r.headers.get('content-type') ?? '').includes('json')) {
+          const j = (await r.json().catch(() => null)) as IngestResponse | null;
+          if (j && Array.isArray(j.commands) && j.commands.length && commandsHandler) {
+            try {
+              commandsHandler(j, { url, key });
+            } catch (e) {
+              console.error('comandos do Central', (e as Error).message);
+            }
+          }
+        } else await r.body?.cancel();
         res = { at: now(), ok: r.ok, status: r.status, ms: Date.now() - t0, error: r.ok ? null : r.status === 401 || r.status === 403 ? 'Chave recusada pelo monitor' : `Monitor respondeu ${r.status}` };
         if (r.ok) acked = Math.max(acked, upto);
       } catch (e) {

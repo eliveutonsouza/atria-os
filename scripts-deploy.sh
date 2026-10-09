@@ -8,6 +8,10 @@ FORCE=0; E2E=1
 for a in "$@"; do case "$a" in --force) FORCE=1;; --no-e2e) E2E=0;; esac; done
 PROJECT="${ATRIA_PROJECT:-$(sed -n 's/^ATRIA_PROJECT=//p' .env 2>/dev/null | tail -1)}"; PROJECT="${PROJECT:-atria-os}"
 C="$PROJECT-atria-1"
+# Deploy a partir do código: soma o docker-compose.build.yml aos arquivos do .env (COMPOSE_FILE) para buildar aqui.
+CF="${COMPOSE_FILE:-$(sed -n 's/^COMPOSE_FILE=//p' .env 2>/dev/null | tail -1)}"; CF="${CF:-docker-compose.yml}"
+case ":$CF:" in *:docker-compose.build.yml:*) ;; *) CF="$CF:docker-compose.build.yml" ;; esac
+export COMPOSE_FILE="$CF"
 busy() {
   docker exec "$C" node -e "const D=require('/app/server/node_modules/better-sqlite3');const db=new D('/data/atria.db',{readonly:true});console.log(db.prepare(\"SELECT COUNT(*) n FROM runs WHERE state IN ('running','waiting_approval')\").get().n)" 2>/dev/null || echo 0
 }

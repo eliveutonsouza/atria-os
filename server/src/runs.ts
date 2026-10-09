@@ -91,6 +91,17 @@ function logEvent(runId: string, kind: RunEventLine['kind'], text: string) {
 
 const running = new Map<string, AbortController>();
 
+// Fila segurada (atualização remota, central.ts): nada novo começa; as em andamento terminam e as
+// enfileiradas esperam. O reinício do processo solta a fila (o estado não é persistido).
+let held = false;
+export function holdQueue(on: boolean) {
+  held = on;
+  if (!on) setImmediate(pump);
+}
+export const queueHeld = () => held;
+/** Execuções em andamento (rodando ou esperando aprovação). */
+export const busyRuns = () => (db.prepare(`SELECT COUNT(*) AS n FROM runs WHERE state IN ('running','waiting_approval')`).get() as { n: number }).n;
+
 export interface EnqueueInput {
   agentId: string;
   project: string | null;
@@ -127,7 +138,7 @@ export function enqueueRun(input: EnqueueInput): RunInfo {
 }
 
 function pump() {
-  while (running.size < config.maxConcurrentRuns) {
+  while (!held && running.size < config.maxConcurrentRuns) {
     const next = db.prepare(`SELECT * FROM runs WHERE state = 'queued' ORDER BY created_at LIMIT 1`).get() as RunRow | undefined;
     if (!next) return;
     const ac = new AbortController();
@@ -271,6 +282,12 @@ export function pendingApprovals(): ApprovalInfo[] {
   return rows.map((r) => ({ id: r.id, runId: r.run_id, title: r.title, rows: JSON.parse(r.rows), createdAt: r.created_at, ...(r.kind === 'destructive' ? { kind: 'destructive' as const } : {}) }));
 }
 
+// Outros módulos (suporte remoto e avisos, support.ts) somam itens ao inbox e decidem como dispensá-los.
+const inboxSources: { prefixes: string[]; items: () => InboxItem[]; dismiss: (id: string) => boolean }[] = [];
+export function addInboxSource(src: (typeof inboxSources)[number]) {
+  inboxSources.push(src);
+}
+
 export function inboxItems(): InboxItem[] {
   const dismissed = new Set(dismissedInbox());
   const items: InboxItem[] = pendingApprovals().map((a) => ({
@@ -288,6 +305,7 @@ export function inboxItems(): InboxItem[] {
     items.push({ id: `failed:${f.id}`, tag: 'Falha', label: f.task, tone: 'crit', action: { type: 'view', view: 'runs', params: { runId: f.id } } });
   }
   items.push(...designInboxItems());
+  for (const src of inboxSources) items.push(...src.items());
   return items;
 }
 
@@ -302,6 +320,8 @@ const dismissedInbox = (): string[] => {
 };
 
 export function dismissInboxItem(id: string): boolean {
+  const src = inboxSources.find((x) => x.prefixes.some((p) => id.startsWith(p)));
+  if (src) return src.dismiss(id);
   if (!id.startsWith('failed:')) return false;
   const list = dismissedInbox().filter((x) => x !== id);
   kvSet('inbox_dismissed', JSON.stringify([...list, id].slice(-200)));

@@ -1,0 +1,23 @@
+# Instalação a partir do código: builda as imagens aqui (tags :local) em vez de puxar do GHCR.
+# Usado pelo install.sh (grava COMPOSE_FILE no .env) e pelo scripts-deploy.sh; para rodar à mão:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml docker compose up -d --build
+# O atualizador remoto não atua nesse modo (troca tags do GHCR); atualize com ./install.sh --update.
+services:
+  atria:
+    build:
+      context: .
+      args:
+        ATRIA_VERSION: ${ATRIA_VERSION:-dev}
+    image: ${ATRIA_PROJECT:-atria-os}:local
+
+  atria-code:
+    build: ./code
+    image: ${ATRIA_PROJECT:-atria-os}-code:local
+
+  atria-updater:
+    build:
+      context: .
+      dockerfile: updater/Dockerfile
+      args:
+        ATRIA_VERSION: ${ATRIA_VERSION:-dev}
+    image: ${ATRIA_PROJECT:-atria-os}-updater:local

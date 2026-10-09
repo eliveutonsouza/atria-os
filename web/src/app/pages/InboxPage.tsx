@@ -112,8 +112,8 @@ export function InboxPage() {
             <span style={{ fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: toneColor(ib.tone), fontWeight: 600 }}>{ib.tag}</span>
             <span style={{ fontSize: 14, overflowWrap: 'anywhere' }}>{ib.label}</span>
           </button>
-          {ib.id.startsWith('failed:') && (
-            <button className="app-btn small" style={{ marginRight: 10, flexShrink: 0, minHeight: phone ? 44 : undefined }} onClick={() => void dismiss(ib)} title="Tira do inbox; a execução continua no histórico">
+          {/^(failed|notice|support):/.test(ib.id) && (
+            <button className="app-btn small" style={{ marginRight: 10, flexShrink: 0, minHeight: phone ? 44 : undefined }} onClick={() => void dismiss(ib)} title={ib.id.startsWith('failed:') ? 'Tira do inbox; a execução continua no histórico' : 'Tira do inbox'}>
               Dispensar
             </button>
           )}

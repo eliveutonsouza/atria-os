@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { SettingsPayload } from '../../shared/protocol.ts';
 import { readEnv, setSettingsResolver } from './config.ts';
 import { db, kvGet, kvSet, now } from './db.ts';
+import { sessionKind } from './auth.ts';
 
 // Configurações editáveis pelo painel. Precedência: banco > .env > padrão.
 // O .env vira só o "bootstrap" da instalação; tudo que o usuário ajusta no painel mora aqui.
@@ -47,7 +48,13 @@ export const SETTINGS: Record<string, Def> = {
   'monitor.enabled': { kind: 'boolean', env: 'ATRIA_MONITOR_ENABLED', def: false },
   'monitor.url': { kind: 'string', env: 'ATRIA_MONITOR_URL', def: '', maxLen: 200 },
   'monitor.key': { kind: 'secret', env: 'ATRIA_MONITOR_KEY', def: '', maxLen: 200 },
+  // Pedidos do Atria Central (central.ts): entrar como suporte e atualizar a versão. O cliente pode desligar.
+  'support.remoteAccess': { kind: 'boolean', def: true },
+  'update.allowRemote': { kind: 'boolean', def: true },
 };
+
+/** Só o dono da conta muda estas; a sessão de suporte recebe 403. */
+export const OWNER_ONLY_SETTINGS = new Set(['support.remoteAccess', 'update.allowRemote', 'monitor.enabled', 'monitor.url', 'monitor.key']);
 
 /** Endereço do monitor: https, ou http só em localhost/127.0.0.1 (testes). */
 export function validMonitorUrl(s: string): boolean {
@@ -188,6 +195,8 @@ export function register(app: FastifyInstance): void {
 
   app.put('/api/settings', async (req, reply) => {
     const body = (req.body ?? {}) as Record<string, unknown>;
+    if (sessionKind(req) === 'support' && Object.keys(body).some((k) => OWNER_ONLY_SETTINGS.has(k)))
+      return reply.code(403).send({ error: 'Só o dono da conta muda o acesso do suporte, as atualizações e o monitoramento.' });
     const parsed: [string, string | null][] = [];
     try {
       for (const [k, v] of Object.entries(body)) {

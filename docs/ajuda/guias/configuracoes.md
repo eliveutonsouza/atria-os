@@ -3,7 +3,7 @@ titulo: Configurações
 grupo: Sistema
 pagina: settings
 ordem: 2
-resumo: Contas conectadas, voz da Yui, modelos, aprovações, notificações e saúde do sistema, tudo num lugar.
+resumo: Contas conectadas, voz da Yui, modelos, aprovações, notificações, saúde do sistema e o acesso do suporte, tudo num lugar.
 usar_quando: Na instalação, para reconectar uma conta, trocar a voz, ajustar quantos agentes rodam juntos ou ativar avisos no celular.
 nao_usar_quando: Para mudar como um agente trabalha, use Agentes › Configuração.
 frases:
@@ -19,15 +19,15 @@ dicas:
   - Um aparelho antigo ou perdido sai da lista em Notificações › Dispositivos inscritos › **Remover**.
 erros:
   - Colar uma chave do plano ChatGPT. A chave precisa ser de API, da platform.openai.com.
-  - Trocar a senha e estranhar o logout em outro aparelho. Trocar a senha encerra as outras sessões.
+  - Trocar a senha e estranhar o logout em outro aparelho. Trocar a senha encerra as outras sessões (inclusive a do suporte).
   - Colar preços em JSON com vírgula sobrando ou número entre aspas. O campo avisa e não deixa salvar.
   - Escrever preço por 1 mil tokens. Os preços são em US$ por 1 milhão de tokens (perMinute é US$ por minuto de voz).
-relacionados: [conectores, celular, aprovacoes, agentes]
+relacionados: [conectores, celular, aprovacoes, agentes, suporte-e-atualizacoes]
 ---
 # Configurações
 
 ## O que é
-Tem as seções Primeiros passos, Conta, Conexões, Yui & voz, Modelos, Agentes & aprovações, Notificações e Sistema. O que você salva aqui vale mais que o arquivo .env da instalação.
+Tem as seções Primeiros passos, Conta, Conexões, Yui & voz, Modelos, Agentes & aprovações, Notificações, Sistema e Suporte e atualizações. O que você salva aqui vale mais que o arquivo .env da instalação.
 
 ## Passo a passo
 1. **Primeiros passos.** Veja o que já está pronto e clique em **Configurar** no que falta.
@@ -38,6 +38,7 @@ Tem as seções Primeiros passos, Conta, Conexões, Yui & voz, Modelos, Agentes 
 6. **Agentes & aprovações.** Lista do que sempre pede aprovação e a opção "Pedir aprovação para ações sensíveis em conectores".
 7. **Notificações.** Instalar app, Ativar notificações, Enviar teste e Dispositivos inscritos. Cada aparelho da lista tem **Remover** (pede confirmação); ele para de receber avisos até você ativar de novo nele.
 8. **Sistema.** Saúde de cada peça, os comandos de atualizar e de backup na VPS e o **Monitoramento remoto** (opcional, ver o guia Monitoramento remoto).
+9. **Suporte e atualizações.** Se a equipe Atria pode entrar para ajudar (com Acessos recentes e **Encerrar acesso**), se aceita atualizações mandadas por ela, a versão instalada e o estado do atualizador (ver o guia Suporte e atualizações).
 
 ## O que você vê na tela
 - Selo de estado em cada conexão (conectado ou o que falta).
