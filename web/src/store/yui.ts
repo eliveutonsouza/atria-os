@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AppPage, ApprovalInfo, Brief, ChatMessage, CustomViewInfo, InboxItem, MissionInfo, ProjectSummary, RunInfo, ViewName, ViewParams, WorkflowRunInfo, YuiState } from '@shared/protocol'
+import type { AppPage, ApprovalInfo, Brief, ChatMessage, CustomViewInfo, InboxItem, MissionInfo, ProjectSummary, RunInfo, ViewName, ViewParams, WorkflowInputRequest, WorkflowRunInfo, YuiState } from '@shared/protocol'
 
 export type Mode = 'center' | 'canvas' | 'focus'
 
@@ -62,6 +62,9 @@ export interface YuiStore {
   updateReady: boolean
   pushEnabled: boolean
   workflowRuns: Record<string, WorkflowRunInfo>
+  // pedidos de informação dos workflows (passo "Pedir informação") e o formulário aberto
+  workflowInputs: Record<string, WorkflowInputRequest>
+  inputOpen: string | null
   customViews: Record<string, CustomViewInfo>
   liveConnecting: boolean
   liveTranscript: string
@@ -127,6 +130,8 @@ export const useYui = create<YuiStore>((set, get) => ({
   updateReady: false,
   pushEnabled: false,
   workflowRuns: {},
+  workflowInputs: {},
+  inputOpen: null,
   customViews: {},
   liveConnecting: false,
   liveTranscript: '',

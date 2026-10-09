@@ -36,10 +36,13 @@ interface PushMsg {
 }
 
 // Tipo da notificação (approval | failed | done) filtrado pela configuração "notify.types".
-const allowed = (kind: 'approval' | 'failed' | 'done') =>
+// 'input' (pedido de informação de workflow) sempre chega: o fluxo está parado esperando o usuário.
+type PushKind = 'approval' | 'failed' | 'done' | 'input';
+const allowed = (kind: PushKind) =>
   String(getSetting('notify.types') ?? 'approval,failed,done').split(',').map((s) => s.trim()).includes(kind);
 
-export async function sendPush(msg: PushMsg, opts: { force?: boolean; kind?: 'approval' | 'failed' | 'done' } = {}): Promise<number> {
+export async function sendPush(msg: PushMsg, opts: { force?: boolean; kind?: PushKind } = {}): Promise<number> {
+  if (opts.kind === 'input') opts = { ...opts, force: true };
   if (!opts.force && Date.now() - lastVisible < VISIBLE_MS) return 0;
   if (!opts.force && opts.kind && !allowed(opts.kind)) return 0;
   const subs = db.prepare('SELECT endpoint, keys FROM push_subscriptions').all() as { endpoint: string; keys: string }[];

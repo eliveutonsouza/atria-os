@@ -261,6 +261,7 @@ export type ServerEvent =
   | { type: 'mission.deleted'; missionId: string }
   | { type: 'workflow.deleted'; slug: string }
   | { type: 'workflow.run.updated'; run: WorkflowRunInfo }
+  | { type: 'workflow.input.updated'; request: WorkflowInputRequest }
   | { type: 'custom.created'; view: CustomViewInfo }
   | { type: 'vault.changed'; paths: string[]; at: number }
   | { type: 'company.doc.updated'; doc: CompanyDoc }
@@ -310,7 +311,7 @@ export interface RepoInfo {
 }
 
 // ---------- missões (plano de execução multi-agente) ----------
-export type StepStatus = 'pending' | 'waiting_approval' | 'running' | 'done' | 'failed' | 'skipped' | 'cancelled';
+export type StepStatus = 'pending' | 'waiting_approval' | 'waiting_input' | 'running' | 'done' | 'failed' | 'skipped' | 'cancelled';
 export interface MissionStep {
   id: string;
   title: string;
@@ -440,7 +441,19 @@ export interface AgentConfig {
 }
 
 // ---------- workflows de decisão ----------
-export type WorkflowNodeType = 'start' | 'task' | 'decision' | 'approval' | 'parallel' | 'end';
+export type WorkflowNodeType = 'start' | 'task' | 'decision' | 'approval' | 'parallel' | 'input' | 'notify' | 'end';
+
+// Passo "Pedir informação" (input): o fluxo para e espera o usuário responder estes campos.
+export type InputFieldKind = 'text' | 'longtext' | 'date' | 'time' | 'number' | 'boolean' | 'choice' | 'audio' | 'images' | 'files';
+export interface InputField {
+  key: string; // slug estável (data-da-reuniao)
+  label: string;
+  kind: InputFieldKind;
+  required: boolean;
+  options?: string[]; // choice
+  default?: string | null; // 'hoje' (date/time) ou valor literal
+}
+export type NotifyChannel = 'telegram' | 'email' | 'push';
 export interface WorkflowNode {
   id: string; // "1", "2"… (número do passo no markdown)
   type: WorkflowNodeType;
@@ -454,6 +467,10 @@ export interface WorkflowNode {
   branches?: { label: string; to: string }[]; // decision
   next?: string[]; // task/approval/parallel/start
   ask?: boolean; // approval: sempre perguntar ao usuário (sem isso a Yui decide com base nas decisões anteriores)
+  fields?: InputField[]; // input
+  notifyVia?: NotifyChannel[]; // input (avisar quando parar) e notify
+  message?: { mode: 'ai' | 'template'; text: string }; // notify: a Yui escreve seguindo `text` ou texto fixo com {{Título do passo}}
+  attach?: boolean; // notify: anexar arquivos gerados no run
   position?: { x: number; y: number };
 }
 export interface WorkflowDef {
@@ -470,7 +487,7 @@ export interface WorkflowDef {
 export interface WorkflowRunInfo {
   id: string;
   workflow: string; // slug
-  status: 'running' | 'waiting_approval' | 'done' | 'failed' | 'cancelled';
+  status: 'running' | 'waiting_approval' | 'waiting_input' | 'done' | 'failed' | 'cancelled';
   current: string | null;
   nodes: Record<string, { status: StepStatus; runId?: string | null; result?: string | null; decision?: string | null; decidedBy?: 'yui' | 'user' | null; feedback?: 'agree' | 'disagree' | null }>;
   startedAt: string;
@@ -953,4 +970,32 @@ export interface AgentUsageRef {
   id: string;
   label: string; // "Revisão de acessibilidade · seg 09:00"
   detail?: string; // "passos 2 e 4"
+}
+
+// ---------- workflows: pedidos de informação (passo input) ----------
+export interface WorkflowInputRequest {
+  id: string;
+  runId: string;
+  nodeId: string;
+  workflow: string; // slug
+  workflowName: string;
+  title: string;
+  instruction: string;
+  fields: InputField[];
+  status: 'pending' | 'processing' | 'done' | 'cancelled' | 'failed';
+  answers: Record<string, unknown>; // valores já recebidos (arquivos: [{name, path, size}])
+  progress: string | null; // "Transcrevendo a gravação · parte 3 de 5"
+  error: string | null;
+  createdAt: string;
+  remindedAt: string | null;
+  nextReminderAt: string | null;
+  answeredAt: string | null;
+  notifiedVia: NotifyChannel[];
+}
+
+export interface NotifyStatus {
+  telegram: { configured: boolean; linked: boolean; chatName: string | null; botName: string | null; linkCode: string | null; error: string | null };
+  email: { configured: boolean; to: string | null; from: string | null };
+  push: { devices: number };
+  remindHours: number;
 }

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import cron from 'node-cron';
 import type OpenAI from 'openai';
-import type { ApprovalInfo, StepStatus, WorkflowDef, WorkflowNode, WorkflowRunInfo } from '../../shared/protocol.ts';
+import type { ApprovalInfo, InputFieldKind, NotifyChannel, StepStatus, WorkflowDef, WorkflowNode, WorkflowRunInfo } from '../../shared/protocol.ts';
 import { config } from './config.ts';
 import { db, now, uid } from './db.ts';
 import { emit, setYuiState } from './bus.ts';
@@ -14,7 +14,9 @@ import { registerBrain } from './extensions.ts';
 import { openai } from './brain.ts';
 import { narrate } from './live.ts';
 import { createRoutine, deleteRoutine, registerRoutineRoutes, routinesForWorkflow, setWorkflowRunner } from './routines.ts';
-import { parseWorkflowMarkdown, serializeWorkflow, slugify, toMermaid, validateWorkflow } from './workflowMarkdown.ts';
+import { fieldKey, parseWorkflowMarkdown, serializeWorkflow, slugify, toMermaid, validateWorkflow } from './workflowMarkdown.ts';
+import { cancelInputsForRun, notice, orphanInputs, requestInput } from './workflowInputs.ts';
+import { publicUrl } from './notify.ts';
 
 // Workflows de decisão: definidos em markdown canônico (/workspace/.atria/workflows/<slug>.md),
 // editados como fluxograma no Atria OS e executados passo a passo por agentes (manual ou rotina cron).
@@ -47,6 +49,10 @@ CREATE TABLE IF NOT EXISTS workflow_approval_decisions (
 );
 CREATE INDEX IF NOT EXISTS wad_wf ON workflow_approval_decisions(workflow, created_at);
 `);
+// estado da execução (saídas, visitas, variáveis, passos esperando resposta) para retomar depois de um reinício
+if (!(db.prepare(`PRAGMA table_info(workflow_runs)`).all() as { name: string }[]).some((c) => c.name === 'state_json')) {
+  db.exec(`ALTER TABLE workflow_runs ADD COLUMN state_json TEXT`);
+}
 
 const wfDir = () => join(config.metaDir, 'workflows');
 
@@ -208,6 +214,9 @@ export function listWorkflowRuns(slug: string, limit = 20): WorkflowRunInfo[] {
   return (db.prepare('SELECT * FROM workflow_runs WHERE workflow = ? ORDER BY started_at DESC LIMIT ?').all(slugify(slug), limit) as RunRow[]).map(toInfo);
 }
 
+// Onde um passo "Pedir informação" está esperando: o fim do ramo (stopAt) e os fins dos ramos de fora (outer),
+// para retomar o percurso igual depois de um reinício.
+interface WaitPoint { stopAt: string | null; outer: (string | null)[] }
 interface Exec {
   id: string;
   def: WorkflowDef;
@@ -218,12 +227,29 @@ interface Exec {
   activeRuns: Set<string>;
   visits: Map<string, number>;
   steps: number;
+  vars: Record<string, unknown>; // respostas dos pedidos (chave do campo → valor), para decisões e avisos
+  waits: Record<string, WaitPoint>;
+}
+interface SavedState {
+  outputs: { node: string; result: string }[];
+  visits: [string, number][];
+  steps: number;
+  vars: Record<string, unknown>;
+  waits: Record<string, WaitPoint>;
 }
 const executions = new Map<string, Exec>();
 
+const stateOf = (ex: Exec): SavedState => ({
+  outputs: ex.outputs.map((o) => ({ node: o.node.id, result: o.result })),
+  visits: [...ex.visits],
+  steps: ex.steps,
+  vars: ex.vars,
+  waits: ex.waits,
+});
+
 function persist(ex: Exec, fields: { status?: WorkflowRunInfo['status']; current?: string | null; finished?: boolean } = {}) {
-  const sets = ['nodes = @nodes'];
-  const p: Record<string, unknown> = { id: ex.id, nodes: JSON.stringify(ex.nodes) };
+  const sets = ['nodes = @nodes', 'state_json = @state'];
+  const p: Record<string, unknown> = { id: ex.id, nodes: JSON.stringify(ex.nodes), state: JSON.stringify(stateOf(ex)) };
   if (fields.status) {
     sets.push('status = @status');
     p.status = fields.status;
@@ -265,22 +291,28 @@ export async function runWorkflow(slug: string, opts: { routineId?: string; orig
   const nodes: Record<string, NodeState> = Object.fromEntries(def.nodes.map((n) => [n.id, { status: 'pending' as StepStatus }]));
   db.prepare(`INSERT INTO workflow_runs(id, workflow, status, current, nodes, routine_id, origin, input, started_at) VALUES(?, ?, 'running', NULL, ?, ?, ?, ?, ?)`)
     .run(id, def.slug, JSON.stringify(nodes), opts.routineId ?? null, opts.origin ?? 'manual', opts.input ?? null, now());
-  const ex: Exec = { id, def, nodes, outputs: [], input: opts.input ?? null, cancelled: false, activeRuns: new Set(), visits: new Map(), steps: 0 };
+  const ex: Exec = { id, def, nodes, outputs: [], input: opts.input ?? null, cancelled: false, activeRuns: new Set(), visits: new Map(), steps: 0, vars: {}, waits: {} };
   executions.set(id, ex);
   persist(ex);
   setYuiState('delegating');
+  const first = def.nodes.find((n) => n.type === 'start') ?? def.nodes[0];
+  drive(ex, () => walk(ex, first.id, null, []));
+  return getWorkflowRun(id)!;
+}
+
+// Roda o percurso e fecha a execução (concluída, cancelada ou com falha).
+function drive(ex: Exec, body: () => Promise<void>) {
+  const name = ex.def.name;
   void (async () => {
     try {
-      const first = def.nodes.find((n) => n.type === 'start') ?? def.nodes[0];
-      await walk(ex, first.id, null);
-      if (ex.cancelled) return finish(ex, 'cancelled', `Workflow "${def.name}" cancelado.`);
+      await body();
+      if (ex.cancelled) return finish(ex, 'cancelled', `Workflow "${name}" cancelado.`);
       const last = ex.outputs.filter((o) => o.node.type === 'task').at(-1);
-      finish(ex, 'done', `Workflow "${def.name}" concluído.${last ? ` ${clip(last.result.replace(/\s+/g, ' '), 220)}` : ''}`);
+      finish(ex, 'done', `Workflow "${name}" concluído.${last ? ` ${clip(last.result.replace(/\s+/g, ' '), 220)}` : ''}`);
     } catch (e) {
-      finish(ex, ex.cancelled ? 'cancelled' : 'failed', ex.cancelled ? `Workflow "${def.name}" interrompido: ${(e as Error).message}.` : `Workflow "${def.name}" parou: ${(e as Error).message}.`);
+      finish(ex, ex.cancelled ? 'cancelled' : 'failed', ex.cancelled ? `Workflow "${name}" interrompido: ${(e as Error).message}.` : `Workflow "${name}" parou: ${(e as Error).message}.`);
     }
   })();
-  return getWorkflowRun(id)!;
 }
 
 function finish(ex: Exec, status: WorkflowRunInfo['status'], msg: string) {
@@ -306,7 +338,8 @@ function reachable(ex: Exec, from: string): string[] {
 }
 
 // Percorre a partir de `id` até o fim (ou até `stopAt`, o ponto de junção de um paralelo).
-async function walk(ex: Exec, start: string | undefined, stopAt: string | null): Promise<void> {
+// `outer` = os stopAt dos percursos de fora (paralelos aninhados), guardados quando um passo espera resposta.
+async function walk(ex: Exec, start: string | undefined, stopAt: string | null, outer: (string | null)[]): Promise<void> {
   let id = start;
   while (id && id !== stopAt) {
     if (ex.cancelled) return;
@@ -328,27 +361,37 @@ async function walk(ex: Exec, start: string | undefined, stopAt: string | null):
     }
     if (node.type === 'task') await task(ex, node);
     else if (node.type === 'approval') await approval(ex, node);
+    else if (node.type === 'input') await inputStep(ex, node, { stopAt, outer });
+    else if (node.type === 'notify') await notifyStep(ex, node);
     else setNode(ex, id, { status: 'done' }); // start / parallel
     persist(ex);
     if ((node.next?.length ?? 0) > 1) {
-      await parallel(ex, node.next!);
+      await parallel(ex, node.next!, stopAt, outer);
       return;
     }
     id = node.next?.[0];
   }
 }
 
-async function parallel(ex: Exec, branches: string[]) {
+async function parallel(ex: Exec, branches: string[], stopAt: string | null, outer: (string | null)[]) {
   // Junção = primeiro passo (em largura) alcançável por todos os ramos.
   const sets = branches.map((b) => new Set(reachable(ex, b)));
   const join = reachable(ex, branches[0]).find((n) => !branches.includes(n) && sets.every((s) => s.has(n))) ?? null;
-  await Promise.all(branches.map((b) => walk(ex, b, join)));
-  if (join && !ex.cancelled) await walk(ex, join, null);
+  await Promise.all(branches.map((b) => walk(ex, b, join, [...outer, stopAt])));
+  if (join && join !== stopAt && !ex.cancelled) await walk(ex, join, stopAt, outer);
+}
+
+// Continua depois de um passo já resolvido (retomada): segue o próximo, ou abre o paralelo.
+async function continueAfter(ex: Exec, node: WorkflowNode, w: WaitPoint) {
+  if ((node.next?.length ?? 0) > 1) await parallel(ex, node.next!, w.stopAt, w.outer);
+  else await walk(ex, node.next?.[0], w.stopAt, w.outer);
 }
 
 function contextFor(ex: Exec): string {
   const parts: string[] = [];
   if (ex.input) parts.push(`Entrada desta execução: ${ex.input}`);
+  const vars = Object.entries(ex.vars).filter(([k]) => !k.includes('.'));
+  if (vars.length) parts.push(`Respostas do usuário: ${vars.map(([k, v]) => `${k} = ${clip(Array.isArray(v) ? v.join(', ') : String(v).replace(/\s+/g, ' '), 200)}`).join('; ')}`);
   for (const o of ex.outputs.slice(-6)) {
     parts.push(`### Passo ${o.node.id} — ${o.node.title}${o.node.output ? ` (saída "${o.node.output}")` : ''}\n${clip(o.result, 8000)}`);
   }
@@ -605,11 +648,191 @@ export function cancelWorkflowRun(id: string): boolean {
   if (!ex) return false;
   ex.cancelled = true;
   for (const r of ex.activeRuns) cancelRun(r);
+  cancelInputsForRun(id);
   return true;
 }
 
-function recoverWorkflowRuns() {
-  db.prepare(`UPDATE workflow_runs SET status = 'failed', finished_at = ? WHERE status IN ('running','waiting_approval')`).run(now());
+// ---------- pedir informação / avisar ----------
+
+const othersWaiting = (ex: Exec, except: string) => Object.keys(ex.waits).some((k) => k !== except);
+
+async function inputStep(ex: Exec, node: WorkflowNode, w: WaitPoint, resume = false) {
+  ex.waits[node.id] = w;
+  const { done } = requestInput({
+    runId: ex.id, node, workflow: ex.def.slug, workflowName: ex.def.name, resume,
+    onProcessing: () => {
+      setNode(ex, node.id, { status: 'running', result: 'Resposta recebida; processando…' });
+      persist(ex, { status: othersWaiting(ex, node.id) ? 'waiting_input' : 'running' });
+    },
+  });
+  if (ex.nodes[node.id]?.status !== 'running') {
+    setNode(ex, node.id, { status: 'waiting_input', result: null });
+    persist(ex, { status: 'waiting_input' });
+  }
+  if (!resume) announce(`${ex.def.name}: preciso de você — ${node.title}. Te avisei${node.notifyVia?.length ? ` por ${node.notifyVia.join(', ')}` : ''}.`);
+  const out = await done;
+  delete ex.waits[node.id];
+  if (out.status === 'cancelled' || ex.cancelled) {
+    ex.cancelled = true;
+    setNode(ex, node.id, { status: 'cancelled', result: 'pedido cancelado' });
+    persist(ex);
+    throw new Error(`pedido do passo ${node.id} cancelado`);
+  }
+  Object.assign(ex.vars, out.vars);
+  setNode(ex, node.id, { status: 'done', result: out.output });
+  ex.outputs.push({ node, result: out.output });
+  persist(ex, { status: othersWaiting(ex, node.id) ? 'waiting_input' : 'running' });
+}
+
+type Composer = (i: { workflow: string; passo: string; pedido: string; contexto: string }) => Promise<{ titulo: string; texto: string }>;
+const openaiComposer: Composer = async (i) => {
+  const res = await openai.responses.create({
+    model: config.brainModel,
+    instructions:
+      'Você escreve um aviso curto para o dono, enviado por Telegram/e-mail/push no meio de um workflow. Português direto, sem saudação longa; inclua links, valores e datas que estiverem nos resultados; até 1200 caracteres. titulo com até 60 caracteres.',
+    input: `Workflow: ${i.workflow}\nPasso: ${i.passo}\nO que avisar: ${i.pedido || 'o resultado até aqui'}\n\nResultados desta execução:\n${i.contexto || '(nenhum)'}`,
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'aviso',
+        strict: true,
+        schema: { type: 'object', additionalProperties: false, required: ['titulo', 'texto'], properties: { titulo: { type: 'string' }, texto: { type: 'string' } } },
+      },
+    },
+  });
+  trackOpenAI('workflow-aviso', res.model, res.usage);
+  return JSON.parse(res.output_text) as { titulo: string; texto: string };
+};
+let composer: Composer = openaiComposer;
+/** Troca quem escreve o aviso do passo Avisar (testes). null volta ao modelo. */
+export function setNoticeComposer(c: Composer | null) {
+  composer = c ?? openaiComposer;
+}
+
+const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+// Texto fixo: {{Título do passo}} / {{Título do passo.saida}} / {{3}} = saída do passo; {{chave}} = resposta de um pedido.
+export function fillTemplate(text: string, ex: Pick<Exec, 'outputs' | 'vars' | 'input' | 'def'>): string {
+  return text.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (all, ref: string) => {
+    const k = norm(ref.replace(/\.(saida|saída|output|resultado)$/i, ''));
+    if (k === 'entrada') return ex.input ?? '';
+    if (k === 'workflow') return ex.def.name;
+    if (k === 'data' || k === 'hoje') return new Date().toLocaleDateString('pt-BR', { timeZone: config.timezone });
+    const o = [...ex.outputs].reverse().find((x) => x.node.id === k || norm(x.node.title) === k || (x.node.output && norm(x.node.output) === k));
+    if (o) return o.result.trim();
+    const v = Object.entries(ex.vars).find(([key]) => norm(key) === k || norm(key) === k.replace(/\s+/g, '-'));
+    if (v) return Array.isArray(v[1]) ? v[1].join(', ') : String(v[1]);
+    return all;
+  });
+}
+
+// Arquivos citados nas saídas (dentro do workspace), até 5 e 20 MB cada.
+function runFiles(ex: Exec): string[] {
+  const ws = config.workspaceDir.replace(/\/+$/, '');
+  const re = new RegExp(`${ws.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/[^\\s\`'"()<>\\[\\],;]+`, 'g');
+  const out: string[] = [];
+  for (const o of [...ex.outputs].reverse()) {
+    for (const m of o.result.match(re) ?? []) {
+      const p = m.replace(/[.:]+$/, '');
+      if (out.includes(p) || p.includes('/../')) continue;
+      try {
+        const st = statSync(p);
+        if (st.isFile() && st.size <= 20 * 1024 * 1024) out.push(p);
+      } catch {
+        /* não existe */
+      }
+      if (out.length >= 5) return out;
+    }
+  }
+  return out;
+}
+
+async function notifyStep(ex: Exec, node: WorkflowNode) {
+  setNode(ex, node.id, { status: 'running' });
+  persist(ex);
+  const channels: NotifyChannel[] = node.notifyVia?.length ? node.notifyVia : ['push'];
+  const pedido = node.message?.text || node.instruction || '';
+  let title = `${ex.def.name}: ${node.title}`;
+  let text: string;
+  if (node.message?.mode === 'template') text = fillTemplate(pedido, ex) || title;
+  else {
+    try {
+      const c = await composer({ workflow: ex.def.name, passo: `${node.id}. ${node.title}`, pedido, contexto: contextFor(ex) });
+      title = c.titulo?.trim() || title;
+      text = c.texto.trim();
+    } catch (e) {
+      console.error('workflow aviso', (e as Error).message);
+      const last = ex.outputs.at(-1);
+      text = [pedido ? fillTemplate(pedido, ex) : '', last ? clip(last.result, 1500) : ''].filter(Boolean).join('\n\n') || title;
+    }
+  }
+  const files = node.attach ? runFiles(ex) : [];
+  const res = await notice({ title, text, url: publicUrl(`/app/workflows/${ex.def.slug}`), files, channels, kind: 'notice' });
+  const ok = res.filter((r) => r.ok).map((r) => r.channel);
+  const bad = res.filter((r) => !r.ok).map((r) => `${r.channel} (${r.error ?? 'falhou'})`);
+  const result = [
+    ok.length ? `Avisado por ${ok.join(', ')}.` : 'Nenhum aviso saiu.',
+    bad.length ? `Não saiu por: ${bad.join('; ')}.` : '',
+    files.length ? `Anexos: ${files.join(', ')}` : '',
+    `\nMensagem enviada:\n${title}\n${text}`,
+  ].filter(Boolean).join('\n');
+  setNode(ex, node.id, { status: 'done', result });
+  ex.outputs.push({ node, result });
+}
+
+// ---------- reinício ----------
+
+// Execuções esperando resposta (passo Pedir informação) voltam a esperar; as que estavam rodando um agente
+// ou esperando aprovação falham como antes ("interrompida por reinício").
+export function recoverWorkflowRuns() {
+  const rows = db.prepare(`SELECT * FROM workflow_runs WHERE status IN ('running','waiting_approval','waiting_input')`).all() as (RunRow & { state_json: string | null; input: string | null })[];
+  const fail = (r: RunRow, why: string) => {
+    const nodes = JSON.parse(r.nodes) as Record<string, NodeState>;
+    for (const [k, n] of Object.entries(nodes)) {
+      if (n.status === 'running' || n.status === 'waiting_approval' || n.status === 'waiting_input') nodes[k] = { ...n, status: 'failed', result: n.result ?? why };
+      else if (n.status === 'pending') nodes[k] = { ...n, status: 'skipped' };
+    }
+    db.prepare(`UPDATE workflow_runs SET status = 'failed', finished_at = ?, current = NULL, nodes = ? WHERE id = ?`).run(now(), JSON.stringify(nodes), r.id);
+  };
+  for (const r of rows) {
+    if (executions.has(r.id)) continue;
+    const def = r.status === 'waiting_input' ? loadWorkflow(r.workflow) : null;
+    const st = r.state_json ? (JSON.parse(r.state_json) as SavedState) : null;
+    const nodes = JSON.parse(r.nodes) as Record<string, NodeState>;
+    const busyOther = Object.entries(nodes).some(([k, n]) => (n.status === 'running' || n.status === 'waiting_approval') && !st?.waits[k]);
+    if (!def || !st || busyOther || !Object.keys(st.waits).length || Object.keys(st.waits).some((k) => !def.nodes.find((n) => n.id === k))) {
+      fail(r, 'interrompida por reinício');
+      continue;
+    }
+    const byNode = (id: string) => def.nodes.find((n) => n.id === id);
+    const ex: Exec = {
+      id: r.id, def, nodes, input: r.input, cancelled: false, activeRuns: new Set(), steps: st.steps, vars: st.vars ?? {}, waits: {},
+      visits: new Map(st.visits),
+      outputs: st.outputs.map((o) => ({ node: byNode(o.node) ?? { id: o.node, type: 'task', title: `Passo ${o.node}` }, result: o.result })),
+    };
+    executions.set(ex.id, ex);
+    const points = Object.entries(st.waits);
+    // a cadeia mais longa de junções diz como voltar ao percurso de fora depois que os ramos terminam
+    const deepest = points.map(([, w]) => w).sort((a, b) => b.outer.length - a.outer.length)[0];
+    drive(ex, async () => {
+      await Promise.all(points.map(async ([id, w]) => {
+        const node = byNode(id)!;
+        await inputStep(ex, node, w, true);
+        persist(ex);
+        if (!ex.cancelled) await continueAfter(ex, node, w);
+      }));
+      let stop = deepest.stopAt;
+      let out = deepest.outer;
+      while (stop !== null && !ex.cancelled) {
+        const parentStop = out.at(-1) ?? null;
+        await walk(ex, stop, parentStop, out.slice(0, -1));
+        stop = parentStop;
+        out = out.slice(0, -1);
+      }
+    });
+    console.log(`workflow ${r.workflow}: execução ${r.id} voltou a esperar resposta`);
+  }
+  orphanInputs(new Set(executions.keys()));
 }
 
 // ---------- geração por linguagem natural (Yui cria workflows) ----------
@@ -617,10 +840,10 @@ function recoverWorkflowRuns() {
 const NODE_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['id', 'type', 'title', 'agent', 'instruction', 'output', 'condition', 'branches', 'next', 'mcp', 'ask'],
+  required: ['id', 'type', 'title', 'agent', 'instruction', 'output', 'condition', 'branches', 'next', 'mcp', 'ask', 'fields', 'notifyVia', 'messageMode', 'attach'],
   properties: {
     id: { type: 'string' },
-    type: { type: 'string', enum: ['start', 'task', 'decision', 'approval', 'parallel', 'end'] },
+    type: { type: 'string', enum: ['start', 'task', 'decision', 'approval', 'parallel', 'input', 'notify', 'end'] },
     title: { type: 'string' },
     agent: { type: ['string', 'null'] },
     instruction: { type: ['string', 'null'] },
@@ -633,6 +856,25 @@ const NODE_SCHEMA = {
     },
     next: { type: 'array', items: { type: 'string' } },
     mcp: { type: 'array', items: { type: 'string' } },
+    fields: {
+      type: 'array',
+      description: 'input: campos que o usuário preenche; demais tipos: []',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['label', 'kind', 'required', 'options', 'default'],
+        properties: {
+          label: { type: 'string' },
+          kind: { type: 'string', enum: ['text', 'longtext', 'date', 'time', 'number', 'boolean', 'choice', 'audio', 'images', 'files'] },
+          required: { type: 'boolean' },
+          options: { type: 'array', items: { type: 'string' }, description: 'choice: opções; demais: []' },
+          default: { type: ['string', 'null'], description: '"hoje" para data/hora do dia; senão null' },
+        },
+      },
+    },
+    notifyVia: { type: 'array', items: { type: 'string', enum: ['telegram', 'email', 'push'] }, description: 'input/notify: canais do aviso; demais: []' },
+    messageMode: { type: ['string', 'null'], enum: ['ai', 'template', null], description: 'notify: ai (a Yui escreve seguindo instruction) ou template (instruction é o texto fixo com {{Título do passo}}); demais: null' },
+    attach: { type: 'boolean', description: 'notify: anexar arquivos gerados na execução; demais: false' },
   },
 };
 
@@ -643,7 +885,8 @@ export async function generateWorkflow(input: { descricao: string; nome?: string
   const res = await openai.responses.create({
     model: config.plannerModel,
     instructions: `Você desenha workflows de trabalho para agentes Claude Code do Atria OS. Gere passos numerados ("1", "2"…) na ordem de execução.
-Tipos: task (um agente executa; instrução completa e autossuficiente em português, citando ferramentas/conectores quando útil), decision (condição objetiva + 2 ramos, normalmente "sim"/"não", com "to" = id do passo), approval (revisão do usuário: use SOMENTE quando o pedido disser para pedir aprovação/permissão/revisão dele naquela etapa, e então com ask=true e instruction dizendo o que revisar), parallel (next com 2+ passos em paralelo), end (último passo).
+Tipos: task (um agente executa; instrução completa e autossuficiente em português, citando ferramentas/conectores quando útil), decision (condição objetiva + 2 ramos, normalmente "sim"/"não", com "to" = id do passo), approval (revisão do usuário: use SOMENTE quando o pedido disser para pedir aprovação/permissão/revisão dele naquela etapa, e então com ask=true e instruction dizendo o que revisar), parallel (next com 2+ passos em paralelo), input ("Pedir informação": o fluxo PARA e espera o usuário mandar algo — data, texto, gravação de áudio para transcrever, fotos, arquivos, escolha, sim/não; instruction = o que pedir; fields = os campos, kind audio para gravações de reunião, default "hoje" em datas do dia; notifyVia = como avisar), notify ("Avisar": manda uma mensagem por telegram/email/push e segue; instruction = o que dizer; messageMode "ai"; attach=true quando houver arquivos/links gerados a enviar), end (último passo).
+Quando precisar de algo do usuário no meio do fluxo (ex.: "espera eu mandar a gravação da reunião", "pergunta a data"), use input — não use approval para isso. Quando o pedido disser para avisar/mandar no Telegram ou e-mail, use notify; os canais vêm do pedido (sem canal citado: push).
 Use SOMENTE estes agentes (campo agent = id):
 ${agents}
 Em tasks preencha agent, instruction e output (nome curto da saída). Fora de tasks use null nesses campos. next = próximo(s) id(s) (vazio em decision/end). Termine sempre com um passo end. O workflow roda no automático: sem pedido explícito do usuário NÃO crie approval, nem antes de publicar, enviar ou fazer deploy. Uma aprovação rejeitada já interrompe o workflow: NÃO crie decisão para checar se foi aprovado. Não crie passo start só para descrever agenda/recorrência (o agendamento é configurado à parte).`,
@@ -663,7 +906,11 @@ Em tasks preencha agent, instruction e output (nome curto da saída). Fora de ta
     },
   });
   trackOpenAI('workflow-gerar', res.model, res.usage);
-  type GenNode = { id: string; type: WorkflowNode['type']; title: string; agent: string | null; instruction: string | null; output: string | null; condition: string | null; branches: { label: string; to: string }[]; next: string[]; mcp: string[]; ask: boolean };
+  type GenNode = {
+    id: string; type: WorkflowNode['type']; title: string; agent: string | null; instruction: string | null; output: string | null; condition: string | null;
+    branches: { label: string; to: string }[]; next: string[]; mcp: string[]; ask: boolean;
+    fields: { label: string; kind: InputFieldKind; required: boolean; options: string[]; default: string | null }[]; notifyVia: NotifyChannel[]; messageMode: 'ai' | 'template' | null; attach: boolean;
+  };
   const raw = JSON.parse(res.output_text) as { name: string; description: string; nodes: GenNode[] };
   const nodes: WorkflowNode[] = raw.nodes.map((n) => {
     const out: WorkflowNode = { id: n.id, type: n.type, title: n.title };
@@ -675,6 +922,20 @@ Em tasks preencha agent, instruction e output (nome curto da saída). Fora de ta
     if (n.next?.length && n.type !== 'decision' && n.type !== 'end') out.next = n.next;
     if (n.mcp?.length) out.mcp = n.mcp;
     if (n.type === 'approval') out.ask = true; // gerador só cria aprovação quando o usuário pediu
+    if (n.type === 'input') {
+      out.fields = n.fields.map((f) => ({
+        key: fieldKey(f.label), label: f.label, kind: f.kind, required: f.required,
+        ...(f.kind === 'choice' && f.options.length ? { options: f.options } : {}),
+        ...(f.default ? { default: f.default } : {}),
+      }));
+      out.notifyVia = n.notifyVia.length ? n.notifyVia : ['push'];
+    }
+    if (n.type === 'notify') {
+      out.notifyVia = n.notifyVia.length ? n.notifyVia : ['push'];
+      out.message = { mode: n.messageMode === 'template' ? 'template' : 'ai', text: n.instruction ?? '' };
+      delete out.instruction;
+      if (n.attach) out.attach = true;
+    }
     return out;
   });
   const name = input.nome || raw.name;
@@ -778,7 +1039,7 @@ export function register(app: FastifyInstance): void {
   registerBrain({
     name: 'workflows',
     instructions:
-      `- Workflows = rotinas de trabalho repetíveis com vários passos, decisões, aprovações e agentes (ex.: "post pro Instagram", "leads diários"). Quando o usuário quiser criar um processo/rotina de trabalho, use create_workflow com uma descrição detalhada (objetivo, passos, agentes, decisões, aprovações) — ele abre no editor para o usuário ajustar. "Roda o workflow X" → run_workflow. "Agenda / todo dia / toda segunda" para um workflow → schedule_workflow com cron de 5 campos (fuso ${config.timezone}). Lista de workflows: show_view workflows; rotinas agendadas: show_view routines. create_routine fica só para uma instrução simples de um agente. Workflows rodam no automático: passos de Aprovação são decididos por mim com base nas decisões anteriores do usuário (ele é chamado só se eu não tiver certeza ou se o passo estiver marcado "sempre me perguntar"); só crie passo de aprovação quando ele pedir. "Exclui/remove/apaga o workflow X" → delete_workflow: é irreversível, use só quando o usuário pedir claramente para excluir aquele workflow (nunca por iniciativa própria) — abre um modal de aprovação; diga que aguarda a aprovação dele e nunca diga que já excluiu.`,
+      `- Workflows = rotinas de trabalho repetíveis com vários passos, decisões, aprovações e agentes (ex.: "post pro Instagram", "leads diários"). Quando o usuário quiser criar um processo/rotina de trabalho, use create_workflow com uma descrição detalhada (objetivo, passos, agentes, decisões, aprovações) — ele abre no editor para o usuário ajustar. "Roda o workflow X" → run_workflow. "Agenda / todo dia / toda segunda" para um workflow → schedule_workflow com cron de 5 campos (fuso ${config.timezone}). Lista de workflows: show_view workflows; rotinas agendadas: show_view routines. create_routine fica só para uma instrução simples de um agente. Workflows rodam no automático: passos de Aprovação são decididos por mim com base nas decisões anteriores do usuário (ele é chamado só se eu não tiver certeza ou se o passo estiver marcado "sempre me perguntar"); só crie passo de aprovação quando ele pedir. Passo "Pedir informação" para o workflow até o usuário mandar algo (data, gravação para transcrever, fotos, arquivos…) e "Avisar" manda mensagem por Telegram/e-mail/push — use-os quando ele descrever "espera eu mandar…" ou "me avisa no Telegram…". "Exclui/remove/apaga o workflow X" → delete_workflow: é irreversível, use só quando o usuário pedir claramente para excluir aquele workflow (nunca por iniciativa própria) — abre um modal de aprovação; diga que aguarda a aprovação dele e nunca diga que já excluiu.`,
     snapshot: () => {
       const ws = listWorkflows();
       return ws.length
@@ -879,7 +1140,12 @@ export function register(app: FastifyInstance): void {
           if (!w) return Promise.resolve({ ok: false, error: 'workflow não encontrado', disponiveis: listWorkflows().map((x) => x.slug) });
           return Promise.resolve({
             ok: true, slug: w.slug, nome: w.name, gatilho: w.trigger, fluxo: toMermaid(w, { compact: true }),
-            passos: w.nodes.map((n) => ({ id: n.id, tipo: n.type, titulo: n.title, agente: n.agent ?? null, instrucao: n.instruction ?? null, condicao: n.condition ?? null, ...(n.type === 'approval' ? { sempre_perguntar: !!n.ask } : {}) })),
+            passos: w.nodes.map((n) => ({
+              id: n.id, tipo: n.type, titulo: n.title, agente: n.agent ?? null, instrucao: n.instruction ?? null, condicao: n.condition ?? null,
+              ...(n.type === 'approval' ? { sempre_perguntar: !!n.ask } : {}),
+              ...(n.type === 'input' ? { campos: (n.fields ?? []).map((f) => `${f.label} (${f.kind}${f.required ? ', obrigatório' : ''})`), avisar: n.notifyVia ?? ['push'] } : {}),
+              ...(n.type === 'notify' ? { avisar: n.notifyVia ?? [], mensagem: n.message ?? null, anexar: !!n.attach } : {}),
+            })),
             erros: validateWorkflow(w),
           });
         }

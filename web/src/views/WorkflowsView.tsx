@@ -15,8 +15,8 @@ type Row = WorkflowDef & { lastRun: WorkflowRunInfo | null; routines: { id: stri
 
 const PLURAL = { task: 'tarefas', decision: 'decisões', approval: 'aprovações' } as const
 
-const RUN_C: Record<string, string> = { running: C.cyan, waiting_approval: C.warn, done: C.ok, failed: C.crit, cancelled: C.t3 }
-const RUN_T: Record<string, string> = { running: 'rodando', waiting_approval: 'aguardando aprovação', done: 'concluído', failed: 'falhou', cancelled: 'cancelado' }
+const RUN_C: Record<string, string> = { running: C.cyan, waiting_approval: C.warn, waiting_input: C.cyan, done: C.ok, failed: C.crit, cancelled: C.t3 }
+const RUN_T: Record<string, string> = { running: 'rodando', waiting_approval: 'aguardando aprovação', waiting_input: 'esperando sua resposta', done: 'concluído', failed: 'falhou', cancelled: 'cancelado' }
 
 export function WorkflowsView() {
   const { data, loading, error, reload } = useApi<Row[]>('/api/workflows', [], 8000)
@@ -163,7 +163,7 @@ export function WorkflowsView() {
           rows={[
             { label: 'Passos', value: String(del.nodes.length) },
             { label: 'Rotinas agendadas', value: del.routines.length ? del.routines.map((r) => r.cron).join(', ') : 'nenhuma' },
-            ...(del.lastRun && (del.lastRun.status === 'running' || del.lastRun.status === 'waiting_approval') ? [{ label: 'Em execução agora', value: 'será interrompida' }] : []),
+            ...(del.lastRun && (del.lastRun.status === 'running' || del.lastRun.status === 'waiting_approval' || del.lastRun.status === 'waiting_input') ? [{ label: 'Em execução agora', value: 'será interrompida' }] : []),
           ]}
           onClose={() => setDel(null)}
           onDeleted={() => {

@@ -4,6 +4,8 @@ import { useLocation, useNavigate } from 'react-router'
 import type { Bootstrap, ViewName, ViewParams } from '@shared/protocol'
 import { api } from '../api/client'
 import { connectEvents } from '../api/events'
+import { InputFormHost, InputToast } from '../workflow/InputForm'
+import { loadInputs } from '../workflow/inputs'
 import { sendContextDebounced } from '../lib/actions'
 import { ApprovalModal, CommandPalette, HistoryDrawer, Inbox, UpdateToast } from '../overlays/Overlays'
 import { pttDown, pttUp, toggleLive } from '../voice/live'
@@ -69,18 +71,20 @@ function parsePath(path: string): { view: ViewName; params: ViewParams } | null 
   return null
 }
 
-// /app/<página>/<id?> = dashboard (Yui minimizada); demais rotas = modo Yui.
+// /app/<página>/<id?>/<sub?> = dashboard (Yui minimizada); demais rotas = modo Yui.
+// sub: segundo nível de detalhe (/app/workflows/pedido/<id> = formulário de um pedido de informação).
 const APP_PAGES = new Set(['overview', 'ops', 'agents', 'runs', 'missions', 'workflows', 'schedule', 'projects', 'browser', 'terminal', 'claude', 'tools', 'inbox', 'infra', 'settings', 'vault', 'brain', 'company', 'help', 'more', 'usage', 'reminders', 'skills'])
 function appPathFor(page: string, p: Record<string, string>) {
   const base = page === 'overview' ? '/app' : `/app/${page}`
-  return p.id ? `${base}/${encodeURIComponent(p.id)}` : base
+  if (!p.id) return base
+  return p.sub ? `${base}/${encodeURIComponent(p.id)}/${encodeURIComponent(p.sub)}` : `${base}/${encodeURIComponent(p.id)}`
 }
 function applyPath(path: string) {
   const s = useYui.getState()
   const seg = path.split('/').filter(Boolean).map(decodeURIComponent)
   if (seg[0] === 'app') {
     const page = seg[1] && APP_PAGES.has(seg[1]) ? seg[1] : 'overview'
-    s.set({ shellMode: 'app', appPage: page as AppPage, appParams: seg[2] ? { id: seg[2] } : {} })
+    s.set({ shellMode: 'app', appPage: page as AppPage, appParams: seg[2] ? { id: seg[2], ...(seg[3] ? { sub: seg[3] } : {}) } : {} })
     return
   }
   if (s.shellMode === 'app') s.set({ shellMode: 'yui' })
@@ -138,6 +142,7 @@ async function bootstrap() {
     pending: b.greeting.showBrief ? { view: 'brief' } : null,
   })
   connectEvents()
+  void loadInputs()
   // atalho do app instalado: "Falar com a Yui" já abre a conversa por voz
   const qs = new URLSearchParams(location.search)
   if (qs.get('voice') === '1') {
@@ -279,6 +284,8 @@ export function Shell() {
         <HistoryDrawer />
         <CommandPalette />
         <ApprovalModal />
+        <InputFormHost />
+        <InputToast />
         <UpdateToast />
       </main>
     </>

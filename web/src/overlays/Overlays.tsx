@@ -7,6 +7,7 @@ import { resolveApproval } from '../lib/actions'
 import { C, toneColor } from '../lib/colors'
 import { dockInput } from '../shell/parts'
 import { useYui } from '../store/yui'
+import { openInboxView } from '../workflow/inputs'
 import { BottomSheet } from '../views/Sheet'
 import { ConfirmDeleteModal } from '../views/ui'
 
@@ -16,7 +17,7 @@ function openInboxItem(ib: InboxItem) {
   if (ib.action.type === 'approval') {
     if (s.approvals[ib.action.approvalId]) s.set({ approvalOpen: ib.action.approvalId, yst: 'warning' })
     else s.show('runs')
-  } else s.show(ib.action.view, ib.action.params ?? {})
+  } else openInboxView(ib)
 }
 
 export function Inbox() {

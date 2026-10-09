@@ -7,6 +7,7 @@ import { C, toneColor } from '../../lib/colors'
 import { useYui } from '../../store/yui'
 import { Tabs } from '../../views/kit'
 import { Empty, useHeader } from '../../views/ui'
+import { openInboxView } from '../../workflow/inputs'
 import { relTime } from './common'
 
 // Exclusões pedidas à Yui usam run_id "delete:workflow:<slug>" / "delete:mission:<id>".
@@ -105,7 +106,7 @@ export function InboxPage() {
       {others.map((ib) => (
         <div key={ib.id} style={{ display: 'flex', alignItems: 'center', gap: 8, borderRadius: 14, border: '1px solid rgba(255,255,255,.06)', background: 'rgba(255,255,255,.025)', minWidth: 0 }}>
           <button
-            onClick={() => ib.action.type === 'view' && useYui.getState().show(ib.action.view, ib.action.params ?? {})}
+            onClick={() => openInboxView(ib)}
             className="app-row"
             style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, padding: '14px 16px', borderRadius: 14, border: 'none', background: 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer' }}
           >

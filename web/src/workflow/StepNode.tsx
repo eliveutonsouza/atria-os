@@ -1,5 +1,5 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import type { WorkflowNodeType } from '@shared/protocol'
+import type { NotifyChannel, WorkflowNodeType } from '@shared/protocol'
 import { C } from '../lib/colors'
 import type { FlowNode, MissionFlowNode } from './graph'
 
@@ -11,6 +11,8 @@ export const TYPE_META: Record<WorkflowNodeType, { label: string; color: string;
   decision: { label: 'Decisão', color: C.lav, icon: '◆' },
   approval: { label: 'Aprovação', color: C.warn, icon: '✋' },
   parallel: { label: 'Paralelo', color: C.violet, icon: '⫴' },
+  input: { label: 'Pedir informação', color: '#7fb6ff', icon: '✎' },
+  notify: { label: 'Avisar', color: C.ok, icon: '➤' },
   end: { label: 'Fim', color: C.ok, icon: '■' },
 }
 
@@ -21,7 +23,10 @@ const STATUS_BADGE: Record<string, { t: string; c: string }> = {
   skipped: { t: '–', c: C.t4 },
   running: { t: '●', c: C.cyan },
   waiting_approval: { t: '…', c: C.warn },
+  waiting_input: { t: '◷', c: '#7fb6ff' },
 }
+
+export const CHANNEL_LABEL: Record<NotifyChannel, string> = { telegram: 'Telegram', email: 'E-mail', push: 'Push' }
 
 const handle = { width: 9, height: 9, background: '#0f1229', border: '1px solid rgba(160,170,255,.45)' }
 
@@ -29,7 +34,7 @@ export function StepNode({ data, selected }: NodeProps<FlowNode>) {
   const { step, status, decision, agentName, active } = data
   const meta = TYPE_META[step.type]
   const badge = status ? STATUS_BADGE[status] : undefined
-  const pulse = active || status === 'running' || status === 'waiting_approval'
+  const pulse = active || status === 'running' || status === 'waiting_approval' || status === 'waiting_input'
   const ring = selected ? `0 0 0 1.5px ${meta.color}, 0 0 22px ${meta.color}55` : pulse ? `0 0 18px ${meta.color}66` : '0 10px 30px rgba(0,0,0,.35)'
   const dim = status === 'skipped' || status === 'cancelled'
 
@@ -78,6 +83,14 @@ export function StepNode({ data, selected }: NodeProps<FlowNode>) {
       <div style={{ marginTop: 5, fontSize: 13, fontWeight: 600, color: C.text, lineHeight: 1.3 }}>{step.title}</div>
       {step.type === 'task' && (
         <div style={{ marginTop: 5, fontSize: 11, color: agentName ? '#a9e9f8' : C.crit }}>{agentName ? `${agentName}` : 'sem agente'}</div>
+      )}
+      {step.type === 'input' && (
+        <div style={{ marginTop: 5, fontSize: 11, color: status === 'waiting_input' ? meta.color : C.t3 }}>
+          {status === 'waiting_input' ? 'esperando sua resposta' : `${step.fields?.length ?? 0} campo${step.fields?.length === 1 ? '' : 's'}${step.fields?.some((f) => f.kind === 'audio') ? ' · áudio transcrito' : ''}`}
+        </div>
+      )}
+      {step.type === 'notify' && (step.notifyVia ?? []).length > 0 && (
+        <div style={{ marginTop: 5, fontSize: 11, color: C.t3 }}>{(step.notifyVia ?? []).map((c) => CHANNEL_LABEL[c]).join(' + ')}</div>
       )}
       {step.type === 'task' && step.instruction && (
         <div style={{ marginTop: 4, fontSize: 11, color: C.t3, lineHeight: 1.35, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{step.instruction}</div>

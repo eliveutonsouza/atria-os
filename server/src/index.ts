@@ -5,6 +5,7 @@ import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import httpProxy from '@fastify/http-proxy';
+import multipart from '@fastify/multipart';
 import { timingSafeEqual } from 'node:crypto';
 import { connect } from 'node:net';
 import { cpSync, existsSync, readFileSync, statSync } from 'node:fs';
@@ -29,7 +30,9 @@ import * as customViews from './customViews.ts';
 import * as toolbox from './toolbox.ts';
 import * as agentsAdmin from './agentsAdmin.ts';
 import * as workflows from './workflows.ts';
+import * as workflowInputs from './workflowInputs.ts';
 import * as push from './push.ts';
+import * as notify from './notify.ts';
 import * as stats from './stats.ts';
 import * as browserLive from './browserLive.ts';
 import * as settings from './settings.ts';
@@ -88,10 +91,12 @@ await app.register(helmet, {
 });
 
 await app.register(websocket);
+// uploads (Empresa, pedidos de informação dos workflows): limite global de 500 MB; cada rota aperta o seu
+await app.register(multipart, { limits: { fileSize: 500 * 1024 * 1024, files: 30, fields: 10, parts: 40 } });
 registerAuth(app);
 initTerminal();
 registerTerminal(app);
-for (const mod of [missions, customViews, toolbox, agentsAdmin, workflows, push, stats, browserLive, settings, onboarding, vault, company, help, usage, models, remindersApi, reportsApi, historyApi, projectsApi, telemetry, central, support, claudeDesign, skillsHub]) mod.register(app);
+for (const mod of [missions, customViews, toolbox, agentsAdmin, workflowInputs, workflows, push, notify, stats, browserLive, settings, onboarding, vault, company, help, usage, models, remindersApi, reportsApi, historyApi, projectsApi, telemetry, central, support, claudeDesign, skillsHub]) mod.register(app);
 // skill nova/removida na plataforma: relê as capacidades do Claude para aparecer nas listas
 skillsHub.setPlatformChangeHook(() => void captureInit());
 vaultAuto.register();

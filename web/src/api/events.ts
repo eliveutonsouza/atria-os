@@ -1,6 +1,7 @@
 import type { ServerEvent, UiAction } from '@shared/protocol'
 import { dropMission } from '../lib/actions'
 import { useYui } from '../store/yui'
+import { onInputUpdated } from '../workflow/inputs'
 import { MOCK } from './client'
 
 let yuiStreaming = false
@@ -94,6 +95,9 @@ export function applyEvent(ev: ServerEvent) {
       break
     case 'workflow.run.updated':
       s.set({ workflowRuns: { ...s.workflowRuns, [ev.run.id]: ev.run } })
+      break
+    case 'workflow.input.updated':
+      onInputUpdated(ev.request)
       break
     case 'custom.created':
       s.set({ customViews: { ...s.customViews, [ev.view.id]: ev.view } })

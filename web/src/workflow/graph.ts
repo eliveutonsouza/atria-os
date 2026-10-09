@@ -66,7 +66,7 @@ export function toFlow(
         status: st?.status,
         decision: st?.decision ?? null,
         agentName: s.agent ? (opts.agentNames?.[s.agent] ?? s.agent) : undefined,
-        active: opts.run?.current === s.id && (opts.run.status === 'running' || opts.run.status === 'waiting_approval'),
+        active: opts.run?.current === s.id && (opts.run.status === 'running' || opts.run.status === 'waiting_approval' || opts.run.status === 'waiting_input'),
       },
     }
   })

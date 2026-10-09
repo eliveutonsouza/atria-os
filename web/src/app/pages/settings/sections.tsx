@@ -88,7 +88,7 @@ function ConnRow({ letter, color, name, ok, status, desc, action }: { letter: st
   )
 }
 
-const bigBtn = (primary = false) =>
+export const bigBtn = (primary = false) =>
   ({
     // altura vem de --big-btn-h (44px no toque, ver Section/ConnRow)
     height: 'var(--big-btn-h, 36px)', padding: '0 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', justifyContent: 'center',

@@ -29,6 +29,10 @@ const DEFAULTS: Record<string, Price> = {
   'gpt-live-1': { in: 0, out: 0, perMinute: 0.05 },
   'gpt-realtime-2.1-mini': { in: 0.6, out: 2.4, cachedIn: 0.06, audioIn: 10, audioOut: 20 },
   'gpt-realtime': { in: 4, out: 24, cachedIn: 0.4, audioIn: 32, audioOut: 64 },
+  // transcrição (workflows › Pedir informação): gpt-4o-transcribe cobra tokens (≈ US$ 0,006/min); whisper-1 por minuto
+  'gpt-4o-transcribe': { in: 2.5, out: 10, audioIn: 6, perMinute: 0.006 },
+  'gpt-4o-mini-transcribe': { in: 1.25, out: 5, audioIn: 3, perMinute: 0.003 },
+  'whisper-1': { in: 0, out: 0, perMinute: 0.006 },
   'text-embedding-3-small': { in: 0.02, out: 0 },
   'text-embedding-3-large': { in: 0.13, out: 0 },
 };

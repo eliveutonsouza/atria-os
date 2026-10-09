@@ -44,6 +44,13 @@ export const SETTINGS: Record<string, Def> = {
   'ui.reducedMotion': { kind: 'boolean', def: false },
   'approvals.mcpSensitive': { kind: 'boolean', def: false },
   'notify.types': { kind: 'string', def: 'approval,failed,done', maxLen: 120 },
+  // Avisos fora do app (notify.ts): Telegram (bot próprio + chat vinculado por código), e-mail pela Resend e lembrete dos pedidos.
+  'notify.telegram.token': { kind: 'secret', def: '', maxLen: 200 },
+  'notify.telegram.chatId': { kind: 'string', def: '', maxLen: 40 },
+  'notify.email.resendKey': { kind: 'secret', def: '', maxLen: 200 },
+  'notify.email.from': { kind: 'string', def: '', maxLen: 160 },
+  'notify.email.to': { kind: 'string', def: '', maxLen: 300 },
+  'notify.remindHours': { kind: 'number', def: 24, min: 1, max: 720 },
   // Monitoramento remoto (Atria Central): pulso a cada 30 s + URL de saúde (telemetry.ts)
   'monitor.enabled': { kind: 'boolean', env: 'ATRIA_MONITOR_ENABLED', def: false },
   'monitor.url': { kind: 'string', env: 'ATRIA_MONITOR_URL', def: '', maxLen: 200 },
@@ -160,6 +167,11 @@ function validate(key: string, v: unknown): string | null {
       if (key === 'user.email' && s && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) throw new Error('e-mail inválido');
       if (key === 'pricing.openai' && s) validatePricing(s);
       if (key === 'monitor.url' && s && !validMonitorUrl(s)) throw new Error('endereço do monitor: use https://');
+      if (key === 'notify.telegram.token' && s && !/^\d+:[A-Za-z0-9_-]{20,}$/.test(s)) throw new Error('token do Telegram inválido (formato 123456:ABC…, do @BotFather)');
+      if (key === 'notify.telegram.chatId' && s && !/^-?\d+$/.test(s)) throw new Error('chat do Telegram: só números');
+      if (key === 'notify.email.resendKey' && s && !/^re_[A-Za-z0-9_-]{8,}$/.test(s)) throw new Error('chave da Resend inválida (começa com re_)');
+      if (key === 'notify.email.to' && s && !s.split(',').every((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim()))) throw new Error('e-mail de destino inválido');
+      if (key === 'notify.email.from' && s && !/^([^<>]*<)?[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+>?$/.test(s)) throw new Error('remetente inválido (ex.: Atria <avisos@seudominio.com>)');
       if (key === 'openai.key' && s &&!/^sk-[A-Za-z0-9_-]{20,}$/.test(s)) throw new Error('chave OpenAI inválida (começa com sk-)');
       return s;
     }

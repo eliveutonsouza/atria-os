@@ -154,7 +154,7 @@ export function SchedulePage() {
           {(wfs.data ?? []).length === 0 && <span className="app-muted">Nenhum workflow ainda.</span>}
           {(wfs.data ?? []).map((w) => {
             const routine = w.routines.find((r) => r.enabled)
-            const running = w.lastRun && (w.lastRun.status === 'running' || w.lastRun.status === 'waiting_approval')
+            const running = w.lastRun && (w.lastRun.status === 'running' || w.lastRun.status === 'waiting_approval' || w.lastRun.status === 'waiting_input')
             const tasks = w.nodes.filter((n) => n.type !== 'start' && n.type !== 'end').slice(0, 6)
             return (
               <div key={w.slug} className="app-card" style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>

@@ -6,7 +6,7 @@ import { chromium, webkit, devices } from 'playwright';
 
 const B = process.env.ATRIA_URL ?? 'https://atria.eliveutonsouza.cloud';
 const SHOTS = process.env.ATRIA_SHOTS ?? '/e2e/shots';
-const ROUTES = ['/app/more', '/app/usage', '/app/reminders', '/app/missions/new', '/', '/agents', '/runs', '/tools', '/claude', '/routines', '/app', '/app/ops', '/app/agents', '/app/agents/backend', '/app/runs', '/app/missions', '/app/workflows', '/app/workflows/post-instagram', '/app/schedule', '/app/projects', '/app/browser', '/app/terminal', '/app/claude', '/app/tools', '/app/skills', '/app/skills/installed', '/app/inbox', '/app/infra', '/app/settings', '/app/vault', '/app/brain', '/app/company', '/app/company/documentos', '/app/company/busca', '/app/help', '/app/help/guia%3Aworkflows', '/app/help/resultados', '/app/help/faq'];
+const ROUTES = ['/app/more', '/app/usage', '/app/reminders', '/app/missions/new', '/', '/agents', '/runs', '/tools', '/claude', '/routines', '/app', '/app/ops', '/app/agents', '/app/agents/backend', '/app/runs', '/app/missions', '/app/workflows', '/app/workflows/post-instagram', '/app/schedule', '/app/projects', '/app/browser', '/app/terminal', '/app/claude', '/app/tools', '/app/skills', '/app/skills/installed', '/app/inbox', '/app/infra', '/app/settings', '/app/settings/notices', '/app/vault', '/app/brain', '/app/company', '/app/company/documentos', '/app/company/busca', '/app/help', '/app/help/guia%3Aworkflows', '/app/help/resultados', '/app/help/faq'];
 const OWN_SCROLL = '.xterm, .react-flow, [data-own-scroll]';
 const fails = [];
 const warns = [];
@@ -49,7 +49,17 @@ for (const [engine, device, shotDir] of DEVICES) {
     await page.waitForURL((u) => !u.pathname.includes('login'));
     state = await ctx.storageState();
   }
-  for (const r of ROUTES) {
+  // formulário de pedido de informação (/app/workflows/pedido/<id>): usa ATRIA_INPUT_ID ou o primeiro pedido pendente
+  const routes = [...ROUTES];
+  const inputId =
+    process.env.ATRIA_INPUT_ID ??
+    (await page.request
+      .get(B + '/api/workflow-inputs')
+      .then((r) => (r.ok() ? r.json() : []))
+      .then((l) => l.find((x) => x.status === 'pending')?.id ?? null)
+      .catch(() => null));
+  if (inputId) routes.push(`/app/workflows/pedido/${inputId}`);
+  for (const r of routes) {
     await page.goto(B + r);
     await page.waitForTimeout(2200); // painel do Canvas anima ~550 ms
     const res = await page.evaluate((OWN) => {

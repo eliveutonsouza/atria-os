@@ -1,4 +1,3 @@
-import multipart from '@fastify/multipart';
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs';
@@ -55,7 +54,7 @@ async function receiveFiles(req: FastifyRequest) {
   const duplicates: string[] = [];
   const rejected: { name: string; reason: string }[] = [];
   let category: CompanyCategory | null = null;
-  for await (const part of req.parts()) {
+  for await (const part of req.parts({ limits: { fileSize: MAX_FILE, files: 30, fields: 10, parts: 40 } })) {
     if (part.type === 'field') {
       if (part.fieldname === 'category' && isCat(part.value)) category = part.value;
       continue;
@@ -133,7 +132,7 @@ async function stats(): Promise<CompanyStats> {
 // ---------- HTTP ----------
 
 export function register(app: FastifyInstance) {
-  app.register(multipart, { limits: { fileSize: MAX_FILE, files: 30, fields: 10, parts: 40 } });
+  // @fastify/multipart é registrado no index.ts (500 MB); aqui cada upload usa o limite da Empresa
   init().catch((e) => console.error('empresa: inicialização', e.message));
 
   app.addHook('preHandler', async (req, reply) => {

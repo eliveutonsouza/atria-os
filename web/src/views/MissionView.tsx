@@ -13,6 +13,7 @@ import { ConfirmDeleteModal, Empty, ErrorNote, Eyebrow, Skeleton, useHeader } fr
 const ST: Record<StepStatus, { icon: string; c: string; label: string }> = {
   pending: { icon: '○', c: C.t3, label: 'na fila' },
   waiting_approval: { icon: '◐', c: C.warn, label: 'aguardando seu OK' },
+  waiting_input: { icon: '◷', c: C.cyan, label: 'aguardando sua resposta' },
   running: { icon: '●', c: C.cyan, label: 'trabalhando' },
   done: { icon: '✓', c: C.ok, label: 'concluída' },
   failed: { icon: '⚠', c: C.crit, label: 'falhou' },

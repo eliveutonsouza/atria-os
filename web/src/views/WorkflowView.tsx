@@ -15,15 +15,16 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import '../workflow/workflow.css'
-import type { AgentInfo, WorkflowDef, WorkflowNode, WorkflowNodeType, WorkflowRunInfo } from '@shared/protocol'
-import { parseWorkflowMarkdown, serializeWorkflow, slugify, toMermaid, validateWorkflow } from '@shared/workflowMarkdown'
+import type { AgentInfo, InputField, InputFieldKind, NotifyChannel, WorkflowDef, WorkflowNode, WorkflowNodeType, WorkflowRunInfo } from '@shared/protocol'
+import { fieldKey, parseWorkflowMarkdown, serializeWorkflow, slugify, toMermaid, validateWorkflow } from '@shared/workflowMarkdown'
 import { MermaidDiagram } from '../lib/MermaidDiagram'
 import { api } from '../api/client'
 import { useApi } from '../api/useApi'
 import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
 import { connect, disconnect, nextId, removeStep, toFlow, type FlowNode } from '../workflow/graph'
-import { nodeTypes, TYPE_META } from '../workflow/StepNode'
+import { CHANNEL_LABEL, nodeTypes, TYPE_META } from '../workflow/StepNode'
+import { FIELD_KIND_LABEL, openInputRequest, remindInput } from '../workflow/inputs'
 import { DeleteWorkflowModal } from '../workflow/DeleteWorkflow'
 import { CRON_PRESETS, describeCron, send } from '../workflow/http'
 import { ActionSheet, BottomSheet } from './Sheet'
@@ -104,9 +105,14 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
     if (!mdFocus.current) setMdText(md)
   }, [md])
 
+  // execução pedida pela URL/Inbox (o editor já aberto troca de execução)
+  useEffect(() => {
+    if (runParam) setRunId(runParam)
+  }, [runParam])
+
   // última execução ativa aparece ao abrir
   useEffect(() => {
-    if (!runId && runs.data?.[0] && (runs.data[0].status === 'running' || runs.data[0].status === 'waiting_approval')) setRunId(runs.data[0].id)
+    if (!runId && runs.data?.[0] && isActive(runs.data[0])) setRunId(runs.data[0].id)
   }, [runs.data, runId])
 
   const flow = useMemo(() => toFlow(draft.nodes, { run, agentNames, selected }), [draft.nodes, run, agentNames, selected])
@@ -146,9 +152,10 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
     const step: WorkflowNode = clean({
       id,
       type,
-      title: type === 'decision' ? 'Condição atendida?' : type === 'approval' ? 'Revisão humana' : type === 'end' ? 'Fim' : type === 'parallel' ? 'Em paralelo' : 'Novo passo',
+      title: DEFAULT_TITLE[type] ?? 'Novo passo',
       ...(type === 'task' ? { agent: agents[0]?.id, instruction: '' } : {}),
       ...(type === 'decision' ? { condition: '' } : {}),
+      ...typeDefaults(type, {}),
       position: { x: base.x + 40, y: base.y + 150 },
     })
     update((ns) => {
@@ -247,7 +254,7 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
     await api.post(`/api/workflow-runs/${run.id}/cancel`).catch(() => {})
   }
 
-  const running = run && (run.status === 'running' || run.status === 'waiting_approval')
+  const running = run && isActive(run)
   useHeader(
     isNew ? 'Novo workflow' : `Workflow · ${describeCron(draft.trigger.type === 'cron' ? draft.trigger.cron : null)}`,
     draft.name,
@@ -268,7 +275,7 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
     setSelected(null)
     setSheet(false)
   }
-  const PALETTE: WorkflowNodeType[] = ['task', 'decision', 'approval', 'parallel', 'end']
+  const PALETTE: WorkflowNodeType[] = ['task', 'decision', 'approval', 'input', 'notify', 'parallel', 'end']
 
   const canvas = (
     <ReactFlow
@@ -429,7 +436,7 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
                       <span style={{ display: 'block', fontSize: 12, color: n.type === 'task' && !n.agent ? C.crit : C.t3, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {meta.label}
                         {n.type === 'task' ? ` · ${n.agent ? (agentNames[n.agent] ?? n.agent) : 'sem agente'}` : ''}
-                        {st && st !== 'pending' ? ` · ${st}` : ''}
+                        {st && st !== 'pending' ? ` · ${STEP_T[st] ?? st}` : ''}
                       </span>
                     </span>
                     <span aria-hidden style={{ color: C.t3 }}>›</span>
@@ -584,8 +591,42 @@ function clean(n: WorkflowNode): WorkflowNode {
   }
   if (out.type === 'end') delete out.next
   if (out.type !== 'approval' || !out.ask) delete out.ask
+  if (out.type !== 'input') delete out.fields
+  if (out.type !== 'input' && out.type !== 'notify') delete out.notifyVia
+  if (out.type !== 'notify') {
+    delete out.message
+    delete out.attach
+  }
+  if (!out.attach) delete out.attach
   return out
 }
+
+const DEFAULT_TITLE: Partial<Record<WorkflowNodeType, string>> = {
+  decision: 'Condição atendida?',
+  approval: 'Revisão humana',
+  input: 'Pedir informação',
+  notify: 'Avisar',
+  parallel: 'Em paralelo',
+  end: 'Fim',
+}
+
+// Valores iniciais ao criar o passo ou trocar o tipo (mantém o que já existir).
+function typeDefaults(type: WorkflowNodeType, cur: Partial<WorkflowNode>): Partial<WorkflowNode> {
+  if (type === 'input')
+    return {
+      fields: cur.fields?.length ? cur.fields : [{ key: 'resposta', label: 'Resposta', kind: 'text', required: true }],
+      notifyVia: cur.notifyVia?.length ? cur.notifyVia : ['push'],
+      instruction: cur.instruction ?? '',
+    }
+  if (type === 'notify')
+    return {
+      notifyVia: cur.notifyVia?.length ? cur.notifyVia : ['telegram'],
+      message: cur.message ?? { mode: 'ai', text: '' },
+    }
+  return {}
+}
+
+const isActive = (r: WorkflowRunInfo) => r.status === 'running' || r.status === 'waiting_approval' || r.status === 'waiting_input'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -608,7 +649,7 @@ function StepProps({ step, steps, agents, touch, onChange, onDelete }: { step: W
         <span style={{ fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: TYPE_META[step.type].color, fontWeight: 700 }}>
           Passo {step.id}
         </span>
-        <select className="wf-input" aria-label="Tipo do passo" value={step.type} onChange={(e) => onChange({ type: e.target.value as WorkflowNodeType })} style={{ width: 'auto' }}>
+        <select className="wf-input" aria-label="Tipo do passo" value={step.type} onChange={(e) => onChange({ type: e.target.value as WorkflowNodeType, ...typeDefaults(e.target.value as WorkflowNodeType, step) })} style={{ width: 'auto' }}>
           {(Object.keys(TYPE_META) as WorkflowNodeType[]).map((t) => (
             <option key={t} value={t}>{TYPE_META[t].label}</option>
           ))}
@@ -697,7 +738,9 @@ function StepProps({ step, steps, agents, touch, onChange, onDelete }: { step: W
           <div style={{ marginTop: 10, fontSize: 12, color: C.t3 }}>Dica: arraste do ponto inferior do losango até outro passo para criar um ramo.</div>
         </>
       )}
-      {(step.type === 'task' || step.type === 'approval' || step.type === 'start' || step.type === 'parallel') && (
+      {step.type === 'input' && <InputProps step={step} touch={touch} onChange={onChange} />}
+      {step.type === 'notify' && <NotifyProps step={step} onChange={onChange} />}
+      {(step.type === 'task' || step.type === 'approval' || step.type === 'start' || step.type === 'parallel' || step.type === 'input' || step.type === 'notify') && (
         <Field label={step.type === 'parallel' || step.type === 'start' ? 'Próximos (em paralelo)' : 'Próximo passo'}>
           <select
             className="wf-input"
@@ -734,6 +777,206 @@ function StepProps({ step, steps, agents, touch, onChange, onDelete }: { step: W
   )
 }
 
+const KINDS = Object.keys(FIELD_KIND_LABEL) as InputFieldKind[]
+const CHANNELS: NotifyChannel[] = ['telegram', 'push', 'email']
+
+function uniqueKey(label: string, fields: InputField[], self?: InputField): string {
+  const base = fieldKey(label)
+  let k = base
+  for (let i = 2; fields.some((f) => f !== self && f.key === k); i++) k = `${base}-${i}`
+  return k
+}
+
+function ChannelChips({ value, onChange, telegramHint }: { value: NotifyChannel[]; onChange: (v: NotifyChannel[]) => void; telegramHint?: boolean }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+      {CHANNELS.map((c) => {
+        const on = value.includes(c)
+        return (
+          <button
+            key={c}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onChange(on ? value.filter((x) => x !== c) : [...value, c])}
+            style={{
+              minHeight: 32, padding: '4px 12px', borderRadius: 999, fontSize: 12.5, cursor: 'pointer', fontFamily: 'Manrope, sans-serif',
+              border: on ? '1px solid transparent' : '1px solid rgba(255,255,255,.1)', background: on ? 'rgba(103,216,242,.12)' : 'transparent', color: on ? '#a9e9f8' : C.t2,
+            }}
+          >
+            {on ? '✓ ' : ''}
+            {CHANNEL_LABEL[c]}
+            {c === 'telegram' && telegramHint ? ' (pode responder lá)' : ''}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// Passo "Pedir informação": o que pedir, campos e por onde avisar.
+function InputProps({ step, touch, onChange }: { step: WorkflowNode; touch?: boolean; onChange: (p: Partial<WorkflowNode>) => void }) {
+  return (
+    <>
+      <Field label="O que pedir (aparece no aviso)">
+        <textarea className="wf-input" rows={3} value={step.instruction ?? ''} onChange={(e) => onChange({ instruction: e.target.value })} placeholder="Depois da reunião com o lead, mande a gravação e o que ficou combinado." />
+      </Field>
+      <span className="wf-label">Campos</span>
+      <InputFieldsEditor fields={step.fields ?? []} touch={touch} onChange={(fields) => onChange({ fields })} />
+      <span className="wf-label">Quando parar, avisar por</span>
+      <ChannelChips value={step.notifyVia ?? []} onChange={(notifyVia) => onChange({ notifyVia })} telegramHint />
+      <div style={{ fontSize: 12, color: C.t3, lineHeight: 1.5, marginBottom: 14 }}>Espera sem prazo e lembra a cada 24 h. Os próximos passos recebem as respostas e a transcrição.</div>
+    </>
+  )
+}
+
+function InputFieldsEditor({ fields, touch, onChange }: { fields: InputField[]; touch?: boolean; onChange: (f: InputField[]) => void }) {
+  const [adding, setAdding] = useState(false)
+  const patch = (i: number, p: Partial<InputField>) => onChange(fields.map((f, j) => (j === i ? { ...f, ...p } : f)))
+  const setLabel = (i: number, label: string) => {
+    const f = fields[i]
+    // a chave acompanha o rótulo enquanto ainda for a gerada por ele (depois fica estável)
+    const auto = f.key === fieldKey(f.label) || f.key === 'resposta' || /^campo(-\d+)?$/.test(f.key)
+    patch(i, { label, ...(auto ? { key: uniqueKey(label, fields, f) } : {}) })
+  }
+  const add = (kind: InputFieldKind) => {
+    const label = FIELD_KIND_LABEL[kind]
+    onChange([...fields, { key: uniqueKey(label, fields), label, kind, required: true, ...(kind === 'choice' ? { options: ['sim', 'não'] } : {}) }])
+    setAdding(false)
+  }
+  const move = (i: number, d: -1 | 1) => {
+    const j = i + d
+    if (j < 0 || j >= fields.length) return
+    const next = [...fields]
+    ;[next[i], next[j]] = [next[j], next[i]]
+    onChange(next)
+  }
+  const tiny = { height: touch ? 40 : 24, width: touch ? 40 : 24, padding: 0, fontSize: 12 }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+      {fields.map((f, i) => (
+        <div key={i} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(0,0,0,.2)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <select
+              className="wf-input"
+              aria-label="Tipo do campo"
+              value={f.kind}
+              onChange={(e) => {
+                const kind = e.target.value as InputFieldKind
+                patch(i, { kind, options: kind === 'choice' ? (f.options?.length ? f.options : ['sim', 'não']) : undefined, default: kind === 'date' || kind === 'time' ? f.default : undefined })
+              }}
+              style={{ flex: '0 0 104px', color: '#a9e9f8' }}
+            >
+              {KINDS.map((k) => (
+                <option key={k} value={k}>{FIELD_KIND_LABEL[k]}</option>
+              ))}
+            </select>
+            <input className="wf-input" aria-label="Rótulo do campo" value={f.label} onChange={(e) => setLabel(i, e.target.value)} placeholder="Data da reunião" />
+          </div>
+          {f.kind === 'choice' && (
+            <input
+              className="wf-input"
+              aria-label="Opções (vírgula)"
+              value={listText(f.options)}
+              onChange={(e) => patch(i, { options: e.target.value.split(',').map((x) => x.trimStart()) })}
+              onBlur={() => patch(i, { options: textList(listText(f.options)) })}
+              placeholder="sim, talvez, não"
+            />
+          )}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', fontSize: 12, color: C.t2 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, minHeight: touch ? 40 : undefined }}>
+              <input type="checkbox" checked={f.required} onChange={(e) => patch(i, { required: e.target.checked })} />
+              obrigatório
+            </label>
+            {(f.kind === 'date' || f.kind === 'time') && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 5, minHeight: touch ? 40 : undefined }}>
+                <input type="checkbox" checked={f.default === 'hoje'} onChange={(e) => patch(i, { default: e.target.checked ? 'hoje' : undefined })} />
+                {f.kind === 'date' ? 'padrão hoje' : 'padrão agora'}
+              </label>
+            )}
+            {f.kind === 'audio' && <span style={{ color: C.t3 }}>· transcrito</span>}
+            <button type="button" className="wf-btn ghost" aria-label="Subir campo" disabled={i === 0} onClick={() => move(i, -1)} style={{ ...tiny, marginLeft: 'auto' }}>↑</button>
+            <button type="button" className="wf-btn ghost" aria-label="Descer campo" disabled={i === fields.length - 1} onClick={() => move(i, 1)} style={tiny}>↓</button>
+            <button type="button" className="wf-btn ghost" aria-label={`Remover campo ${f.label}`} onClick={() => onChange(fields.filter((_, j) => j !== i))} style={{ ...tiny, color: '#f39aa4' }}>×</button>
+          </div>
+        </div>
+      ))}
+      {adding ? (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: 8, borderRadius: 10, border: '1px dashed rgba(255,255,255,.18)' }}>
+          {KINDS.map((k) => (
+            <button key={k} type="button" className="wf-btn" onClick={() => add(k)} style={touch ? { height: 40 } : undefined}>{FIELD_KIND_LABEL[k]}</button>
+          ))}
+          <button type="button" className="wf-btn ghost" onClick={() => setAdding(false)} style={touch ? { height: 40 } : undefined}>Cancelar</button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setAdding(true)} style={{ minHeight: touch ? 44 : 34, padding: '6px 10px', borderRadius: 10, border: '1px dashed rgba(255,255,255,.18)', background: 'transparent', color: C.t2, fontSize: 12.5, cursor: 'pointer', fontFamily: 'Manrope, sans-serif', lineHeight: 1.4 }}>
+          + Campo: texto · texto longo · data · hora · número · sim/não · escolha · áudio · imagens · arquivos
+        </button>
+      )}
+    </div>
+  )
+}
+
+// Passo "Avisar": canais, mensagem (a Yui escreve ou texto fixo), anexos e teste.
+function NotifyProps({ step, onChange }: { step: WorkflowNode; onChange: (p: Partial<WorkflowNode>) => void }) {
+  const msg = step.message ?? { mode: 'ai' as const, text: '' }
+  const [testing, setTesting] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+  const test = async () => {
+    const chans = step.notifyVia ?? []
+    if (!chans.length) return setNote('Escolha pelo menos um canal.')
+    setTesting(true)
+    setNote(null)
+    const out: string[] = []
+    for (const c of chans) {
+      try {
+        const r = await api.post<{ ok: boolean; error?: string }>('/api/notify/test', { channel: c })
+        out.push(`${CHANNEL_LABEL[c]}: ${r.ok ? 'enviado' : (r.error ?? 'falhou')}`)
+      } catch (e) {
+        out.push(`${CHANNEL_LABEL[c]}: ${(e as Error).message}`)
+      }
+    }
+    setNote(out.join(' · '))
+    setTesting(false)
+  }
+  const radio = (mode: 'ai' | 'template', title: string, desc: string) => (
+    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: C.t2, lineHeight: 1.45, marginBottom: 8, cursor: 'pointer' }}>
+      <input type="radio" name={`msg-${step.id}`} checked={msg.mode === mode} onChange={() => onChange({ message: { ...msg, mode } })} style={{ marginTop: 2 }} />
+      <span>
+        <b style={{ color: C.text, fontWeight: 600 }}>{title}</b>
+        <br />
+        {desc}
+      </span>
+    </label>
+  )
+  return (
+    <>
+      <span className="wf-label">Por onde</span>
+      <ChannelChips value={step.notifyVia ?? []} onChange={(notifyVia) => onChange({ notifyVia })} />
+      <span className="wf-label">Mensagem</span>
+      {radio('ai', 'A Yui escreve', 'Resume os passos anteriores seguindo a instrução abaixo.')}
+      {radio('template', 'Texto fixo', 'Com marcadores: {{Título do passo}}, {{Título do passo.saida}}, {{3}} (passo 3), {{data}} ou a chave de um campo pedido antes.')}
+      <Field label={msg.mode === 'ai' ? 'Instrução' : 'Texto'}>
+        <textarea
+          className="wf-input"
+          rows={4}
+          value={msg.text}
+          onChange={(e) => onChange({ message: { ...msg, text: e.target.value } })}
+          placeholder={msg.mode === 'ai' ? 'Mande nome do lead, telefone, link do site temporário e um roteiro curto para a ligação de agendamento.' : 'Site pronto: {{Criar site demo.saida}}'}
+        />
+      </Field>
+      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: C.t2, lineHeight: 1.45, marginBottom: 10 }}>
+        <input type="checkbox" checked={!!step.attach} onChange={(e) => onChange({ attach: e.target.checked })} style={{ marginTop: 2 }} />
+        <span>Anexar arquivos gerados (prints, PDF da proposta)</span>
+      </label>
+      <div style={{ fontSize: 12, color: C.t3, lineHeight: 1.5, marginBottom: 10 }}>Não para o fluxo: manda e segue para o próximo passo. Falha no envio vira aviso na execução, sem travar.</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        <button type="button" className="wf-btn" disabled={testing} onClick={() => void test()}>{testing ? 'Enviando…' : 'Enviar um teste agora'}</button>
+        {note && <span role="status" style={{ fontSize: 12, color: C.t2 }}>{note}</span>}
+      </div>
+    </>
+  )
+}
+
 function WorkflowProps({ draft, setDraft }: { draft: Draft; setDraft: React.Dispatch<React.SetStateAction<Draft>> }) {
   return (
     <div>
@@ -753,6 +996,8 @@ function WorkflowProps({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
       <div style={{ fontSize: 12, color: C.t3, lineHeight: 1.6 }}>
         Passos: {draft.nodes.length} · tarefas {draft.nodes.filter((n) => n.type === 'task').length} · decisões {draft.nodes.filter((n) => n.type === 'decision').length} · aprovações{' '}
         {draft.nodes.filter((n) => n.type === 'approval').length}
+        {draft.nodes.some((n) => n.type === 'input') ? ` · pedidos ${draft.nodes.filter((n) => n.type === 'input').length}` : ''}
+        {draft.nodes.some((n) => n.type === 'notify') ? ` · avisos ${draft.nodes.filter((n) => n.type === 'notify').length}` : ''}
       </div>
     </div>
   )
@@ -761,6 +1006,7 @@ function WorkflowProps({ draft, setDraft }: { draft: Draft; setDraft: React.Disp
 const RUN_STATUS: Record<WorkflowRunInfo['status'], { t: string; c: string }> = {
   running: { t: 'rodando', c: C.cyan },
   waiting_approval: { t: 'aguardando aprovação', c: C.warn },
+  waiting_input: { t: 'esperando sua resposta', c: C.cyan },
   done: { t: 'concluído', c: C.ok },
   failed: { t: 'falhou', c: C.crit },
   cancelled: { t: 'cancelado', c: C.t3 },
@@ -782,14 +1028,17 @@ function RunsPanel({ runs, current, onPick, steps }: { runs: WorkflowRunInfo[]; 
             </button>
             {open && (
               <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <WaitingCard runId={r.id} />
                 {steps.map((s) => {
                   const ns = r.nodes[s.id]
                   if (!ns || ns.status === 'pending' || ns.status === 'skipped') return null
                   return (
                     <div key={s.id} style={{ fontSize: 12, lineHeight: 1.45 }}>
-                      <span style={{ color: ns.status === 'done' ? C.ok : ns.status === 'failed' ? C.crit : ns.status === 'running' ? C.cyan : C.warn }}>
+                      <span style={{ color: ns.status === 'done' ? C.ok : ns.status === 'failed' ? C.crit : ns.status === 'running' || ns.status === 'waiting_input' ? C.cyan : C.warn }}>
+                        {ns.status === 'waiting_input' ? '◷ ' : ''}
                         {s.id}. {s.title}
                       </span>
+                      {ns.status === 'waiting_input' && <span style={{ color: C.cyan }}> · aguardando você</span>}
                       {ns.decision && <span style={{ color: C.lav }}> → {ns.decision}</span>}
                       {ns.result && <div style={{ color: C.t2, whiteSpace: 'pre-wrap' }}>{ns.result.length > 280 ? `${ns.result.slice(0, 280)}…` : ns.result}</div>}
                       {ns.decidedBy === 'yui' && <YuiDecisionFeedback runId={r.id} nodeId={s.id} approved={ns.decision === 'aprovado'} feedback={ns.feedback ?? null} />}
@@ -806,6 +1055,68 @@ function RunsPanel({ runs, current, onPick, steps }: { runs: WorkflowRunInfo[]; 
           </div>
         )
       })}
+    </div>
+  )
+}
+
+const STEP_T: Record<string, string> = { running: 'rodando', waiting_approval: 'aguardando aprovação', waiting_input: 'aguardando você', done: 'feito', failed: 'falhou', cancelled: 'cancelado' }
+
+function when(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const hm = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  const day = (x: Date) => x.toDateString()
+  const now = new Date()
+  const tomorrow = new Date(now.getTime() + 864e5)
+  if (day(d) === day(now)) return `às ${hm}`
+  if (day(d) === day(tomorrow)) return `amanhã ${hm}`
+  return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${hm}`
+}
+
+// Execução parada num "Pedir informação" (Runs.dc.html): avisado quando, próximo lembrete, responder; depois, o andamento.
+function WaitingCard({ runId }: { runId: string }) {
+  const req = useYui((s) => {
+    const all = Object.values(s.workflowInputs).filter((r) => r.runId === runId)
+    return all.find((r) => r.status === 'pending') ?? all.find((r) => r.status === 'processing') ?? null
+  })
+  const [busy, setBusy] = useState(false)
+  if (!req) return null
+  const remind = async () => {
+    setBusy(true)
+    try {
+      await remindInput(req.id)
+      say('Mandei o aviso de novo.')
+    } catch (e) {
+      say(`Não consegui reenviar: ${(e as Error).message}.`)
+    }
+    setBusy(false)
+  }
+  const via = req.notifiedVia.map((c) => CHANNEL_LABEL[c]).join(' e ')
+  const sent = req.remindedAt ?? req.createdAt
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12, margin: '0 0 6px', borderRadius: 12, background: 'rgba(103,216,242,.07)', border: '1px solid rgba(103,216,242,.3)' }}>
+      <span style={{ fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', color: C.cyan, fontWeight: 700 }}>{req.status === 'pending' ? 'Esperando sua resposta' : 'Processando sua resposta'}</span>
+      <span style={{ fontSize: 13, fontWeight: 600 }}>{req.title}</span>
+      {req.status === 'pending' ? (
+        <>
+          <span style={{ fontSize: 12.5, color: '#c9cde0', lineHeight: 1.5 }}>
+            {via ? `Avisado por ${via} ${when(sent)}.` : `Pedido aberto ${when(req.createdAt)}.`}
+            {req.nextReminderAt ? ` Próximo lembrete ${when(req.nextReminderAt)}.` : ''}
+            {req.notifiedVia.includes('telegram') ? ' Também dá para responder pelo Telegram mandando o áudio para o bot.' : ''}
+          </span>
+          {req.error && <span role="alert" style={{ fontSize: 12.5, color: '#f39aa4' }}>O último envio falhou: {req.error}. Responda de novo.</span>}
+          <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="wf-btn primary" style={{ height: 36 }} onClick={() => openInputRequest(req.id)}>Responder agora</button>
+            <button className="wf-btn" style={{ height: 36 }} disabled={busy} onClick={() => void remind()}>{busy ? 'Enviando…' : 'Lembrar de novo agora'}</button>
+          </span>
+        </>
+      ) : (
+        <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5 }}>
+          <li style={{ display: 'flex', gap: 8 }}><span style={{ color: C.ok }}>✓</span>Recebido {when(req.answeredAt)}</li>
+          <li style={{ display: 'flex', gap: 8 }}><span style={{ color: C.cyan }}>◐</span>{req.progress || 'Processando as respostas…'}</li>
+          <li style={{ display: 'flex', gap: 8, color: C.t3 }}><span>○</span>Resumo para os próximos passos</li>
+        </ol>
+      )}
     </div>
   )
 }

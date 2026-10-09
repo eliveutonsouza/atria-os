@@ -1,4 +1,4 @@
-import type { WorkflowDef, WorkflowNode, WorkflowNodeType } from './protocol.ts';
+import type { InputField, InputFieldKind, NotifyChannel, WorkflowDef, WorkflowNode, WorkflowNodeType } from './protocol.ts';
 
 // Formato canônico de workflow em markdown (copiável/colável, legível por agentes):
 //
@@ -30,6 +30,24 @@ import type { WorkflowDef, WorkflowNode, WorkflowNodeType } from './protocol.ts'
 // ```mermaid logo abaixo do "# Nome"; as seções "## N." guardam os detalhes de cada passo.
 // "próximo:" e "se sim → N" continuam aceitos (arquivos antigos), mas o Mermaid vale quando existe.
 // Um workflow só em Mermaid (sem seções ##) também é aceito: os passos saem das caixas.
+//
+// Pedir informação (o fluxo para e espera o usuário) e Avisar:
+//
+// ## 4. Gravação da reunião
+// - tipo: pedir informação
+// - instrução: Mande a gravação e diga se fechou
+// - campo: Data da reunião | data | obrigatório | padrão hoje
+// - campo: Fechou? | escolha | obrigatório
+// - opções: sim, talvez, não          (vale para o campo de escolha logo acima)
+// - campo: Gravação | áudio | opcional
+// - avisar: telegram, push
+//
+// ## 3. Avisar
+// - tipo: avisar
+// - avisar: telegram, email
+// - mensagem: ia                      (ou: fixa — texto com {{Título do passo}} / {{Título do passo.saida}})
+// - texto: Mande o link do site e o material para agendar
+// - anexar: sim
 
 const strip = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
@@ -39,12 +57,58 @@ const TYPE_ALIASES: Record<string, WorkflowNodeType> = {
   decisao: 'decision', decision: 'decision', condicao: 'decision', se: 'decision',
   aprovacao: 'approval', approval: 'approval', 'aprovacao humana': 'approval', revisao: 'approval',
   paralelo: 'parallel', parallel: 'parallel', 'em paralelo': 'parallel',
+  'pedir informacao': 'input', 'pedir informacoes': 'input', formulario: 'input', entrada: 'input', input: 'input', pedido: 'input', 'pedir input': 'input',
+  avisar: 'notify', notificar: 'notify', notify: 'notify', aviso: 'notify', notificacao: 'notify',
   fim: 'end', end: 'end', final: 'end', encerrar: 'end',
 };
 
 const TYPE_LABEL: Record<WorkflowNodeType, string> = {
-  start: 'início', task: 'tarefa', decision: 'decisão', approval: 'aprovação', parallel: 'paralelo', end: 'fim',
+  start: 'início', task: 'tarefa', decision: 'decisão', approval: 'aprovação', parallel: 'paralelo', input: 'pedir informação', notify: 'avisar', end: 'fim',
 };
+
+const FIELD_ALIASES: Record<string, InputFieldKind> = {
+  texto: 'text', text: 'text', 'texto curto': 'text', linha: 'text',
+  'texto longo': 'longtext', longtext: 'longtext', paragrafo: 'longtext', 'texto grande': 'longtext',
+  data: 'date', date: 'date', dia: 'date',
+  hora: 'time', time: 'time', horario: 'time',
+  numero: 'number', number: 'number', valor: 'number',
+  'sim/nao': 'boolean', 'sim ou nao': 'boolean', simnao: 'boolean', booleano: 'boolean', boolean: 'boolean',
+  escolha: 'choice', choice: 'choice', opcoes: 'choice', lista: 'choice', selecao: 'choice',
+  audio: 'audio', gravacao: 'audio', voz: 'audio',
+  imagens: 'images', imagem: 'images', fotos: 'images', foto: 'images', images: 'images', image: 'images',
+  arquivos: 'files', arquivo: 'files', files: 'files', file: 'files', anexos: 'files', anexo: 'files', documentos: 'files',
+};
+
+export const FIELD_LABEL: Record<InputFieldKind, string> = {
+  text: 'texto', longtext: 'texto longo', date: 'data', time: 'hora', number: 'número', boolean: 'sim/não', choice: 'escolha', audio: 'áudio', images: 'imagens', files: 'arquivos',
+};
+
+const CHANNEL_ALIASES: Record<string, NotifyChannel> = {
+  telegram: 'telegram', tg: 'telegram', email: 'email', 'e-mail': 'email', mail: 'email', push: 'push', celular: 'push', notificacao: 'push',
+};
+
+/** Chave estável de um campo a partir do rótulo ("Data da reunião" → data-da-reuniao). */
+export const fieldKey = (label: string) => strip(label).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'campo';
+
+// "Data da reunião | data | obrigatório | padrão hoje | chave data"
+function parseField(v: string): InputField {
+  const [label, ...rest] = v.split('|').map((x) => x.trim());
+  const f: InputField = { key: fieldKey(label), label: label || 'Campo', kind: 'text', required: false };
+  for (const p of rest) {
+    const low = strip(p);
+    if (!low) continue;
+    if (FIELD_ALIASES[low]) f.kind = FIELD_ALIASES[low];
+    else if (/^(obrigatorio|required|requerido)$/.test(low)) f.required = true;
+    else if (/^(opcional|optional)$/.test(low)) f.required = false;
+    else if (/^(padrao|default)\b/.test(low)) f.default = p.replace(/^\S+\s*:?\s*/, '').trim() || null;
+    else if (/^(chave|key)\b/.test(low)) f.key = fieldKey(p.replace(/^\S+\s*:?\s*/, ''));
+    else if (/^(opcoes|options)\b/.test(low)) f.options = parseList(p.replace(/^\S+\s*:?\s*/, ''));
+  }
+  if (f.default && (f.kind === 'date' || f.kind === 'time') && strip(f.default) === 'hoje') f.default = 'hoje';
+  return f;
+}
+
+const parseChannels = (v: string): NotifyChannel[] => [...new Set(parseList(v).map((c) => CHANNEL_ALIASES[strip(c)]).filter((c): c is NotifyChannel => !!c))];
 
 export function slugify(s: string): string {
   return strip(s).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'workflow';
@@ -111,6 +175,7 @@ export function parseWorkflowMarkdown(src: string, fallbackSlug?: string): Omit<
     const title = (hm ? hm[2] : headLine).trim() || `Passo ${id}`;
     const node: WorkflowNode = { id, type: 'task', title };
     const branches: { label: string; to: string }[] = [];
+    const fields: InputField[] = [];
     const freeText: string[] = [];
     let typeSet = false;
 
@@ -130,6 +195,19 @@ export function parseWorkflowMarkdown(src: string, fallbackSlug?: string): Omit<
       else if (kv && ['mcp', 'mcps', 'conectores', 'ferramentas'].includes(key)) node.mcp = parseList(kv[2]);
       else if (kv && ['saida', 'output', 'resultado'].includes(key)) node.output = kv[2].trim();
       else if (kv && ['perguntar', 'ask', 'sempre perguntar'].includes(key)) node.ask = /^(sim|s|yes|true|1)$/i.test(strip(kv[2]));
+      else if (kv && ['campo', 'field', 'pergunta do formulario'].includes(key)) fields.push(parseField(kv[2]));
+      else if (kv && ['opcoes', 'options', 'escolhas'].includes(key)) {
+        const last = fields.at(-1);
+        if (last) {
+          last.options = parseList(kv[2]);
+          if (last.kind === 'text') last.kind = 'choice';
+        }
+      } else if (kv && ['avisar', 'avisar por', 'canais', 'notificar', 'notify'].includes(key)) node.notifyVia = parseChannels(kv[2]);
+      else if (kv && ['mensagem', 'message'].includes(key)) {
+        const mode = /^(fixa|fixo|template|modelo|texto fixo)$/.test(strip(kv[2])) ? 'template' : 'ai';
+        node.message = { mode, text: node.message?.text ?? '' };
+      } else if (kv && ['texto', 'texto da mensagem', 'text'].includes(key)) node.message = { mode: node.message?.mode ?? 'ai', text: kv[2].trim() };
+      else if (kv && ['anexar', 'attach', 'anexos'].includes(key)) node.attach = /^(sim|s|yes|true|1)$/i.test(strip(kv[2]));
       else if (kv && ['condicao', 'condition', 'pergunta'].includes(key)) {
         node.condition = kv[2].trim();
         if (!typeSet) node.type = 'decision';
@@ -145,6 +223,16 @@ export function parseWorkflowMarkdown(src: string, fallbackSlug?: string): Omit<
       node.branches = branches;
       if (!typeSet) node.type = 'decision';
     }
+    if (fields.length) {
+      node.fields = fields;
+      if (!typeSet) node.type = 'input';
+    }
+    if (node.type !== 'input' && node.type !== 'notify') delete node.notifyVia;
+    if (node.type !== 'notify') {
+      delete node.message;
+      delete node.attach;
+    }
+    if (node.type === 'notify' && node.attach === false) delete node.attach;
     if (!node.instruction && freeText.length && node.type !== 'decision') node.instruction = freeText.join(' ');
     if (!typeSet && !node.agent && !node.instruction && !branches.length && /^(fim|end|concluir|encerrar)\b/i.test(strip(title))) node.type = 'end';
     if (node.agent) node.agent = node.agent.replace(/\s*agent$/i, '').trim();
@@ -201,6 +289,23 @@ export function serializeWorkflow(def: Pick<WorkflowDef, 'name' | 'description' 
     if (n.output) out.push(`- saída: ${n.output}`);
     if (n.condition) out.push(`- condição: ${n.condition.replace(/\n+/g, ' ')}`);
     if (n.type === 'approval' && n.ask) out.push('- perguntar: sim');
+    if (n.type === 'input') {
+      for (const f of n.fields ?? []) {
+        const parts = [f.label.replace(/[|\n]+/g, ' ').trim(), FIELD_LABEL[f.kind] ?? 'texto', f.required ? 'obrigatório' : 'opcional'];
+        if (f.default) parts.push(`padrão ${f.default.replace(/[|\n]+/g, ' ')}`);
+        if (f.key !== fieldKey(f.label)) parts.push(`chave ${f.key}`);
+        out.push(`- campo: ${parts.join(' | ')}`);
+        if (f.options?.length) out.push(`- opções: ${f.options.map((o) => o.replace(/[,;\n]+/g, ' ')).join(', ')}`);
+      }
+    }
+    if ((n.type === 'input' || n.type === 'notify') && n.notifyVia?.length) out.push(`- avisar: ${n.notifyVia.join(', ')}`);
+    if (n.type === 'notify') {
+      if (n.message) {
+        out.push(`- mensagem: ${n.message.mode === 'template' ? 'fixa' : 'ia'}`);
+        if (n.message.text) out.push(`- texto: ${n.message.text.replace(/\n+/g, ' ')}`);
+      }
+      if (n.attach) out.push('- anexar: sim');
+    }
     if (n.position) out.push(`- posição: ${Math.round(n.position.x)},${Math.round(n.position.y)}`);
   }
   return `${out.join('\n')}\n`;
@@ -219,6 +324,14 @@ export function validateWorkflow(def: Pick<WorkflowDef, 'nodes'>): string[] {
     if (n.type === 'task' && !n.agent) errs.push(`passo ${n.id} (tarefa) sem agente`);
     if (n.type === 'task' && !n.instruction) errs.push(`passo ${n.id} (tarefa) sem instrução`);
     if (n.type === 'decision' && (n.branches?.length ?? 0) < 2) errs.push(`passo ${n.id} (decisão) precisa de 2+ ramos`);
+    if (n.type === 'input') {
+      const fs = n.fields ?? [];
+      if (!fs.length) errs.push(`passo ${n.id} (pedir informação) sem campos`);
+      const keys = fs.map((f) => f.key);
+      if (new Set(keys).size !== keys.length) errs.push(`passo ${n.id} (pedir informação) tem campos com o mesmo nome`);
+      for (const f of fs) if (f.kind === 'choice' && !f.options?.length) errs.push(`passo ${n.id}: campo "${f.label}" (escolha) sem opções`);
+    }
+    if (n.type === 'notify' && !n.notifyVia?.length) errs.push(`passo ${n.id} (avisar) sem canal (telegram, email ou push)`);
   }
   return errs;
 }
@@ -231,6 +344,8 @@ const SHAPE: Record<WorkflowNodeType, [string, string]> = {
   decision: ['{', '}'],
   approval: ['{{', '}}'],
   parallel: ['[/', '/]'],
+  input: ['[/', '\\]'],
+  notify: ['>', ']'],
   end: ['((', '))'],
 };
 
@@ -275,6 +390,8 @@ export function toMermaid(def: Pick<WorkflowDef, 'nodes'>, opts: MermaidOpts = {
     '  classDef t_decision fill:#2a2110,stroke:#f5b54a,color:#ffe7b8',
     '  classDef t_approval fill:#221a3d,stroke:#a68cf7,color:#e6ddff',
     '  classDef t_parallel fill:#1d1b38,stroke:#cbbcff,color:#e8eaf4',
+    '  classDef t_input fill:#2a1530,stroke:#f08bd0,color:#ffe0f5',
+    '  classDef t_notify fill:#10261c,stroke:#7ee07a,color:#dcffd9',
     '  classDef t_end fill:#1b2045,stroke:#8c92ad,color:#e8eaf4',
   );
   const byType = new Map<WorkflowNodeType, string[]>();
@@ -305,6 +422,7 @@ const OPENERS: [string, string, WorkflowNodeType][] = [
   ['([', '])', 'start'],
   ['((', '))', 'end'],
   ['{{', '}}', 'approval'],
+  ['[/', '\\]', 'input'],
   ['[/', '/]', 'parallel'],
   ['[\\', '\\]', 'parallel'],
   ['[[', ']]', 'task'],
@@ -312,7 +430,7 @@ const OPENERS: [string, string, WorkflowNodeType][] = [
   ['[', ']', 'task'],
   ['{', '}', 'decision'],
   ['(', ')', 'task'],
-  ['>', ']', 'task'],
+  ['>', ']', 'notify'],
 ];
 
 function readNode(s: string, i: number): { id: string; type: WorkflowNodeType | null; label: string | null; end: number } | null {
@@ -325,17 +443,20 @@ function readNode(s: string, i: number): { id: string; type: WorkflowNodeType | 
     if (!s.startsWith(o, j)) continue;
     let k = j + o.length;
     let label: string;
+    // Mesma abertura com fechamentos diferentes ([/…/] paralelo, [/…\] pedir informação): se não fecha, tenta a próxima.
     if (s[k] === '"') {
       const q = s.indexOf('"', k + 1);
       if (q < 0) return null;
       label = s.slice(k + 1, q);
       k = q + 1;
-      const close = s.indexOf(c, k);
-      if (close < 0) return null;
-      return { id, type, label, end: close + c.length };
+      while (s[k] === ' ') k++;
+      if (!s.startsWith(c, k)) continue;
+      return { id, type, label, end: k + c.length };
     }
-    const close = s.indexOf(c, k);
-    if (close < 0) return null;
+    // sem aspas: o rótulo termina no primeiro "]" (ou no fechamento, nas formas que não terminam em "]")
+    const bracket = c.endsWith(']') ? s.indexOf(']', k) : -1;
+    const close = c.endsWith(']') ? (bracket < 0 ? -1 : bracket + 1 - c.length) : s.indexOf(c, k);
+    if (close < k || !s.startsWith(c, close)) continue;
     label = s.slice(k, close);
     return { id, type, label, end: close + c.length };
   }
