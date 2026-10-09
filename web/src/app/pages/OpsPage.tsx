@@ -139,8 +139,8 @@ export function OpsPage() {
                     {col.key === 'running' && <span className="app-mono" style={{ fontSize: 10.5, color: C.cyan }}>{elapsed(cd.startedAt)}</span>}
                   </span>
                   <span style={{ fontSize: 12, color: '#b4b9cf', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{cd.task}</span>
-                  <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <Tag>{cd.kind === 'approval' ? 'aprovação' : ORIGIN_LABEL[cd.origin]}{cd.originLabel ? ` · ${cd.originLabel}` : ''}</Tag>
+                  <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
+                    <Tag>{`${cd.kind === 'approval' ? 'aprovação' : ORIGIN_LABEL[cd.origin]}${cd.originLabel ? ` · ${cd.originLabel}` : ''}`}</Tag>
                     {cd.project && <Tag color={C.t2} bg="rgba(255,255,255,.05)">{cd.project}</Tag>}
                   </span>
                   {col.key === 'running' && (

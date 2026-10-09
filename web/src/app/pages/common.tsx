@@ -71,8 +71,17 @@ export function Dot({ c, pulse = false, hollow = false, size = 8 }: { c: string;
   )
 }
 
-export function Tag({ children, color = '#a9e9f8', bg = 'rgba(103,216,242,.08)' }: { children: ReactNode; color?: string; bg?: string }) {
-  return <span style={{ fontSize: 10.5, padding: '2px 7px', borderRadius: 6, background: bg, color, whiteSpace: 'nowrap' }}>{children}</span>
+// Etiqueta de uma linha: texto longo termina em "…" dentro do contêiner (texto inteiro no title).
+export function Tag({ children, color = '#a9e9f8', bg = 'rgba(103,216,242,.08)', title }: { children: ReactNode; color?: string; bg?: string; title?: string }) {
+  const tip = title ?? (typeof children === 'string' ? children : Array.isArray(children) && children.every((c) => typeof c === 'string') ? children.join('') : undefined)
+  return (
+    <span
+      title={tip}
+      style={{ display: 'inline-block', maxWidth: '100%', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'middle', fontSize: 10.5, padding: '2px 7px', borderRadius: 6, background: bg, color, whiteSpace: 'nowrap', boxSizing: 'border-box' }}
+    >
+      {children}
+    </span>
+  )
 }
 
 export const ORIGIN_LABEL: Record<OpsCard['origin'], string> = { yui: 'Yui', manual: 'manual', routine: 'rotina', mission: 'missão', workflow: 'workflow' }
