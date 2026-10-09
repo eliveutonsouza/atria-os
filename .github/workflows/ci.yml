@@ -99,6 +99,7 @@ jobs:
           bash -n install.sh scripts-deploy.sh deploy/install-release.sh
       - uses: docker/setup-buildx-action@v3
         with:
+          driver-opts: image=mirror.gcr.io/moby/buildkit:buildx-stable-1
           # Docker Hub limita downloads anônimos dos runners (429): busca pelo espelho do Google, que cai no Hub se faltar
           buildkitd-config-inline: |
             [registry."docker.io"]
