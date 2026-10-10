@@ -592,7 +592,7 @@ export type BrowserClientMsg =
   | { type: 'nav'; action: 'back' | 'forward' | 'reload' }
   | { type: 'control'; on: boolean }
   | { type: 'mouse'; event: 'mousePressed' | 'mouseReleased' | 'mouseMoved' | 'mouseWheel'; x: number; y: number; button?: 'left' | 'right' | 'none'; clickCount?: number; deltaX?: number; deltaY?: number }
-  | { type: 'key'; event: 'keyDown' | 'keyUp' | 'char'; key: string; code?: string; text?: string }
+  | { type: 'key'; event: 'keyDown' | 'keyUp' | 'char'; key: string; code?: string; text?: string; modifiers?: number } // modifiers CDP: Alt=1 Ctrl=2 Meta=4 Shift=8
   | { type: 'viewport'; width: number; height: number };
 
 // ---------- Vault (Obsidian) + Cérebro ----------

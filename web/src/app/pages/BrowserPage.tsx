@@ -153,9 +153,14 @@ export function BrowserPage() {
   }
   const key = (event: 'keyDown' | 'keyUp') => (e: KeyboardEvent) => {
     if (!controlling) return
-    e.preventDefault()
     e.stopPropagation() // Espaço/Esc não acionam atalhos do Atria OS enquanto controla o navegador
-    send({ type: 'key', event, key: e.key, code: e.code, text: event === 'keyDown' && e.key.length === 1 ? e.key : event === 'keyDown' && e.key === 'Enter' ? '\r' : undefined })
+    // Tecla morta de acento (´ ~ ^ ` ¨ no ABNT2): espera a próxima tecla, que já chega com o caractere composto (á, ã…)
+    if (e.key === 'Dead' || e.nativeEvent.isComposing) return
+    e.preventDefault()
+    const modifiers = (e.altKey ? 1 : 0) | (e.ctrlKey ? 2 : 0) | (e.metaKey ? 4 : 0) | (e.shiftKey ? 8 : 0)
+    // Com Ctrl/Cmd (atalhos: Ctrl+A, Ctrl+C…) não manda texto; AltGr (Ctrl+Alt) no Windows ainda digita
+    const typing = e.key.length === 1 && (!(e.ctrlKey || e.metaKey) || (e.ctrlKey && e.altKey))
+    send({ type: 'key', event, key: e.key, code: e.code, modifiers: typing ? modifiers & 8 : modifiers, text: event === 'keyDown' && typing ? e.key : event === 'keyDown' && e.key === 'Enter' ? '\r' : undefined })
   }
   // Teclado do celular: input invisível. Teclas especiais vêm no keydown; texto vem no input
   // (Android manda tudo como "Unidentified"), pelo mesmo canal de teclas.

@@ -220,6 +220,26 @@ onEmit((ev) => {
 
 // ---------- entrada do usuário ----------
 const VK: Record<string, number> = { Backspace: 8, Tab: 9, Enter: 13, Escape: 27, ' ': 32, ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, Delete: 46, Home: 36, End: 35, PageUp: 33, PageDown: 34 };
+// Código de tecla pela posição física (KeyboardEvent.code), independente do layout (ABNT2, US…).
+// Sinais NÃO podem usar o código do caractere: '.' (46) viraria Delete, ',' PrintScreen, '-' Insert, '(' seta…
+const VK_CODE: Record<string, number> = {
+  Period: 190, Comma: 188, Minus: 189, Equal: 187, Slash: 191, Semicolon: 186, Quote: 222, BracketLeft: 219, BracketRight: 221,
+  Backslash: 220, Backquote: 192, IntlRo: 193, IntlBackslash: 226, NumpadDecimal: 110, NumpadComma: 194, NumpadAdd: 107,
+  NumpadSubtract: 109, NumpadMultiply: 106, NumpadDivide: 111, NumpadEnter: 13, Space: 32,
+};
+export function virtualKey(key: string, code?: string): number {
+  if (VK[key] !== undefined) return VK[key];
+  if (/^[a-z]$/i.test(key)) return key.toUpperCase().charCodeAt(0);
+  if (/^[0-9]$/.test(key)) return key.charCodeAt(0);
+  if (code) {
+    if (VK_CODE[code] !== undefined) return VK_CODE[code];
+    const m = /^(?:Key([A-Z])|Digit([0-9])|Numpad([0-9]))$/.exec(code);
+    if (m) return m[1] ? m[1].charCodeAt(0) : m[2] ? m[2].charCodeAt(0) : 96 + Number(m[3]);
+    const f = /^F([0-9]{1,2})$/.exec(code);
+    if (f) return 111 + Number(f[1]);
+  }
+  return 0; // caractere sem tecla conhecida (ç, á, @…): o texto entra pelo campo text
+}
 
 async function handle(c: Client, msg: BrowserClientMsg) {
   switch (msg.type) {
@@ -271,7 +291,8 @@ async function handle(c: Client, msg: BrowserClientMsg) {
         key: msg.key,
         code: msg.code,
         text: msg.event === 'keyDown' || msg.event === 'char' ? msg.text : undefined,
-        windowsVirtualKeyCode: VK[msg.key] ?? (msg.key.length === 1 ? msg.key.toUpperCase().charCodeAt(0) : undefined),
+        windowsVirtualKeyCode: virtualKey(msg.key, msg.code),
+        modifiers: msg.modifiers ?? 0,
       });
       return;
     case 'viewport':
