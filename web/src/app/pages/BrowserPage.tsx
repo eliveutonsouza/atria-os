@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type WheelEvent } from 'react'
-import type { BrowserClientMsg, BrowserServerMsg, BrowserTab } from '@shared/protocol'
+import type { BrowserChallengeState, BrowserClientMsg, BrowserServerMsg, BrowserTab } from '@shared/protocol'
 import { api } from '../../api/client'
+import { onBrowserChallenge } from '../../api/events'
 import { C, glow } from '../../lib/colors'
 import { useYui } from '../../store/yui'
 import { useHeader } from '../../views/ui'
@@ -35,6 +36,7 @@ export function BrowserPage() {
   const touch = useRef<{ id: number; x0: number; y0: number; x: number; y: number; drag: boolean } | null>(null)
   const frames = useRef(0)
   const [now, setNow] = useState(Date.now())
+  const [challenge, setChallenge] = useState<BrowserChallengeState | null>(null)
 
   useHeader('Navegador · ao vivo', 'Assista os agentes navegando')
 
@@ -80,6 +82,12 @@ export function BrowserPage() {
       clearInterval(t)
       wsRef.current?.close()
     }
+  }, [])
+
+  // verificação humana pendente (browserChallenge.ts): estado inicial + atualizações por SSE
+  useEffect(() => {
+    api.get<BrowserChallengeState>('/api/browser/challenge').then(setChallenge, () => {})
+    return onBrowserChallenge(setChallenge)
   }, [])
 
   const send = (m: BrowserClientMsg) => {
@@ -203,6 +211,27 @@ export function BrowserPage() {
           Assumir controle
         </label>
       </div>
+
+      {challenge?.active && (
+        <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '12px 16px', borderRadius: 14, background: 'rgba(245,181,74,.1)', border: '1px solid rgba(245,181,74,.4)', color: '#f8d79a' }}>
+          <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: C.warn, boxShadow: glow(C.warn, 8) }} />
+          <span style={{ flex: '1 1 220px', minWidth: 0, fontSize: 13, lineHeight: 1.45 }}>
+            <strong style={{ color: C.text }}>Verificação humana pendente em {challenge.site}</strong> — {controlling ? (coarse ? 'toque' : 'clique') + ' na tela para resolver.' : 'ligue o controle e resolva o desafio na tela.'} O agente continua sozinho depois.
+            {challenge.since && <span style={{ color: C.t3 }}> · há {Math.max(1, Math.round((now - new Date(challenge.since).getTime()) / 60_000))} min</span>}
+          </span>
+          {!controlling && (
+            <button
+              onClick={() => {
+                setControlling(true)
+                send({ type: 'control', on: true })
+              }}
+              style={{ ...btn, height: bh, borderColor: 'rgba(245,181,74,.5)', color: '#f8d79a', fontWeight: 600 }}
+            >
+              Resolver
+            </button>
+          )}
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: narrow ? 'column' : 'row', gap: 14, flex: 1, minHeight: 0, flexWrap: narrow || tablet ? 'nowrap' : 'wrap' }}>
         <section style={{ flex: narrow ? 'none' : tablet ? '1 1 0' : '999 1 560px', minWidth: 0, minHeight: narrow ? 0 : 420, display: 'flex', flexDirection: 'column', borderRadius: 16, overflow: 'hidden', border: `1px solid ${controlling ? 'rgba(103,216,242,.45)' : 'rgba(255,255,255,.1)'}`, background: '#14172c' }}>

@@ -1,4 +1,4 @@
-import type { ServerEvent, UiAction } from '@shared/protocol'
+import type { BrowserChallengeState, ServerEvent, UiAction } from '@shared/protocol'
 import { dropMission } from '../lib/actions'
 import { useYui } from '../store/yui'
 import { onInputUpdated } from '../workflow/inputs'
@@ -22,6 +22,14 @@ const supportListeners = new Set<() => void>()
 export function onSupportUpdated(fn: () => void): () => void {
   supportListeners.add(fn)
   return () => supportListeners.delete(fn)
+}
+
+// Verificação humana no navegador dos agentes: a página Navegador mostra a faixa "resolva aqui".
+type ChallengeListener = (st: BrowserChallengeState) => void
+const challengeListeners = new Set<ChallengeListener>()
+export function onBrowserChallenge(fn: ChallengeListener): () => void {
+  challengeListeners.add(fn)
+  return () => challengeListeners.delete(fn)
 }
 
 export function onVaultChanged(fn: VaultListener): () => void {
@@ -141,6 +149,11 @@ export function applyEvent(ev: ServerEvent) {
     case 'support.updated':
       for (const fn of supportListeners) fn()
       break
+    case 'browser.challenge': {
+      const { type: _type, ...st } = ev
+      for (const fn of challengeListeners) fn(st)
+      break
+    }
     case 'ping':
       break
   }

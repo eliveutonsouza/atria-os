@@ -39,21 +39,33 @@ export function registerRunPrompt(fn: PromptHook) {
 }
 export const runPromptExtras = (ctx: RunContext) => promptHooks.map((h) => h(ctx)).filter(Boolean).join('\n');
 
-// Opções do SDK por agente (allowlist de MCP, plugins, modelo…).
-type OptionsHook = (agentId: string) => Partial<Options>;
+// Opções do SDK por agente (allowlist de MCP, plugins, modelo, hooks…). `ctx` vem nas execuções (runs.ts).
+type OptionsHook = (agentId: string, ctx?: { runId: string }) => Partial<Options>;
 const optionHooks: OptionsHook[] = [];
 export function registerAgentOptions(fn: OptionsHook) {
   optionHooks.push(fn);
 }
-export function agentOptions(agentId: string): Partial<Options> {
+
+type Hooks = NonNullable<Options['hooks']>;
+// Hooks de vários módulos convivem: os matchers de cada evento são somados.
+function mergeHooks(a: Hooks | undefined, b: Hooks | undefined): Hooks | undefined {
+  if (!a || !b) return a ?? b;
+  const out: Hooks = { ...a };
+  for (const [ev, list] of Object.entries(b) as [keyof Hooks, Hooks[keyof Hooks]][]) out[ev] = [...(out[ev] ?? []), ...(list ?? [])];
+  return out;
+}
+
+export function agentOptions(agentId: string, ctx?: { runId: string }): Partial<Options> {
   return optionHooks.reduce<Partial<Options>>((acc, h) => {
-    const o = h(agentId);
+    const o = h(agentId, ctx);
+    const hooks = mergeHooks(acc.hooks, o.hooks);
     return {
       ...acc,
       ...o,
       disallowedTools: [...(acc.disallowedTools ?? []), ...(o.disallowedTools ?? [])],
       mcpServers: { ...(acc.mcpServers ?? {}), ...(o.mcpServers ?? {}) },
       plugins: [...(acc.plugins ?? []), ...(o.plugins ?? [])],
+      ...(hooks ? { hooks } : {}),
     };
   }, {});
 }

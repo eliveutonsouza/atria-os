@@ -53,6 +53,7 @@ export function pageForView(view: ViewName, p: ViewParams): { page: AppPage; par
     case 'company': return { page: 'company', params: id(p.tab) }
     case 'help': return { page: 'help', params: id(p.tab) }
     case 'skills': return { page: 'skills', params: id(p.tab) }
+    case 'browser': return { page: 'browser', params: {} }
     default: return null
   }
 }
@@ -64,8 +65,8 @@ useYui.subscribe((s) => {
   if (s.viewNonce === lastNonce) return
   lastNonce = s.viewNonce
   if (s.viewNonce === 0) return
-  // Vault, Cérebro e Empresa só existem como páginas do dashboard: no modo Yui, abrem o dashboard
-  if (s.shellMode !== 'app' && (s.view === 'vault' || s.view === 'brain' || s.view === 'company' || s.view === 'help' || s.view === 'skills')) {
+  // Vault, Cérebro, Empresa e Navegador só existem como páginas do dashboard: no modo Yui, abrem o dashboard
+  if (s.shellMode !== 'app' && (s.view === 'vault' || s.view === 'brain' || s.view === 'company' || s.view === 'help' || s.view === 'skills' || s.view === 'browser')) {
     lastNonce = 0
     const t = pageForView(s.view, s.viewParams)
     if (t) enterApp(t.page, t.params)

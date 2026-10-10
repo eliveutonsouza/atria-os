@@ -35,6 +35,7 @@ import * as push from './push.ts';
 import * as notify from './notify.ts';
 import * as stats from './stats.ts';
 import * as browserLive from './browserLive.ts';
+import * as browserChallenge from './browserChallenge.ts';
 import * as settings from './settings.ts';
 import * as onboarding from './onboarding.ts';
 import * as vault from './vault.ts';
@@ -96,7 +97,7 @@ await app.register(multipart, { limits: { fileSize: 500 * 1024 * 1024, files: 30
 registerAuth(app);
 initTerminal();
 registerTerminal(app);
-for (const mod of [missions, customViews, toolbox, agentsAdmin, workflowInputs, workflows, push, notify, stats, browserLive, settings, onboarding, vault, company, help, usage, models, remindersApi, reportsApi, historyApi, projectsApi, telemetry, central, support, claudeDesign, skillsHub]) mod.register(app);
+for (const mod of [missions, customViews, toolbox, agentsAdmin, workflowInputs, workflows, push, notify, stats, browserLive, browserChallenge, settings, onboarding, vault, company, help, usage, models, remindersApi, reportsApi, historyApi, projectsApi, telemetry, central, support, claudeDesign, skillsHub]) mod.register(app);
 // skill nova/removida na plataforma: relê as capacidades do Claude para aparecer nas listas
 skillsHub.setPlatformChangeHook(() => void captureInit());
 vaultAuto.register();

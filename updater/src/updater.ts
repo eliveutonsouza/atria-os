@@ -1,7 +1,9 @@
-// Lógica do atualizador: troca ATRIA_TAG no .env do compose, puxa as imagens, recria atria/atria-code,
-// espera ficar saudável e volta para a tag anterior se não ficar. Os comandos passam por um executor
+// Lógica do atualizador: troca os arquivos do compose pelos da versão nova (vêm na imagem atria-updater:<tag>),
+// troca ATRIA_TAG no .env, puxa as imagens, recria atria/atria-code/atria-browser, espera ficar saudável e
+// volta para a tag e os arquivos anteriores se não ficar. Os comandos passam por um executor
 // injetável (Exec) para os testes rodarem sem Docker.
-import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 export interface ExecResult { code: number; stdout: string; stderr: string }
@@ -31,8 +33,12 @@ interface State { previousTag: string | null; step: string | null; job: Job | nu
 
 export const TAG_RE = /^v\d+\.\d+\.\d+$/;
 // Serviços que a atualização troca de imagem. O próprio atualizador vem por último, por um container auxiliar.
-const APP_SERVICES = ['atria', 'atria-code'];
+const APP_SERVICES = ['atria', 'atria-code', 'atria-browser'];
 const SELF_SERVICE = 'atria-updater';
+// Pasta da imagem do atualizador com os arquivos do compose da versão (docker-compose*.yml, Caddyfile, browser/…).
+const IMAGE_STACK = '/app/stack';
+// Nunca vêm da imagem: são da instalação.
+const KEEP_LOCAL = new Set(['.env', '.env.central', '.git']);
 
 export interface UpdaterOptions {
   stackDir: string; // diretório do compose no host, montado no mesmo caminho
@@ -45,6 +51,7 @@ export interface UpdaterOptions {
   sleep?: (ms: number) => Promise<void>;
   now?: () => Date;
   log?: (msg: string) => void;
+  ownStackDir?: string; // arquivos do compose que ESTA imagem carrega (padrão /app/stack)
 }
 
 const realSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -83,6 +90,7 @@ export class Updater {
   constructor(o: UpdaterOptions) {
     this.opts = {
       healthTimeoutMs: 180_000,
+      ownStackDir: IMAGE_STACK,
       pollMs: 3000,
       sleep: realSleep,
       now: () => new Date(),
@@ -102,6 +110,8 @@ export class Updater {
   }
 
   get envPath() { return join(this.opts.stackDir, '.env'); }
+  // Cópia dos arquivos do compose de antes do job (para o rollback); fica junto do estado, fora da pasta da stack.
+  get stackBackupDir() { return join(dirname(this.opts.statePath), 'stack-backup'); }
   private iso() { return this.opts.now().toISOString(); }
 
   private load(): State {
@@ -160,6 +170,8 @@ export class Updater {
     this.state.job = { commandId, jobId: (jobId as string) || commandId, tag, fromTag, startedAt: this.iso(), finishedAt: null, result: null, error: null, reported: false };
     this.state.step = 'received';
     this.save();
+    // backup de um job anterior não vale para este
+    rmSync(this.stackBackupDir, { recursive: true, force: true });
     this.running = this.run(tag, fromTag).finally(() => { this.running = null; });
     return 'accepted';
   }
@@ -206,6 +218,98 @@ export class Updater {
     }
   }
 
+  // Grava na pasta da stack os arquivos do compose que a imagem atria-updater:<tag> carrega, guardando os atuais
+  // em stackBackupDir. Instalação a partir do código (.git) fica como está: quem cuida dos arquivos é o git.
+  // Imagem sem os arquivos (versão antiga) → mantém os atuais. Devolve true se trocou algo.
+  async syncStack(tag: string): Promise<boolean> {
+    const dir = this.opts.stackDir;
+    if (existsSync(join(dir, '.git'))) { this.opts.log('instalação a partir do código (.git): arquivos do compose ficam com o git'); return false; }
+    this.setStep('stack');
+    let registry = '';
+    try { registry = envGet(this.readEnv(), 'ATRIA_REGISTRY') ?? ''; } catch { /* sem .env */ }
+    const image = `${registry || 'ghcr.io/eliveutonsouza'}/atria-updater:${tag}`;
+    await this.must(this.opts.exec('docker', ['pull', '-q', image], { timeoutMs: 600_000 }), `docker pull ${image}`);
+    const created = await this.must(this.opts.exec('docker', ['create', image], { timeoutMs: 60_000 }), 'docker create');
+    const cid = created.stdout.trim().split('\n').pop() ?? '';
+    const tmp = mkdtempSync(join(tmpdir(), 'atria-stack-'));
+    try {
+      const cp = await this.opts.exec('docker', ['cp', '-q', `${cid}:${IMAGE_STACK}/.`, tmp], { timeoutMs: 120_000 });
+      if (cp.code !== 0 || !this.applyStack(tmp)) { this.opts.log(`${image} não traz o compose: mantém os arquivos atuais`); return false; }
+      this.opts.log(`arquivos do compose de ${tag} gravados`);
+      return true;
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+      await this.opts.exec('docker', ['rm', cid], { timeoutMs: 60_000 });
+    }
+  }
+
+  // Copia os arquivos de src para a pasta da stack, guardando os atuais em stackBackupDir. false = src sem compose.
+  private applyStack(src: string): boolean {
+    const dir = this.opts.stackDir;
+    const names = existsSync(src) ? readdirSync(src).filter((n) => !KEEP_LOCAL.has(n)) : [];
+    if (!names.includes('docker-compose.yml')) return false;
+    const backup = this.stackBackupDir;
+    rmSync(backup, { recursive: true, force: true });
+    mkdirSync(join(backup, 'files'), { recursive: true });
+    const added: string[] = [];
+    for (const n of names) {
+      if (existsSync(join(dir, n))) cpSync(join(dir, n), join(backup, 'files', n), { recursive: true });
+      else added.push(n);
+    }
+    writeFileSync(join(backup, 'added.json'), JSON.stringify(added));
+    for (const n of names) {
+      rmSync(join(dir, n), { recursive: true, force: true });
+      cpSync(join(src, n), join(dir, n), { recursive: true });
+    }
+    return true;
+  }
+
+  // Ao subir: se a instalação já está na versão deste atualizador mas o compose da pasta é de outra versão
+  // (a atualização foi feita por um atualizador antigo, que não trocava os arquivos), grava os desta imagem e
+  // recria os serviços. Erro → volta os arquivos e sobe de novo como estava.
+  async reconcileStack(): Promise<boolean> {
+    const dir = this.opts.stackDir;
+    const own = this.opts.ownStackDir;
+    if (this.running || !TAG_RE.test(this.opts.version) || this.currentTag() !== this.opts.version) return false;
+    if (existsSync(join(dir, '.git')) || !existsSync(join(own, 'docker-compose.yml'))) return false;
+    let current = '';
+    try { current = readFileSync(join(dir, 'docker-compose.yml'), 'utf8'); } catch { /* sem compose */ }
+    if (current === readFileSync(join(own, 'docker-compose.yml'), 'utf8')) return false;
+    const job = (async () => {
+      this.opts.log(`compose da pasta difere do da ${this.opts.version}: atualizando os arquivos`);
+      this.applyStack(own);
+      try {
+        await this.must(this.compose(['config', '-q'], 60_000), 'compose da versão inválido');
+        await this.compose(['pull', ...APP_SERVICES]);
+        await this.must(this.compose(['up', '-d', ...APP_SERVICES]), 'docker compose up');
+        rmSync(this.stackBackupDir, { recursive: true, force: true });
+        this.opts.log('arquivos do compose em dia');
+      } catch (e) {
+        this.opts.log(`falhou (${(e as Error).message}); voltando os arquivos anteriores`);
+        this.restoreStack();
+        await this.compose(['up', '-d', ...APP_SERVICES]);
+      }
+    })();
+    this.running = job.finally(() => { this.running = null; });
+    await this.running;
+    return true;
+  }
+
+  // Volta os arquivos guardados por syncStack (e apaga os que a versão nova acrescentou).
+  restoreStack() {
+    const backup = this.stackBackupDir;
+    if (!existsSync(join(backup, 'added.json'))) return;
+    const dir = this.opts.stackDir;
+    const added = JSON.parse(readFileSync(join(backup, 'added.json'), 'utf8')) as string[];
+    for (const n of added) rmSync(join(dir, n), { recursive: true, force: true });
+    for (const n of readdirSync(join(backup, 'files'))) {
+      rmSync(join(dir, n), { recursive: true, force: true });
+      cpSync(join(backup, 'files', n), join(dir, n), { recursive: true });
+    }
+    rmSync(backup, { recursive: true, force: true });
+    this.opts.log('arquivos do compose anteriores restaurados');
+  }
+
   private async deploy(tag: string | null, tolerantPull: boolean) {
     this.writeTag(tag);
     this.setStep('pulling');
@@ -232,6 +336,10 @@ export class Updater {
     try {
       this.setStep('login');
       await this.login();
+      if (await this.syncStack(tag)) {
+        // compose novo inválido com o .env desta instalação → nem tenta subir
+        await this.must(this.compose(['config', '-q'], 60_000), 'compose da versão nova inválido');
+      }
       error = await this.deploy(tag, false);
       if (!error) {
         this.finish('done', null);
@@ -244,6 +352,7 @@ export class Updater {
     this.opts.log(`falhou (${error}); voltando para ${fromTag ?? 'latest'}`);
     try {
       this.setStep('rolling_back');
+      this.restoreStack();
       const again = await this.deploy(fromTag, true);
       if (!again) this.finish('rolled_back', error);
       else this.finish('failed', `${error}; a versão anterior também não subiu: ${again}`);

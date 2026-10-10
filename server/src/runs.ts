@@ -253,6 +253,13 @@ async function requestApproval(run: RunRow, title: string, rows: ApprovalInfo['r
   return approved;
 }
 
+// Pausa sem modal (verificação humana no navegador, browserChallenge.ts): a execução aparece aguardando você.
+export function holdRun(id: string, waiting: boolean, op: string) {
+  const r = getRun(id);
+  if (!r || (r.state !== 'running' && r.state !== 'waiting_approval')) return;
+  patch(id, { state: waiting ? 'waiting_approval' : 'running', current_op: op });
+}
+
 // Cancela todas as aprovações pendentes de um dono (missão/workflow cancelados).
 export function expireApprovals(ownerId: string) {
   const rows = db.prepare(`SELECT id FROM approvals WHERE run_id = ? AND status = 'pending'`).all(ownerId) as { id: string }[];
@@ -379,7 +386,7 @@ function systemAppend(agent: AgentDef, projectName: string | null): string {
     '- Você trabalha no automático: não peça confirmação ao usuário, siga até entregar. Comandos catastróficos (apagar raiz/workspace, formatar disco, DROP DATABASE, mexer em stacks de produção protegidos, force push na main) são bloqueados; se um comando for negado, siga sem ele.',
     '- Resposta final: 1 a 3 frases em português, no estilo de status para ser falado em voz alta (o que foi feito, resultado, próximo passo).',
     projectName ? `- Projeto atual: ${projectName}.` : '- Sem projeto específico: trabalhe em /workspace/.atria/scratch.',
-    '- Navegador: use as ferramentas mcp__playwright__* (Chromium headless na VPS) para navegar, testar sites, preencher formulários e tirar screenshots. Use mcp__claude-in-chrome__* só quando precisar do Chrome real do usuário (contas logadas dele) — chame list_connected_browsers antes; se não houver navegador conectado, use o Playwright e diga isso no resultado. Screenshots com filename relativo são salvos no diretório do projeto atual.',
+    '- Navegador: use as ferramentas mcp__playwright__* (navegador do Atria na VPS, que o usuário assiste ao vivo) para navegar, testar sites, preencher formulários e tirar screenshots. Use mcp__claude-in-chrome__* só quando precisar do Chrome real do usuário (contas logadas dele) — chame list_connected_browsers antes; se não houver navegador conectado, use o Playwright e diga isso no resultado. Screenshots com filename relativo são salvos no diretório do projeto atual.',
     '- Relatórios: se pedirem um relatório, grave JSON em /workspace/.atria/reports/<AAAA-MM-DD-HHmm>.json com {title, lead, kpis:[{value,label}], sections:[{heading, tone:"cyan"|"warn"|"ok", items:[...]}]}.',
   ].join('\n');
 }
@@ -457,7 +464,7 @@ async function execute(run: RunRow, ac: AbortController) {
   let lastContext = 0;
   let turns = 0;
 
-  const { mcpServers: extraMcp, ...perAgent } = agentOptions(agent.id);
+  const { mcpServers: extraMcp, ...perAgent } = agentOptions(agent.id, { runId: run.id });
   const q = query({
     prompt: run.instruction,
     options: {

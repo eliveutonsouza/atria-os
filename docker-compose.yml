@@ -47,20 +47,25 @@ services:
       - traefik.http.routers.${ATRIA_PROJECT:-atria-os}.service=${ATRIA_PROJECT:-atria-os}
       - traefik.http.services.${ATRIA_PROJECT:-atria-os}.loadbalancer.server.port=8080
 
-  # Navegador headless para os agentes (Playwright MCP via HTTP). Perfil persistente: logins feitos
-  # pelos agentes sobrevivem a reinícios. Monta o mesmo workspace: screenshots/PDFs caem no projeto do agente (caminho relativo) ou em /workspace/.atria/browser.
+  # Navegador dos agentes (Playwright MCP via HTTP) com Chrome de verdade numa tela virtual (Xvfb), não headless
+  # (browser/Dockerfile). Perfil persistente: logins feitos pelos agentes sobrevivem a reinícios. Monta o mesmo
+  # workspace: screenshots/PDFs caem no projeto do agente (caminho relativo) ou em /workspace/.atria/browser.
   atria-browser:
-    image: mcr.microsoft.com/playwright/mcp@sha256:77dccc5ce9e94cb8ae7ebea87ddbb6cd54b05760c4d63c54e16accf2726b8734 # v0.0.82
+    image: ${ATRIA_REGISTRY:-ghcr.io/eliveutonsouza}/atria-browser:${ATRIA_TAG:-latest}
     restart: unless-stopped
-    # Chromium com CDP (9223 via proxy, assistido ao vivo pelo Atria OS) + Playwright MCP (8931) ligado a ele.
-    entrypoint: ["/bin/sh", "/browser/entrypoint.sh"]
-    user: "0" # volume do perfil nasce root; chromium já roda com --no-sandbox num container isolado
+    # Chrome com CDP (9223 via proxy, assistido ao vivo pelo Atria OS) + Playwright MCP (8931) ligado a ele.
+    user: "0" # volume do perfil nasce root; o navegador já roda com --no-sandbox num container isolado
+    init: true # recolhe processos órfãos do navegador
+    environment:
+      TZ: ${TZ:-America/Sao_Paulo}
+      # Experimental: instala a extensão "Claude" (Claude in Chrome) pela política do Chrome. Desligada por padrão.
+      ATRIA_BROWSER_CLAUDE_EXTENSION: ${ATRIA_BROWSER_CLAUDE_EXTENSION:-0}
+      ATRIA_BROWSER_CLAUDE_EXTENSION_ID: ${ATRIA_BROWSER_CLAUDE_EXTENSION_ID:-}
     volumes:
       - browser-profile:/profile
       - workspace:/workspace
-      - ./browser:/browser:ro
-    shm_size: 1g
-    mem_limit: 1g
+    shm_size: "1gb"
+    mem_limit: 1536m
     labels:
       - traefik.enable=false
 

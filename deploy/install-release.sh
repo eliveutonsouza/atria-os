@@ -110,7 +110,8 @@ else
 fi
 UPDATER_IMAGE="$REGISTRY/atria-updater:$ATRIA_TAG"
 docker pull -q "$UPDATER_IMAGE" >/dev/null || die "não consegui baixar $UPDATER_IMAGE"
-# Arquivos do compose desta versão (navegador, Caddyfile, overrides) vêm dentro da imagem do atualizador.
+# Arquivos do compose desta versão (Caddyfile, overrides) vêm dentro da imagem do atualizador; nas atualizações
+# remotas o atualizador grava os da versão nova do mesmo jeito.
 cid="$(docker create "$UPDATER_IMAGE")"
 docker cp -q "$cid:/app/stack/." "$ROOT/" && docker rm "$cid" >/dev/null
 ok "arquivos da versão $ATRIA_TAG em $ROOT"

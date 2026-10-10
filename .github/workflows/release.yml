@@ -1,5 +1,5 @@
 # Release: tag vX.Y.Z → imagens multi-arch (amd64 + arm64) privadas no GHCR e GitHub Release com notas geradas.
-#   ghcr.io/eliveutonsouza/atria-os|atria-code|atria-updater:<tag> e :latest (ATRIA_VERSION = tag)
+#   ghcr.io/eliveutonsouza/atria-os|atria-code|atria-browser|atria-updater:<tag> e :latest (ATRIA_VERSION = tag)
 # Assets da release (baixados pelo Atria Central no "instalar em 1 comando"):
 #   docker-compose.release.yml (= docker-compose.yml, modo imagem) e install-release.sh (= deploy/install-release.sh)
 name: Release
@@ -33,6 +33,9 @@ jobs:
           - name: atria-code
             context: ./code
             file: code/Dockerfile
+          - name: atria-browser
+            context: ./browser
+            file: browser/Dockerfile
           - name: atria-updater
             context: .
             file: updater/Dockerfile

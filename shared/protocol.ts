@@ -35,7 +35,8 @@ export type ViewName =
   | 'brain'
   | 'company'
   | 'help'
-  | 'skills';
+  | 'skills'
+  | 'browser';
 
 export const VIEW_NAMES: ViewName[] = [
   'brief',
@@ -62,6 +63,7 @@ export const VIEW_NAMES: ViewName[] = [
   'company',
   'help',
   'skills',
+  'browser',
 ];
 
 export interface ViewParams {
@@ -267,6 +269,7 @@ export type ServerEvent =
   | { type: 'company.doc.updated'; doc: CompanyDoc }
   | { type: 'company.doc.deleted'; id: string }
   | { type: 'company.profile.updated'; profile: CompanyProfile }
+  | ({ type: 'browser.challenge' } & BrowserChallengeState) // verificação humana no navegador dos agentes (browserChallenge.ts)
   | { type: 'support.updated' } // suporte remoto, avisos ou atualização mudaram: a faixa e Configurações releem
   | { type: 'ping' };
 
@@ -569,6 +572,15 @@ export interface BrowserTab {
   url: string;
   active: boolean;
 }
+export type BrowserChallengeKind = 'cloudflare' | 'turnstile' | 'recaptcha' | 'hcaptcha' | 'akamai' | 'perimeterx' | 'datadome' | 'generic';
+// GET /api/browser/challenge e evento SSE browser.challenge
+export interface BrowserChallengeState {
+  active: boolean;
+  site: string | null;
+  kind: BrowserChallengeKind | null;
+  since: string | null;
+}
+
 export type BrowserServerMsg =
   | { type: 'frame'; targetId: string; data: string; width: number; height: number } // JPEG base64
   | { type: 'tabs'; tabs: BrowserTab[] }

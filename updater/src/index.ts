@@ -1,4 +1,4 @@
-// atria-updater: atualiza atria/atria-code para uma tag do GHCR a pedido do Atria OS (rede interna do compose).
+// atria-updater: atualiza atria/atria-code/atria-browser para uma tag do GHCR a pedido do Atria OS (rede interna do compose).
 import { Updater } from './updater.ts';
 import { createApi } from './server.ts';
 import { exec } from './exec.ts';
@@ -17,6 +17,9 @@ const updater = new Updater({
   version: process.env.ATRIA_VERSION || 'dev',
   exec,
 });
+
+// Instalação atualizada por um atualizador antigo (que não trocava o compose): acerta os arquivos agora.
+void updater.reconcileStack().catch((e: Error) => console.error(`[updater] acerto do compose falhou: ${e.message}`));
 
 const server = createApi(updater, token);
 server.listen(port, '0.0.0.0', () => console.log(`[updater] ${updater.opts.version} ouvindo em :${port} (projeto ${updater.opts.project}, ${updater.opts.stackDir})`));
