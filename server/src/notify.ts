@@ -43,6 +43,8 @@ export interface ChatBridge {
   project(): { slug: string | null; name: string };
   setProject(q: string): { ok: true; name: string } | { ok: false; error: string; options: string[] };
   resolveApproval(id: string, approve: boolean): { ok: boolean; title?: string };
+  // resposta falada (opcional, Configurações › Avisos): arquivo .ogg/opus com a fala, ou null
+  speak?(text: string): Promise<string | null>;
 }
 let chatBridge: ChatBridge | null = null;
 export function registerChatBridge(c: ChatBridge | null): void {
@@ -514,6 +516,25 @@ async function talkNow(m: TgMessage): Promise<void> {
   const head = source === 'voice' ? `<i>“${esc(text.slice(0, 300))}${text.length > 300 ? '…' : ''}”</i>\n\n` : '';
   const parts = chunks(answer || 'Pronto.');
   for (let i = 0; i < parts.length; i++) await reply(i === 0 ? m : null, `${i === 0 ? head : ''}${esc(parts[i])}`);
+  // resposta em áudio: "audio" = só quando você mandou áudio; "always" = sempre
+  const mode = String(getSetting('notify.telegram.voiceReply') ?? 'off');
+  if (chatBridge?.speak && answer && (mode === 'always' || (mode === 'audio' && source === 'voice'))) {
+    let file: string | null = null;
+    try {
+      void tg('sendChatAction', { chat_id: tgChat(), action: 'record_voice' }).catch(() => {});
+      file = await chatBridge.speak(answer);
+      if (file) {
+        const form = new FormData();
+        form.set('chat_id', tgChat());
+        form.set('voice', new Blob([readFileSync(file)], { type: 'audio/ogg' }), 'yui.ogg');
+        await tg('sendVoice', form, 120_000);
+      }
+    } catch (e) {
+      console.error('notify telegram voz', errMsg(e));
+    } finally {
+      if (file) rmSync(dirname(file), { recursive: true, force: true });
+    }
+  }
 }
 
 async function onCallback(q: NonNullable<TgUpdate['callback_query']>): Promise<void> {

@@ -212,6 +212,22 @@ export function NoticesSection() {
             <button type="button" style={{ ...bigBtn(), color: '#f39aa4' }} disabled={busy === 'unlink'} onClick={() => void unlink()}>Desvincular</button>
           </div>
         )}
+        {tg?.linked && (
+          <label style={{ ...row, fontSize: 13, gap: 10 }}>
+            <span>Yui responde em áudio</span>
+            <select
+              value={String(data?.values['notify.telegram.voiceReply'] ?? 'off')}
+              onChange={(e) => void save({ 'notify.telegram.voiceReply': e.target.value })}
+              aria-label="Resposta em áudio no Telegram"
+              style={{ height: 40, padding: '0 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', color: C.text, fontSize: 13 }}
+            >
+              <option value="off">Não (só texto)</option>
+              <option value="audio">Quando eu mandar áudio</option>
+              <option value="always">Sempre</option>
+            </select>
+            <span style={{ color: C.t3, fontSize: 12 }}>além do texto · cerca de US$ 0,015 por minuto de fala</span>
+          </label>
+        )}
         {tg?.error && <span role="alert" style={{ fontSize: 12.5, color: '#f39aa4' }}>{tg.error}</span>}
         <div style={row}>
           <button type="button" style={bigBtn()} disabled={!tg?.linked || busy === 'tg-test'} onClick={() => void act('tg-test', async () => setTgMsg(await sendTest('telegram')))}>

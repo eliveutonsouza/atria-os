@@ -57,6 +57,8 @@ export const SETTINGS: Record<string, Def> = {
   // Avisos fora do app (notify.ts): Telegram (bot próprio + chat vinculado por código), e-mail pela Resend e lembrete dos pedidos.
   'notify.telegram.token': { kind: 'secret', def: '', maxLen: 200 },
   'notify.telegram.chatId': { kind: 'string', def: '', maxLen: 40 },
+  // Resposta falada da Yui no Telegram (TTS da OpenAI): off | audio (quando você manda áudio) | always
+  'notify.telegram.voiceReply': { kind: 'enum', def: 'off', options: ['off', 'audio', 'always'] },
   'notify.email.resendKey': { kind: 'secret', def: '', maxLen: 200 },
   'notify.email.from': { kind: 'string', def: '', maxLen: 160 },
   'notify.email.to': { kind: 'string', def: '', maxLen: 300 },

@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { query, type CanUseTool, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { ApprovalInfo, ApprovalRule, InboxItem, RunInfo, RunEventLine, RunState, RunStep } from '../../shared/protocol.ts';
 import { config } from './config.ts';
@@ -27,7 +28,8 @@ export const runBus = new EventEmitter<{
 type RunRow = {
   id: string; mission_id: string | null; step_id: string | null; workflow_run_id: string | null; routine_id: string | null; origin: string; display: 'blocks' | 'html' | null; agent_id: string; project: string | null; instruction: string; task: string; state: RunState;
   progress: number; current_op: string | null; tools: string; steps: string; result: string | null;
-  session_id: string | null; tokens_in: number; tokens_out: number; cost_usd: number; rating?: number | null; context_tokens?: number | null; context_window?: number | null; num_turns?: number | null;
+  session_id: string | null; tokens_in: number; tokens_out: number; cost_usd: number; rating?: number | null;
+  compare_of?: string | null; model_override?: string | null; model_used?: string | null; worktree?: string | null; context_tokens?: number | null; context_window?: number | null; num_turns?: number | null;
   created_at: string; started_at: string | null; finished_at: string | null;
 };
 
@@ -55,6 +57,8 @@ export function toRunInfo(r: RunRow): RunInfo {
     workflowRunId: r.workflow_run_id,
     display: r.display,
     rating: r.rating === 1 || r.rating === -1 ? r.rating : null,
+    compareOf: r.compare_of ?? null,
+    model: r.model_used ?? r.model_override ?? null,
   };
 }
 
@@ -173,6 +177,8 @@ export interface EnqueueInput {
   stepId?: string;
   workflowRunId?: string;
   display?: 'blocks' | 'html' | null;
+  compareOf?: string; // refazer a execução com outro modelo (compare.ts)
+  model?: string | null;
 }
 
 export function enqueueRun(input: EnqueueInput): RunInfo {
@@ -190,6 +196,7 @@ export function enqueueRun(input: EnqueueInput): RunInfo {
      VALUES(?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?)`,
   ).run(id, agent.id, project?.slug ?? null, instruction, task, input.origin ?? 'yui', input.routineId ?? null,
     input.missionId ?? null, input.stepId ?? null, input.workflowRunId ?? null, input.display ?? null, now());
+  if (input.compareOf || input.model) db.prepare(`UPDATE runs SET compare_of = ?, model_override = ? WHERE id = ?`).run(input.compareOf ?? null, input.model ?? null, id);
   const info = getRun(id)!;
   emit({ type: 'run.updated', run: info });
   setImmediate(pump);
@@ -557,7 +564,24 @@ async function execute(run: RunRow, ac: AbortController) {
     mkdirSync(runDir.dir, { recursive: true });
     if (project) excludeFromGit(project.dir);
   }
-  const cwd = runDir?.dir ?? root;
+  // Comparação (refazer com outro modelo): em projeto com git roda numa cópia isolada (git worktree) e pode
+  // mexer à vontade; sem git, só lê. O original nunca é tocado.
+  let compare: { dir: string | null; readOnly: boolean } | null = null;
+  if (run.compare_of) {
+    compare = { dir: null, readOnly: true };
+    if (project && existsSync(join(project.dir, '.git'))) {
+      const wt = join(config.metaDir, 'compare', run.id);
+      try {
+        mkdirSync(join(config.metaDir, 'compare'), { recursive: true });
+        execFileSync('git', ['-C', project.dir, 'worktree', 'add', '--detach', wt, 'HEAD'], { stdio: 'pipe', timeout: 60_000 });
+        compare = { dir: wt, readOnly: false };
+        patch(run.id, { worktree: wt } as Partial<Record<keyof RunRow, unknown>>);
+      } catch (e) {
+        logEvent(run.id, 'system', `Sem cópia isolada (${(e as Error).message.split('\n')[0]}); esta comparação só lê.`);
+      }
+    }
+  }
+  const cwd = compare?.dir ?? runDir?.dir ?? root;
   const extraPatterns = (project?.approvalPatterns ?? []).map((p) => new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 
   const canUseTool: CanUseTool = async (toolName, input, { signal }) => {
@@ -565,6 +589,11 @@ async function execute(run: RunRow, ac: AbortController) {
       const cmd = String(input.command ?? '');
       // Automático por padrão: só o catastrófico é negado (sem modal) e só os padrões que o usuário
       // configurou no atria.json do projeto pedem aprovação.
+      // comparação: nada sai da cópia isolada (sem push, deploy ou publicação)
+      if (run.compare_of && /\bgit\s+(push|remote)\b|\bdeploy\b|\bvercel\b|\bdocker\s+(push|compose\s+up)\b|\bnpm\s+publish\b/.test(cmd)) {
+        logEvent(run.id, 'system', `Comparação: bloqueado "${cmd.split('\n')[0].slice(0, 120)}"`);
+        return { behavior: 'deny', message: 'Esta é uma execução de comparação: não envie nada para fora da cópia (push, deploy, publicação). Descreva o que faria.' };
+      }
       const blocked = blockedReason(cmd);
       if (blocked) {
         logEvent(run.id, 'system', `Bloqueado por segurança (${blocked}): ${cmd.split('\n')[0].slice(0, 200)}`);
@@ -595,6 +624,9 @@ async function execute(run: RunRow, ac: AbortController) {
         return ok ? { behavior: 'allow', updatedInput: input } : { behavior: 'deny', message: 'O usuário rejeitou este comando. Continue sem executá-lo e explique no resultado.' };
       }
       return { behavior: 'allow', updatedInput: input };
+    }
+    if (run.compare_of && toolName.startsWith('mcp__') && SENSITIVE_MCP.test(toolName.split('__').pop() ?? '')) {
+      return { behavior: 'deny', message: 'Esta é uma execução de comparação: não use ações com efeito externo (enviar, publicar, pagar).' };
     }
     // Conectores/MCP com efeito externo irreversível (enviar e-mail, publicar, pagar…) pedem aprovação.
     if (toolName.startsWith('mcp__') && getSetting('approvals.mcpSensitive') !== false && SENSITIVE_MCP.test(toolName.split('__').pop() ?? '')) {
@@ -639,7 +671,7 @@ async function execute(run: RunRow, ac: AbortController) {
       systemPrompt: {
         type: 'preset',
         preset: 'claude_code',
-        append: [systemAppend(agent, project?.name ?? null, runDir, project?.goal ?? null), runPromptExtras({ runId: run.id, agentId: agent.id, project: project?.slug ?? null, display: run.display })].filter(Boolean).join('\n'),
+        append: [systemAppend(agent, project?.name ?? null, runDir, project?.goal ?? null), compare ? (compare.readOnly ? '- Esta é uma execução de COMPARAÇÃO só de leitura: não altere arquivos; investigue e responda.' : `- Esta é uma execução de COMPARAÇÃO numa cópia isolada do projeto (${compare.dir}): trabalhe nela normalmente; o usuário compara com a execução original e decide se fica com a sua. Não faça push, deploy nem envio externo.`) : '', runPromptExtras({ runId: run.id, agentId: agent.id, project: project?.slug ?? null, display: run.display })].filter(Boolean).join('\n'),
       },
       permissionMode: 'default',
       allowedTools: SAFE_TOOLS,
@@ -655,14 +687,16 @@ async function execute(run: RunRow, ac: AbortController) {
       ...(Number(getSetting('budget.runMaxUsd') ?? 0) > 0 && isAutomaticRun(run) ? { maxBudgetUsd: Number(getSetting('budget.runMaxUsd')) } : {}),
       env: claudeEnv(),
       ...perAgent,
+      ...(run.model_override ? { model: run.model_override } : {}),
+      ...(compare?.readOnly ? { disallowedTools: [...(perAgent.disallowedTools ?? []), 'Edit', 'Write', 'NotebookEdit', 'Bash'] } : {}),
     },
   });
 
   for await (const msg of q as AsyncIterable<SDKMessage>) {
     lastEventAt.set(run.id, Date.now());
     if (msg.type === 'system' && msg.subtype === 'init') {
-      patch(run.id, { session_id: msg.session_id });
-      logEvent(run.id, 'system', `session ${msg.session_id} · cwd ${cwd}`);
+      patch(run.id, { session_id: msg.session_id, model_used: msg.model } as Partial<Record<keyof RunRow, unknown>>);
+      logEvent(run.id, 'system', `session ${msg.session_id} · cwd ${cwd} · ${msg.model}`);
       const mcp = msg.mcp_servers.map((m) => `${m.name}${m.status === 'connected' ? '' : ` (${m.status})`}`);
       if (mcp.length) logEvent(run.id, 'system', `MCP: ${mcp.join(', ')}`);
       if (msg.plugins.length) logEvent(run.id, 'system', `plugins: ${msg.plugins.map((p) => p.name).join(', ')}`);

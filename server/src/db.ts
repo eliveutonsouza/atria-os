@@ -154,7 +154,11 @@ addColumn('approvals', 'rule', 'TEXT'); // regra que dá para salvar ao decidir 
 addColumn('runs', 'context_tokens', 'INTEGER');
 addColumn('runs', 'context_window', 'INTEGER');
 addColumn('runs', 'num_turns', 'INTEGER');
-addColumn('runs', 'rating', 'INTEGER'); // 👍 1 / 👎 -1 do usuário (runs.ts rateRun)
+addColumn('runs', 'rating', 'INTEGER');
+addColumn('runs', 'compare_of', 'TEXT'); // refeita com outro modelo para comparar (compare.ts)
+addColumn('runs', 'model_override', 'TEXT');
+addColumn('runs', 'model_used', 'TEXT'); // modelo que de fato rodou (init do SDK)
+addColumn('runs', 'worktree', 'TEXT'); // cópia isolada do projeto usada pela comparação // 👍 1 / 👎 -1 do usuário (runs.ts rateRun)
 addColumn('sessions', 'kind', "TEXT NOT NULL DEFAULT 'owner'"); // owner | support (suporte remoto, support.ts)
 addColumn('sessions', 'label', 'TEXT');
 addColumn('messages', 'project', 'TEXT'); // conversa por projeto (NULL = Geral)

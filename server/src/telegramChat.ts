@@ -1,6 +1,10 @@
 import type { ApprovalInfo } from '../../shared/protocol.ts';
 import { kvGet, kvSet } from './db.ts';
-import { saveMessage, think } from './brain.ts';
+import { openai, saveMessage, think } from './brain.ts';
+import { trackOpenAI } from './usage.ts';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { transcribe } from './transcribe.ts';
 import { findProject, listProjectConfigs } from './projects.ts';
 import { pendingApprovals, resolveApproval, runBus } from './runs.ts';
@@ -41,6 +45,18 @@ registerChatBridge({
     if (!p) return { ok: false, error: `Não achei o projeto "${q}".`, options: listProjectConfigs().filter((x) => x.cloned).map((x) => x.name) };
     kvSet('notify.tg.project', p.slug);
     return { ok: true, name: p.name };
+  },
+  async speak(text) {
+    // fala curta: a Yui responde em 1–3 frases; acima disso só o começo vira áudio
+    const input = text.replace(/[*_`#>]/g, '').slice(0, 1200);
+    const opts = { model: 'gpt-4o-mini-tts', input, response_format: 'opus' as const, instructions: 'Fale em português do Brasil, calma e calorosa, ritmo natural.' };
+    // a voz da Yui ao vivo pode não existir no TTS: cai para marin
+    const res = await openai.audio.speech.create({ ...opts, voice: String(getSetting('voice.name') || 'marin') as 'marin' }).catch(() => openai.audio.speech.create({ ...opts, voice: 'marin' }));
+    trackOpenAI('telegram-voz', 'gpt-4o-mini-tts', { input_tokens: Math.ceil(input.length / 4), output_tokens: 0 });
+    const dir = mkdtempSync(join(tmpdir(), 'atria-tts-'));
+    const file = join(dir, 'yui.ogg');
+    writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+    return file;
   },
   resolveApproval(id, approve) {
     const a = pendingApprovals().find((x) => x.id === id);

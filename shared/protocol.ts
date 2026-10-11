@@ -144,6 +144,8 @@ export interface RunInfo {
   workflowRunId?: string | null;
   display?: 'blocks' | 'html' | null;
   rating?: 1 | -1 | null; // nota do usuário (👍/👎)
+  compareOf?: string | null; // refeita com outro modelo para comparar com esta execução
+  model?: string | null; // modelo que rodou
 }
 
 export interface RunEventLine {
