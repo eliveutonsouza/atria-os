@@ -496,6 +496,7 @@ export interface WorkflowRunInfo {
   nodes: Record<string, { status: StepStatus; runId?: string | null; result?: string | null; decision?: string | null; decidedBy?: 'yui' | 'user' | null; feedback?: 'agree' | 'disagree' | null }>;
   startedAt: string;
   finishedAt: string | null;
+  dir?: string | null; // pasta própria desta execução, onde os agentes gravam o que geram
 }
 export interface RoutineInfo {
   id: string;

@@ -2,6 +2,9 @@
 
 Versões marcadas do Atria OS. Cada tag `vX.Y.Z` publica as imagens no GHCR e pode ser aplicada pelo Atria Central (Atualizações).
 
+## v1.1.1
+- Cada execução de workflow tem pasta própria (`<projeto>/.atria/execucoes/<workflow>/<data>-<id>`), compartilhada pelos passos dela: dá para rodar o mesmo workflow várias vezes ao mesmo tempo sem uma sobrescrever os arquivos da outra. A pasta aparece no histórico de execuções do workflow e fica fora do git do projeto.
+
 ## v1.1.0
 - Multi-projeto na tela principal: seletor de projeto clicável (Ctrl P), com execuções rodando e mensagens novas por projeto; cada projeto tem a própria conversa com a Yui ("Geral" = sem projeto).
 - Painel Execuções (contador no topo ou "Agentes trabalhando"): tarefas rodando, na fila e aguardando aprovação agrupadas por projeto, com Ver, Parar, Revisar e Ir para o projeto.

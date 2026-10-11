@@ -1029,6 +1029,11 @@ function RunsPanel({ runs, current, onPick, steps }: { runs: WorkflowRunInfo[]; 
             {open && (
               <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <WaitingCard runId={r.id} />
+                {r.dir && (
+                  <div style={{ fontSize: 11.5, color: C.t3, wordBreak: 'break-all' }}>
+                    Pasta desta execução: <span style={{ fontFamily: "'JetBrains Mono', monospace", color: C.t2 }}>{r.dir}</span>
+                  </div>
+                )}
                 {steps.map((s) => {
                   const ns = r.nodes[s.id]
                   if (!ns || ns.status === 'pending' || ns.status === 'skipped') return null

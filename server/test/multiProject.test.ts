@@ -57,3 +57,16 @@ test('projeto ativo: vazio vira null e segue o setActiveProject', () => {
   assert.equal(brain.recentMessages(10).at(-1)?.text, 'padrão = projeto ativo');
   proj.setActiveProject(null);
 });
+
+test('workflowRunDir: cada execução do mesmo workflow tem pasta própria e estável', async () => {
+  await import('../src/workflows.ts');
+  const { db } = await import('../src/db.ts');
+  const ins = db.prepare(`INSERT INTO workflow_runs(id, workflow, status, current, nodes, started_at) VALUES(?, 'posts', 'running', NULL, '{}', ?)`);
+  ins.run('wfaaaaaa1', '2026-10-11T17:30:00.000Z');
+  ins.run('wfbbbbbb2', '2026-10-11T17:30:00.000Z');
+  const a = runs.workflowRunDir('/w/proj', 'wfaaaaaa1');
+  const b = runs.workflowRunDir('/w/proj', 'wfbbbbbb2');
+  assert.notEqual(a, b);
+  assert.equal(a, runs.workflowRunDir('/w/proj', 'wfaaaaaa1'));
+  assert.match(a, /^\/w\/proj\/\.atria\/execucoes\/posts\/2026-10-11_\d\dh30-wfaaaa$/);
+});

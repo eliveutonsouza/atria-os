@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
-import { existsSync, mkdirSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { query, type CanUseTool, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { ApprovalInfo, InboxItem, RunInfo, RunEventLine, RunState, RunStep } from '../../shared/protocol.ts';
 import { config } from './config.ts';
@@ -399,7 +399,30 @@ export function purgeRuns(olderThanDays: number): number {
   return n;
 }
 
-function systemAppend(agent: AgentDef, projectName: string | null): string {
+// Cada execução de workflow ganha a própria pasta (compartilhada pelos passos dela), para rodar o mesmo
+// workflow várias vezes ao mesmo tempo sem uma sobrescrever os arquivos da outra.
+export function workflowRunDir(base: string, wfRunId: string): string {
+  const row = db.prepare(`SELECT workflow, started_at FROM workflow_runs WHERE id = ?`).get(wfRunId) as { workflow: string; started_at: string } | undefined;
+  const at = row ? new Date(row.started_at) : new Date();
+  const stamp = at.toLocaleString('sv-SE', { timeZone: process.env.TZ || undefined }).slice(0, 16).replace(' ', '_').replace(':', 'h');
+  const slug = (row?.workflow ?? 'workflow').replace(/[^\w.-]+/g, '-');
+  return join(base, '.atria', 'execucoes', slug, `${stamp}-${wfRunId.slice(0, 6)}`);
+}
+
+// Mantém .atria/ fora do git do projeto sem mexer no .gitignore versionado.
+function excludeFromGit(projectDir: string) {
+  const exclude = join(projectDir, '.git', 'info', 'exclude');
+  if (!existsSync(join(projectDir, '.git'))) return;
+  try {
+    const cur = existsSync(exclude) ? readFileSync(exclude, 'utf8') : '';
+    if (!/^\/?\.atria\/?$/m.test(cur)) {
+      mkdirSync(join(projectDir, '.git', 'info'), { recursive: true });
+      appendFileSync(exclude, `${cur && !cur.endsWith('\n') ? '\n' : ''}/.atria/\n`);
+    }
+  } catch { /* repo somente leitura: segue sem */ }
+}
+
+function systemAppend(agent: AgentDef, projectName: string | null, runDir?: { dir: string; root: string } | null): string {
   return [
     `Você é o ${agent.name}, um agente da força de trabalho da Yui, no Atria OS.`,
     agent.prompt,
@@ -410,6 +433,10 @@ function systemAppend(agent: AgentDef, projectName: string | null): string {
     '- Você trabalha no automático: não peça confirmação ao usuário, siga até entregar. Comandos catastróficos (apagar raiz/workspace, formatar disco, DROP DATABASE, mexer em stacks de produção protegidos, force push na main) são bloqueados; se um comando for negado, siga sem ele.',
     '- Resposta final: 1 a 3 frases em português, no estilo de status para ser falado em voz alta (o que foi feito, resultado, próximo passo).',
     projectName ? `- Projeto atual: ${projectName}.` : '- Sem projeto específico: trabalhe em /workspace/.atria/scratch.',
+    ...(runDir ? [
+      `- Esta é uma execução de workflow com pasta própria: ${runDir.dir} (diretório atual). Grave aqui tudo o que gerar (relatórios, rascunhos, planilhas, screenshots, arquivos intermediários); os outros passos desta execução leem daqui. Outras execuções do mesmo workflow podem estar rodando ao mesmo tempo, cada uma na sua pasta: nunca grave arquivos gerados fora desta pasta.`,
+      `- Arquivos do projeto ficam em ${runDir.root}: leia de lá à vontade; só altere arquivos do projeto quando o passo pedir isso explicitamente.`,
+    ] : []),
     '- Navegador: use as ferramentas mcp__playwright__* (navegador do Atria na VPS, que o usuário assiste ao vivo) para navegar, testar sites, preencher formulários e tirar screenshots. Use mcp__claude-in-chrome__* só quando precisar do Chrome real do usuário (contas logadas dele) — chame list_connected_browsers antes; se não houver navegador conectado, use o Playwright e diga isso no resultado. Screenshots com filename relativo são salvos no diretório do projeto atual.',
     '- Relatórios: se pedirem um relatório, grave JSON em /workspace/.atria/reports/<AAAA-MM-DD-HHmm>.json com {title, lead, kpis:[{value,label}], sections:[{heading, tone:"cyan"|"warn"|"ok", items:[...]}]}.',
   ].join('\n');
@@ -438,7 +465,14 @@ async function execute(run: RunRow, ac: AbortController) {
   const metaDir = config.metaDir;
   mkdirSync(join(metaDir, 'reports'), { recursive: true });
   mkdirSync(scratch, { recursive: true });
-  const cwd = project?.dir ?? scratch;
+  const root = project?.dir ?? scratch;
+  let runDir: { dir: string; root: string } | null = null;
+  if (run.workflow_run_id) {
+    runDir = { dir: workflowRunDir(root, run.workflow_run_id), root };
+    mkdirSync(runDir.dir, { recursive: true });
+    if (project) excludeFromGit(project.dir);
+  }
+  const cwd = runDir?.dir ?? root;
   const extraPatterns = (project?.approvalPatterns ?? []).map((p) => new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 
   const canUseTool: CanUseTool = async (toolName, input, { signal }) => {
@@ -494,11 +528,11 @@ async function execute(run: RunRow, ac: AbortController) {
     options: {
       cwd,
       abortController: ac,
-      additionalDirectories: [metaDir],
+      additionalDirectories: runDir ? [metaDir, root] : [metaDir],
       systemPrompt: {
         type: 'preset',
         preset: 'claude_code',
-        append: [systemAppend(agent, project?.name ?? null), runPromptExtras({ runId: run.id, agentId: agent.id, project: project?.slug ?? null, display: run.display })].filter(Boolean).join('\n'),
+        append: [systemAppend(agent, project?.name ?? null, runDir), runPromptExtras({ runId: run.id, agentId: agent.id, project: project?.slug ?? null, display: run.display })].filter(Boolean).join('\n'),
       },
       permissionMode: 'default',
       allowedTools: SAFE_TOOLS,

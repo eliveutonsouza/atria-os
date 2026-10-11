@@ -9,7 +9,8 @@ import { config } from './config.ts';
 import { db, now, uid } from './db.ts';
 import { emit, setYuiState } from './bus.ts';
 import { findAgent, loadAgents } from './agents.ts';
-import { askApproval, cancelRun, enqueueRun, expireApprovals, inboxItems, runBus } from './runs.ts';
+import { askApproval, cancelRun, enqueueRun, expireApprovals, inboxItems, runBus, workflowRunDir } from './runs.ts';
+import { findProject } from './projects.ts';
 import { registerBrain } from './extensions.ts';
 import { openai } from './brain.ts';
 import { narrate } from './live.ts';
@@ -201,8 +202,16 @@ interface RunRow {
   id: string; workflow: string; status: WorkflowRunInfo['status']; current: string | null; nodes: string; started_at: string; finished_at: string | null;
 }
 
+// Pasta própria da execução (criada pelo primeiro passo de agente); null enquanto nenhum agente rodou.
+function runDirOf(r: RunRow): string | null {
+  const slug = loadWorkflow(r.workflow)?.project;
+  const root = (slug && findProject(slug)?.dir) || join(config.metaDir, 'scratch');
+  const dir = workflowRunDir(root, r.id);
+  return existsSync(dir) ? dir : null;
+}
+
 const toInfo = (r: RunRow): WorkflowRunInfo => ({
-  id: r.id, workflow: r.workflow, status: r.status, current: r.current, nodes: JSON.parse(r.nodes), startedAt: r.started_at, finishedAt: r.finished_at,
+  id: r.id, workflow: r.workflow, status: r.status, current: r.current, nodes: JSON.parse(r.nodes), startedAt: r.started_at, finishedAt: r.finished_at, dir: runDirOf(r),
 });
 
 export function getWorkflowRun(id: string): WorkflowRunInfo | null {
