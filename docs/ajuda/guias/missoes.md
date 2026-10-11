@@ -50,3 +50,6 @@ Uma missão é um plano de execução: o objetivo vira de 2 a 8 etapas, cada uma
 - Novo cliente quer site → missão com Designer, Copy, Frontend e QA, até o deploy, sem parar (diga "me pede OK antes do deploy" se quiser revisar).
 - Auditoria antes de entregar um sistema → missão com Security, QA e Report.
 - Uma etapa falhou por falta de acesso → resolva o acesso e diga "tenta de novo a missão".
+
+## Concluída com ressalvas
+Ao terminar, a missão confere sozinha (sem gastar IA) se alguma etapa terminou sem resultado, falou em falha, parou no limite de turnos ou pedia um arquivo sem entregar nenhum. Se achar algo, a missão mostra **Concluída com ressalvas · vale conferir** com a lista, e a Yui avisa.

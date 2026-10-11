@@ -17,7 +17,7 @@ import { addClient, emit, setYuiState, yuiState } from './bus.ts';
 import { isAuthed, isAuthedCookieHeader, registerAuth, requireAuth } from './auth.ts';
 import { agentInfos, agentsWorking } from './agents.ts';
 import { activeProject, ensureProject, findProject, listProjectConfigs, projectDetail, projectLogs, projectSummaries, setActiveProject } from './projects.ts';
-import { cancelRun, claudeLoggedIn, enqueueRun, getRun, inboxItems, listRuns, pendingApprovals, recoverRuns, resolveApproval, runEvents } from './runs.ts';
+import { cancelRun, claudeLoggedIn, enqueueRun, getRun, inboxItems, listRuns, pendingApprovals, rateRun, recoverRuns, resolveApproval, runEvents } from './runs.ts';
 import { brief, infra, latestReport, overview } from './metrics.ts';
 import { getUiContext, recentMessages, setUiContext } from './brain.ts';
 import { endLive, handleText, liveActive, narrate, setUiContextNote, startLive } from './live.ts';
@@ -58,6 +58,7 @@ import * as budget from './budget.ts';
 import './telegramChat.ts';
 import * as search from './search.ts';
 import './insights.ts';
+import * as artifacts from './artifacts.ts';
 import { healthFull } from './health.ts';
 import { startClaudeUsage } from './claudeUsage.ts';
 import { agora, saudacao, startAmbiente } from './ambiente.ts';
@@ -102,7 +103,7 @@ await app.register(multipart, { limits: { fileSize: 500 * 1024 * 1024, files: 30
 registerAuth(app);
 initTerminal();
 registerTerminal(app);
-for (const mod of [missions, customViews, toolbox, agentsAdmin, workflowInputs, workflows, push, notify, stats, browserLive, browserChallenge, settings, onboarding, vault, company, help, usage, models, remindersApi, reportsApi, historyApi, projectsApi, telemetry, central, support, claudeDesign, skillsHub, approvalRules, budget, search]) mod.register(app);
+for (const mod of [missions, customViews, toolbox, agentsAdmin, workflowInputs, workflows, push, notify, stats, browserLive, browserChallenge, settings, onboarding, vault, company, help, usage, models, remindersApi, reportsApi, historyApi, projectsApi, telemetry, central, support, claudeDesign, skillsHub, approvalRules, budget, search, artifacts]) mod.register(app);
 // skill nova/removida na plataforma: relê as capacidades do Claude para aparecer nas listas
 skillsHub.setPlatformChangeHook(() => void captureInit());
 vaultAuto.register();
@@ -267,6 +268,12 @@ app.post('/api/runs', async (req, reply) => {
   } catch (e) {
     return reply.code(400).send({ error: (e as Error).message });
   }
+});
+app.post('/api/runs/:id/rating', async (req, reply) => {
+  const v = (req.body as { rating?: unknown } | undefined)?.rating;
+  if (v !== 1 && v !== -1 && v !== 0) return reply.code(400).send({ error: 'rating: 1, -1 ou 0' });
+  const r = rateRun((req.params as { id: string }).id, v);
+  return r ?? reply.code(404).send({ error: 'execução não encontrada' });
 });
 app.post('/api/runs/:id/cancel', async (req, reply) => {
   const ok = cancelRun((req.params as { id: string }).id);

@@ -2,6 +2,12 @@
 
 Versões marcadas do Atria OS. Cada tag `vX.Y.Z` publica as imagens no GHCR e pode ser aplicada pelo Atria Central (Atualizações).
 
+## v1.4.0
+Terceira fase das ideias do Paperclip/Hermes (entregas e qualidade):
+- Entregas dos agentes: registro automático do que a execução gerou (pasta do workflow, relatórios, screenshots) e ferramenta para o agente registrar o resto; lista em Artefatos com abrir, baixar, mandar no Telegram e fixar; limpeza após 30 dias; "me manda o PDF que o agente fez" por voz.
+- Nota 👍/👎 por execução (botões e voz), nas métricas por agente do balanço.
+- Missões conferem o fim sem IA: "concluída com ressalvas" quando há etapa sem resultado, falha no texto, limite de turnos ou arquivo prometido sem entrega.
+
 ## v1.3.0
 Segunda fase das ideias do Paperclip/Hermes (canal e lembrança):
 - Conversar com a Yui pelo Telegram: texto e áudio do chat vinculado, projeto próprio (/projeto), aprovações comuns com botões; exclusões só no painel.

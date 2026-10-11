@@ -120,6 +120,14 @@ function MissionDetail({ id, m, loading, error, reload, onEdit }: { id?: string;
           <div style={{ height: '100%', width: `${pct}%`, background: m.status === 'failed' ? C.crit : `linear-gradient(90deg, ${C.cyan}, ${C.violet})`, transition: 'width .4s' }} />
         </div>
       </div>
+      {m.warnings && m.warnings.length > 0 && (
+        <div role="note" style={{ maxWidth: 820, padding: '12px 14px', borderRadius: 12, background: 'rgba(245,181,74,.06)', border: '1px solid rgba(245,181,74,.28)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.08em', color: C.warn }}>CONCLUÍDA COM RESSALVAS · VALE CONFERIR</span>
+          {m.warnings.map((w) => (
+            <span key={w} style={{ fontSize: 13.5, color: '#e6d3a8', lineHeight: 1.5 }}>{w}</span>
+          ))}
+        </div>
+      )}
       <Graph steps={m.steps} />
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <Eyebrow style={{ marginBottom: 6 }}>Etapas</Eyebrow>

@@ -143,6 +143,7 @@ export interface RunInfo {
   missionId?: string | null;
   workflowRunId?: string | null;
   display?: 'blocks' | 'html' | null;
+  rating?: 1 | -1 | null; // nota do usuário (👍/👎)
 }
 
 export interface RunEventLine {
@@ -355,6 +356,7 @@ export interface MissionInfo {
   finishedAt: string | null;
   details?: string | null; // detalhes e referências do pedido (entram no planejamento)
   approvalBefore?: string[]; // "deploy" | "enviar": pedir OK antes dessas ações
+  warnings?: string[]; // checagens do fim: concluída com ressalvas (resultado vazio, falha no texto, sem entrega…)
 }
 
 // ---------- telas sob medida ----------

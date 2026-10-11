@@ -20,13 +20,14 @@ export const runBus = new EventEmitter<{
   progress: [RunInfo];
   finished: [RunInfo];
   stalled: [RunInfo];
+  rated: [RunInfo];
   approval: [ApprovalInfo];
 }>();
 
 type RunRow = {
   id: string; mission_id: string | null; step_id: string | null; workflow_run_id: string | null; routine_id: string | null; origin: string; display: 'blocks' | 'html' | null; agent_id: string; project: string | null; instruction: string; task: string; state: RunState;
   progress: number; current_op: string | null; tools: string; steps: string; result: string | null;
-  session_id: string | null; tokens_in: number; tokens_out: number; cost_usd: number; context_tokens?: number | null; context_window?: number | null; num_turns?: number | null;
+  session_id: string | null; tokens_in: number; tokens_out: number; cost_usd: number; rating?: number | null; context_tokens?: number | null; context_window?: number | null; num_turns?: number | null;
   created_at: string; started_at: string | null; finished_at: string | null;
 };
 
@@ -53,7 +54,18 @@ export function toRunInfo(r: RunRow): RunInfo {
     missionId: r.mission_id,
     workflowRunId: r.workflow_run_id,
     display: r.display,
+    rating: r.rating === 1 || r.rating === -1 ? r.rating : null,
   };
+}
+
+/** Nota do usuário para uma execução (0 = limpar). 👎 também alimenta a revisão de lições (runBus 'rated'). */
+export function rateRun(id: string, rating: 1 | -1 | 0): RunInfo | null {
+  const r = db.prepare(`UPDATE runs SET rating = ? WHERE id = ?`).run(rating || null, id);
+  if (!r.changes) return null;
+  const info = getRun(id)!;
+  emit({ type: 'run.updated', run: info });
+  runBus.emit('rated', info);
+  return info;
 }
 
 export function getRun(id: string): RunInfo | null {

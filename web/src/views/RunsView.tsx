@@ -158,6 +158,7 @@ export function RunsView() {
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button onClick={() => openResult(r.id)} style={phone ? { ...resultBtn, height: 44 } : resultBtn}>Ver resultado</button>
                         {r.missionId && <button onClick={() => useYui.getState().show('mission', { missionId: r.missionId! })} style={phone ? { ...resultBtn, height: 44 } : resultBtn}>Ver missão</button>}
+                        <RateRun run={r} phone={phone} />
                       </div>
                     </div>
                   )}
@@ -169,5 +170,31 @@ export function RunsView() {
         })}
       </div>
     </div>
+  )
+}
+
+// 👍/👎 do usuário: entra nas métricas por agente; 👎 faz o agente revisar o que errou (lições).
+function RateRun({ run, phone }: { run: RunInfo; phone: boolean }) {
+  const [rating, setRating] = useState(run.rating ?? null)
+  const rate = (v: 1 | -1) => {
+    const next = rating === v ? 0 : v
+    setRating(next || null)
+    api.post(`/api/runs/${run.id}/rating`, { rating: next }).catch(() => setRating(run.rating ?? null))
+  }
+  const btn = (v: 1 | -1, label: string, aria: string) => (
+    <button
+      aria-label={aria}
+      aria-pressed={rating === v}
+      onClick={() => rate(v)}
+      style={{ minWidth: phone ? 44 : 36, height: phone ? 44 : 32, borderRadius: 10, border: `1px solid ${rating === v ? (v === 1 ? 'rgba(79,224,176,.5)' : 'rgba(240,98,114,.5)') : 'rgba(255,255,255,.1)'}`, background: rating === v ? (v === 1 ? 'rgba(79,224,176,.12)' : 'rgba(240,98,114,.12)') : 'transparent', color: C.text, cursor: 'pointer', fontSize: 15 }}
+    >
+      {label}
+    </button>
+  )
+  return (
+    <span style={{ display: 'inline-flex', gap: 6, marginLeft: 'auto', alignItems: 'center' }}>
+      {btn(1, '👍', 'Ficou boa')}
+      {btn(-1, '👎', 'Ficou ruim')}
+    </span>
   )
 }

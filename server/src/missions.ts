@@ -12,6 +12,7 @@ import { askApproval, cancelRun, enqueueRun, expireApprovals, getRun, runBus } f
 import { openai } from './brain.ts';
 import { narrate } from './live.ts';
 import { registerBrain } from './extensions.ts';
+import { scanRunById } from './artifacts.ts';
 
 // Missões: um pedido grande vira um plano (DAG de etapas, cada uma com um agente), mostrado no Canvas
 // e executado em ordem de dependência. Resultados das etapas anteriores entram no contexto das seguintes.
@@ -40,14 +41,37 @@ addColumn('approval_before', 'TEXT');
 
 type MissionRow = {
   id: string; title: string; goal: string; project: string | null; status: MissionInfo['status']; plan_json: string; created_at: string; finished_at: string | null;
-  details: string | null; approval_before: string | null;
+  details: string | null; approval_before: string | null; warnings?: string | null;
 };
 
 function toInfo(r: MissionRow): MissionInfo {
   return {
     id: r.id, title: r.title, goal: r.goal, project: r.project, status: r.status, steps: JSON.parse(r.plan_json), createdAt: r.created_at, finishedAt: r.finished_at,
     details: r.details, approvalBefore: r.approval_before ? (JSON.parse(r.approval_before) as string[]) : [],
+    warnings: r.warnings ? (JSON.parse(r.warnings) as string[]) : [],
   };
+}
+
+if (!db.prepare(`SELECT 1 FROM pragma_table_info('missions') WHERE name = 'warnings'`).get()) db.exec(`ALTER TABLE missions ADD COLUMN warnings TEXT`);
+
+// Checagens determinísticas ao fim da missão (ideia do revisor do Paperclip, sem chamar IA de novo):
+// resultado vazio ou com cara de falha, execução que estourou os turnos, etapa que prometia arquivo sem entrega.
+const FAIL_MARKS = /\b(não consegui|nao consegui|não foi possível|nao foi possivel|falhou|falha ao|erro ao|bloqueado|sem acesso|não encontrei)\b/i;
+const FILE_PROMISE = /\b(pdf|planilha|relatório|relatorio|arquivo|imagem|screenshot|documento|apresentação|xlsx|csv)\b/i;
+export function missionWarnings(m: Pick<MissionInfo, 'steps'>): string[] {
+  const out: string[] = [];
+  for (const s of m.steps) {
+    if (s.status !== 'done') continue;
+    const res = (s.result ?? '').trim();
+    if (!res) out.push(`${s.title}: terminou sem resultado escrito.`);
+    else if (FAIL_MARKS.test(res.slice(0, 600))) out.push(`${s.title}: o resultado fala em falha ("${(FAIL_MARKS.exec(res)?.[0] ?? '').toLowerCase()}").`);
+    if (s.runId) {
+      const r = db.prepare(`SELECT result, num_turns FROM runs WHERE id = ?`).get(s.runId) as { result: string | null; num_turns: number | null } | undefined;
+      if (r?.result?.includes('error_max_turns')) out.push(`${s.title}: parou no limite de turnos.`);
+      if (FILE_PROMISE.test(s.instruction) && !db.prepare(`SELECT 1 FROM artifacts WHERE run_id = ? LIMIT 1`).get(s.runId)) out.push(`${s.title}: pedia um arquivo, mas nenhuma entrega foi registrada.`);
+    }
+  }
+  return out.slice(0, 6);
 }
 
 export function getMission(id: string): MissionInfo | null {
@@ -65,7 +89,7 @@ function latestActive(): MissionInfo | null {
 }
 
 function save(m: MissionInfo) {
-  db.prepare('UPDATE missions SET status = ?, plan_json = ?, finished_at = ? WHERE id = ?').run(m.status, JSON.stringify(m.steps), m.finishedAt, m.id);
+  db.prepare('UPDATE missions SET status = ?, plan_json = ?, finished_at = ?, warnings = ? WHERE id = ?').run(m.status, JSON.stringify(m.steps), m.finishedAt, m.warnings?.length ? JSON.stringify(m.warnings) : null, m.id);
   emit({ type: 'mission.updated', mission: m });
 }
 
@@ -441,6 +465,7 @@ function finishIfDone(id: string) {
   const doneCount = m.steps.filter((s) => s.status === 'done').length;
   m.status = failed.length ? 'failed' : doneCount === 0 ? 'cancelled' : 'done';
   m.finishedAt = now();
+  if (m.status === 'done') m.warnings = missionWarnings(m);
   save(m);
   if (m.status === 'cancelled') {
     narrate(`Missão ${m.title} encerrada sem executar etapas.`, { speak: true });
@@ -450,8 +475,10 @@ function finishIfDone(id: string) {
   narrate(
     failed.length
       ? `A missão ${m.title} terminou com ${failed.length} etapa${failed.length > 1 ? 's' : ''} com falha. ${failed[0].title}: ${(failed[0].result ?? '').slice(0, 200)}`
-      : `Missão ${m.title} concluída: ${doneCount} etapas. ${(last?.result ?? '').slice(0, 300)}`,
-    { speak: true, end: failed.length ? 'warning' : 'success' },
+      : m.warnings?.length
+        ? `Missão ${m.title} concluída com ressalvas: ${m.warnings[0]}${m.warnings.length > 1 ? ` E mais ${m.warnings.length - 1}.` : ''} Vale conferir.`
+        : `Missão ${m.title} concluída: ${doneCount} etapas. ${(last?.result ?? '').slice(0, 300)}`,
+    { speak: true, end: failed.length || m.warnings?.length ? 'warning' : 'success' },
   );
   showMissionResult(m);
 }
@@ -476,6 +503,7 @@ runBus.on('finished', (run: RunInfo) => {
   if (!step) return;
   if (m.status === 'cancelled') return; // etapa já marcada como cancelada
   step.result = run.result;
+  if (run.state === 'done') scanRunById(run.id); // entregas registradas antes das checagens do fim
   if (run.state === 'done') {
     step.status = 'done';
     narrate(`Etapa concluída: ${step.title} (${step.agent}).`, { speak: false });

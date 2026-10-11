@@ -50,3 +50,14 @@ Cada vez que um agente trabalha nasce uma execução. Esta tela lista todas, das
 
 ## Execução calada
 Se uma execução fica sem nenhuma atividade por 20 min (ajustável em Configurações › Agentes & aprovações › Limites e segurança), a Yui avisa e a linha mostra "Sem atividade há N min". No dobro do tempo ela para, para liberar a vaga, e o resultado diz o motivo. Execuções esperando sua aprovação ou uma verificação no navegador não contam.
+
+## Nota 👍/👎
+No fim de cada execução concluída há 👍 e 👎. A nota entra no balanço por agente ("como foi minha semana?") e 👎 faz o agente revisar o que errou.
+- Por voz: "essa ficou ruim" ou "gostei do relatório" (vale para a última execução concluída; a Yui confirma qual foi).
+
+## Entregas (arquivos que os agentes geram)
+Os arquivos que os agentes produzem aparecem em Artefatos › **Entregas dos agentes**:
+- Entram sozinhos: o que cai na pasta da execução de workflow, os relatórios e as imagens novas do projeto (screenshots). Os agentes registram o resto (PDF, planilha, documento final).
+- Cada linha tem **Abrir**, **Baixar**, **Telegram** (manda o arquivo no seu Telegram), **Execução** e **Fixar**.
+- Entregas não fixadas saem da lista depois de 30 dias. Arquivos fora da pasta .atria do projeto nunca são apagados, só saem da lista.
+- Por voz: "Yui, me manda o PDF que o agente fez ontem" ou "quais arquivos saíram hoje?".
