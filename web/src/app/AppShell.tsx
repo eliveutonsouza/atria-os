@@ -36,6 +36,7 @@ export const PAGE_TITLES: Record<AppPage, [string, string]> = {
   more: ['Menu', 'Mais'],
   usage: ['Sistema · consumo de inteligência artificial', 'Consumo de IA'],
   reminders: ['Organizar · lembretes', 'Lembretes'],
+  artifacts: ['Acompanhar · entregas dos agentes', 'Artefatos'],
 }
 
 // Cabeçalho padrão ao trocar de página; a página (ou a view reaproveitada) sobrescreve via useHeader.

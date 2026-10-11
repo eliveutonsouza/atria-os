@@ -62,3 +62,16 @@ test('cópia isolada: aplicar leva as mudanças ao projeto; descartar apaga a c�
   assert.ok(cmp.discardCompare('r-drop'));
   assert.ok(!existsSync(wt2));
 });
+
+test('aplicar com mudanças não salvas da original: recusa com a lista e substitui quando pedido', () => {
+  writeFileSync(join(proj, 'NOTAS.md'), 'da original\n'); // não commitado
+  const wt = join(ws, '.atria', 'compare', 'r-conf');
+  g('worktree', 'add', '--detach', wt, 'HEAD');
+  writeFileSync(join(wt, 'NOTAS.md'), 'da refeita\n');
+  db.prepare(`INSERT INTO runs(id, agent_id, project, instruction, task, state, created_at, compare_of, worktree) VALUES('r-conf', 'backend', 'stoq', 'x', 'x', 'done', ?, 'o1', ?)`).run(now(), wt);
+  assert.throws(() => cmp.applyCompare('r-conf'), (e: unknown) => e instanceof cmp.CompareConflict && (e as InstanceType<typeof cmp.CompareConflict>).conflicts.includes('NOTAS.md'));
+  assert.equal(readFileSync(join(proj, 'NOTAS.md'), 'utf8'), 'da original\n');
+  cmp.applyCompare('r-conf', true);
+  assert.equal(readFileSync(join(proj, 'NOTAS.md'), 'utf8'), 'da refeita\n');
+  assert.ok(!existsSync(wt));
+});

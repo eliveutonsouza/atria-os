@@ -75,7 +75,7 @@ function parsePath(path: string): { view: ViewName; params: ViewParams } | null 
 
 // /app/<página>/<id?>/<sub?> = dashboard (Yui minimizada); demais rotas = modo Yui.
 // sub: segundo nível de detalhe (/app/workflows/pedido/<id> = formulário de um pedido de informação).
-const APP_PAGES = new Set(['overview', 'ops', 'agents', 'runs', 'missions', 'workflows', 'schedule', 'projects', 'browser', 'terminal', 'claude', 'tools', 'inbox', 'infra', 'settings', 'vault', 'brain', 'company', 'help', 'more', 'usage', 'reminders', 'skills'])
+const APP_PAGES = new Set(['overview', 'ops', 'agents', 'runs', 'missions', 'workflows', 'schedule', 'projects', 'browser', 'terminal', 'claude', 'tools', 'inbox', 'infra', 'settings', 'vault', 'brain', 'company', 'help', 'more', 'usage', 'reminders', 'skills', 'artifacts'])
 function appPathFor(page: string, p: Record<string, string>) {
   const base = page === 'overview' ? '/app' : `/app/${page}`
   if (!p.id) return base

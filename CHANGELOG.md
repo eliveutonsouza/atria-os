@@ -2,6 +2,13 @@
 
 Versões marcadas do Atria OS. Cada tag `vX.Y.Z` publica as imagens no GHCR e pode ser aplicada pelo Atria Central (Atualizações).
 
+## v1.6.1
+Correções achadas no teste de ponta a ponta numa instalação de teste:
+- "Rodar agora" de uma rotina não fica mais preso esperando o limite do Claude (é pedido seu).
+- Ficar com a refeita: quando a execução original deixou mudanças não salvas nos mesmos arquivos, o Atria lista os arquivos e pergunta antes de substituir (antes, falhava).
+- Artefatos virou página do painel (menu Acompanhar), como no canvas aprovado.
+- Botão de pendências no celular com 44 px e nome acessível.
+
 ## v1.6.0
 - Entregas com pré-visualização: lista com filtros (documentos, imagens, planilhas, fixados, projeto, busca) e o arquivo aberto ao lado (PDF, imagem, CSV, Markdown, texto); no celular, tela cheia com as ações embaixo.
 - Refazer com outro modelo e comparar: a refeita roda numa cópia isolada do projeto (sem push, deploy ou envios); original e refeita lado a lado, com "Ficar com a refeita" (aplica no projeto) ou "Descartar cópia"; também por voz.

@@ -66,5 +66,5 @@ Os arquivos que os agentes produzem aparecem em Artefatos › **Entregas dos age
 Numa execução concluída, **Refazer com outro modelo** roda a mesma tarefa, com o mesmo agente, em outro modelo.
 - Em projeto com git, a refeita trabalha numa cópia isolada do projeto e o original não muda. Sem git, ela só pode ler.
 - Push, deploy, publicação e envios por conectores ficam bloqueados na refeita.
-- **Comparar** mostra original e refeita lado a lado (modelo, tempo, turnos, custo, arquivos mudados e nota). **Ficar com a refeita** aplica as mudanças da cópia no projeto; **Descartar cópia** apaga a cópia. Cópias esquecidas saem em 7 dias.
+- **Comparar** mostra original e refeita lado a lado (modelo, tempo, turnos, custo, arquivos mudados e nota). **Ficar com a refeita** aplica as mudanças da cópia no projeto (se a original deixou mudanças não salvas nos mesmos arquivos, o Atria mostra quais são e pergunta antes de substituir); **Descartar cópia** apaga a cópia. Cópias esquecidas saem em 7 dias.
 - Por voz: "Yui, refaz isso com o Opus e compara".

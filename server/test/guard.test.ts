@@ -130,3 +130,11 @@ test('versões do agente: edição guarda cópia; restaurar volta e guarda a atu
   assert.equal(admin.agentVersions('backend').length, 2); // a editada foi para o histórico
   assert.ok('error' in admin.restoreAgentVersion('backend', '../../etc/passwd'));
 });
+
+test('"rodar agora" de rotina é manual: não espera o limite', () => {
+  const reset = new Date(Date.now() + 3600_000).toISOString();
+  kvSet('claude_limits', JSON.stringify({ at: now(), limits: [{ kind: 'five_hour', label: '', pct: 99, resetsAt: reset }] }));
+  assert.equal(budget.gate({ id: 'm', project: null, origin: 'manual', routine_id: 'r1', workflow_run_id: null }), null);
+  assert.match(budget.gate({ id: 'a', project: null, origin: 'routine', routine_id: 'r1', workflow_run_id: null }) ?? '', /Aguardando limite/);
+  kvSet('claude_limits', JSON.stringify({ at: now(), limits: [] }));
+});

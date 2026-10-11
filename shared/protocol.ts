@@ -541,7 +541,7 @@ export interface RoutineInfo {
 export type AppPage =
   | 'overview' | 'ops' | 'agents' | 'runs' | 'missions' | 'workflows' | 'schedule' | 'projects'
   | 'browser' | 'terminal' | 'claude' | 'tools' | 'inbox' | 'infra' | 'settings'
-  | 'vault' | 'brain' | 'company' | 'help' | 'more' | 'usage' | 'reminders' | 'skills';
+  | 'vault' | 'brain' | 'company' | 'help' | 'more' | 'usage' | 'reminders' | 'skills' | 'artifacts';
 
 export interface StatsOverview {
   kpis: { runsToday: number; runsYesterday: number; success7d: number | null; failed7d: number; agentsActive: number; agentsTotal: number; approvals: number; cost7d: number; tokens7d: number };

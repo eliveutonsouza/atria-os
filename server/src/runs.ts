@@ -149,8 +149,9 @@ export function addStartGate(g: (r: GateRun) => string | null) {
 }
 export const kickQueue = () => setImmediate(pump);
 /** Disparada sem o usuário pedir na hora: rotina, ou passo de workflow que uma rotina iniciou. */
-export function isAutomaticRun(r: Pick<GateRun, 'routine_id' | 'workflow_run_id'>): boolean {
-  if (r.routine_id) return true;
+export function isAutomaticRun(r: Pick<GateRun, 'routine_id' | 'workflow_run_id'> & { origin?: string | null }): boolean {
+  // "Rodar agora" de uma rotina é pedido seu (origin manual): não espera o limite
+  if (r.routine_id) return r.origin !== 'manual';
   if (!r.workflow_run_id) return false;
   const w = db.prepare(`SELECT origin FROM workflow_runs WHERE id = ?`).get(r.workflow_run_id) as { origin: string | null } | undefined;
   return w?.origin === 'routine';

@@ -109,6 +109,7 @@ export function CompareModal({ runId, onClose }: { runId: string; onClose: () =>
   const [data, setData] = useState<Comparison | null>(null)
   const [pick, setPick] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [conflict, setConflict] = useState<string | null>(null)
   const load = () => api.get<Comparison>(`/api/runs/${runId}/comparison`).then(setData).catch(() => setData(null))
   useEffect(() => {
     void load()
@@ -118,15 +119,19 @@ export function CompareModal({ runId, onClose }: { runId: string; onClose: () =>
   }, [runId])
   const ref = data?.refeitas[pick] ?? data?.refeitas.at(-1)
   const rate = (id: string) => (v: 1 | -1) => api.post(`/api/runs/${id}/rating`, { rating: v }).then(load).catch(() => {})
-  const act = async (what: 'apply' | 'discard') => {
+  const act = async (what: 'apply' | 'discard', replace = false) => {
     if (!ref) return
     setBusy(true)
     try {
-      const r = await api.post<{ stat?: string }>(`/api/runs/${ref.run.id}/compare/${what}`)
+      const r = await api.post<{ stat?: string }>(`/api/runs/${ref.run.id}/compare/${what}`, replace ? { replace: true } : undefined)
       useYui.getState().say(what === 'apply' ? `Apliquei as mudanças da refeita no projeto${r?.stat ? ` (${r.stat})` : ''}.` : 'Descartei a cópia da refeita.', { state: 'success' })
+      setConflict(null)
       void load()
     } catch (e) {
-      useYui.getState().say((e as Error).message, { state: 'warning' })
+      const msg = (e as Error).message
+      // mudanças não salvas (em geral da execução original) nos mesmos arquivos: pergunta antes de substituir
+      if (what === 'apply' && /mudanças não salvas/.test(msg)) setConflict(msg)
+      else useYui.getState().say(msg, { state: 'warning' })
     } finally {
       setBusy(false)
     }
@@ -157,7 +162,16 @@ export function CompareModal({ runId, onClose }: { runId: string; onClose: () =>
         <SideCard s={data.original} label="Original" accent={false} onRate={rate(data.original.run.id)} />
         {ref ? <SideCard s={ref} label="Refeita" accent onRate={ref.run.state === 'done' ? rate(ref.run.id) : undefined} /> : <span style={{ color: C.t3, fontSize: 13 }}>Nenhuma refeita ainda.</span>}
       </div>
-      {ref?.worktree && ref.run.state === 'done' && (
+      {conflict && (
+        <div role="alert" style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(245,181,74,.06)', border: '1px solid rgba(245,181,74,.3)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <span style={{ fontSize: 13.5, color: '#e6d3a8', lineHeight: 1.5 }}>Não apliquei: {conflict}. Substituir esses arquivos pelos da refeita? O que a original deixou neles será perdido.</span>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            <button onClick={() => setConflict(null)} style={btn}>Cancelar</button>
+            <button disabled={busy} onClick={() => void act('apply', true)} style={{ ...btn, border: 'none', background: '#f5b54a', color: '#1a1205', fontWeight: 700 }}>Substituir pelos da refeita</button>
+          </div>
+        </div>
+      )}
+      {ref?.worktree && ref.run.state === 'done' && !conflict && (
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
           <button disabled={busy} onClick={() => void act('discard')} style={btn}>Descartar cópia</button>
           <button disabled={busy} onClick={() => void act('apply')} style={{ ...btn, border: 'none', background: C.cyan, color: '#06221c', fontWeight: 700 }}>Ficar com a refeita</button>

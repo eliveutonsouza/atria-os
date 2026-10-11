@@ -163,7 +163,8 @@ export function TopBar() {
         {inbox.length > 0 && (
           <button
             onClick={() => set({ inboxOpen: !useYui.getState().inboxOpen })}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, height: bh, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(245,181,74,.25)', background: 'rgba(245,181,74,.06)', color: '#f5c97a', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            aria-label={`${inbox.length} pendências`}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, height: bh, minWidth: coarse ? 44 : undefined, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(245,181,74,.25)', background: 'rgba(245,181,74,.06)', color: '#f5c97a', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
           >
             <span>{inbox.length}</span>
             {!narrow && <span style={{ fontWeight: 500 }}>pendências</span>}

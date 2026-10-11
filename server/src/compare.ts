@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, rmSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { RunInfo } from '../../shared/protocol.ts';
 import { config } from './config.ts';
@@ -71,8 +71,20 @@ function worktreeOf(id: string): { wt: string; project: string } {
   return { wt: r.worktree, project: p.dir };
 }
 
-/** "Ficar com a refeita": aplica no projeto as mudanças da cópia (git apply com 3 vias) e descarta a cópia. */
-export function applyCompare(id: string): { ok: true; stat: string } {
+export class CompareConflict extends Error {
+  conflicts: string[];
+  constructor(conflicts: string[]) {
+    super(`o projeto tem mudanças não salvas nos mesmos arquivos (${conflicts.slice(0, 5).join(', ')}${conflicts.length > 5 ? '…' : ''}), provavelmente da execução original`);
+    this.conflicts = conflicts;
+  }
+}
+
+/**
+ * "Ficar com a refeita": aplica no projeto as mudanças da cópia e descarta a cópia.
+ * Se o projeto tiver mudanças não salvas nos mesmos arquivos (em geral, da execução original), recusa com a lista;
+ * com `replace`, esses arquivos passam a ser exatamente os da refeita.
+ */
+export function applyCompare(id: string, replace = false): { ok: true; stat: string } {
   const { wt, project } = worktreeOf(id);
   git(wt, ['add', '-A']);
   const patch = execFileSync('git', ['-C', wt, 'diff', '--cached', '--binary', 'HEAD'], { stdio: 'pipe', timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
@@ -81,7 +93,28 @@ export function applyCompare(id: string): { ok: true; stat: string } {
     return { ok: true, stat: 'sem mudanças para aplicar' };
   }
   const stat = git(wt, ['diff', '--cached', '--shortstat', 'HEAD']).trim();
-  execFileSync('git', ['-C', project, 'apply', '--3way', '--whitespace=nowarn'], { input: patch, stdio: ['pipe', 'pipe', 'pipe'], timeout: 60_000 });
+  // arquivos que a refeita mudou: "A\tcaminho", "M\tcaminho", "D\tcaminho" (renomeados viram D + A)
+  const changes = git(wt, ['diff', '--cached', '--name-status', '--no-renames', 'HEAD']).split('\n').filter(Boolean).map((l) => {
+    const [st, ...rest] = l.split('\t');
+    return { st: st[0], path: rest.join('\t') };
+  });
+  const dirty = new Set(git(project, ['status', '--porcelain', '--untracked-files=all']).split('\n').filter(Boolean).map((l) => l.slice(3).replace(/^"|"$/g, '')));
+  const conflicts = changes.map((c) => c.path).filter((p) => dirty.has(p));
+  if (conflicts.length && !replace) throw new CompareConflict(conflicts);
+  if (conflicts.length) {
+    // substituir: cada arquivo mudado pela refeita fica igual ao da cópia
+    for (const c of changes) {
+      const dest = join(project, c.path);
+      if (!dest.startsWith(`${project}/`)) continue;
+      if (c.st === 'D') rmSync(dest, { force: true });
+      else {
+        mkdirSync(dirname(dest), { recursive: true });
+        copyFileSync(join(wt, c.path), dest);
+      }
+    }
+  } else {
+    execFileSync('git', ['-C', project, 'apply', '--3way', '--whitespace=nowarn'], { input: patch, stdio: ['pipe', 'pipe', 'pipe'], timeout: 60_000 });
+  }
   discardCompare(id);
   return { ok: true, stat };
 }
@@ -159,8 +192,9 @@ export function register(app: FastifyInstance): void {
   app.get('/api/runs/:id/comparison', (req, reply) => comparison((req.params as { id: string }).id) ?? reply.code(404).send({ error: 'não encontrado' }));
   app.post('/api/runs/:id/compare/apply', (req, reply) => {
     try {
-      return applyCompare((req.params as { id: string }).id);
+      return applyCompare((req.params as { id: string }).id, (req.body as { replace?: unknown } | undefined)?.replace === true);
     } catch (e) {
+      if (e instanceof CompareConflict) return reply.code(409).send({ error: e.message, conflicts: e.conflicts });
       return reply.code(409).send({ error: `não consegui aplicar: ${(e as Error).message.split('\n')[0]}` });
     }
   });

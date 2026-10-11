@@ -65,7 +65,7 @@ function fire(r: RoutineRow, origin: 'routine' | 'manual' = 'routine') {
       void Promise.resolve(workflowRunner(r.workflow_id, { routineId: r.id, origin })).catch((e) => console.error(`rotina ${r.name}:`, (e as Error).message));
       return;
     }
-    enqueueRun({ agentId: r.agent_id, project: r.project, instruction: r.instruction, task: r.name, origin: 'routine', routineId: r.id });
+    enqueueRun({ agentId: r.agent_id, project: r.project, instruction: r.instruction, task: r.name, origin: origin === 'manual' ? 'manual' : 'routine', routineId: r.id });
   } catch (e) {
     console.error(`rotina ${r.name}:`, (e as Error).message);
   }

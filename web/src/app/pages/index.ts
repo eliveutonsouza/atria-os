@@ -23,6 +23,7 @@ import { MorePage } from './MorePage'
 import { UsagePage } from './UsagePage'
 import { RemindersPage } from './RemindersPage'
 import { SkillsPage } from './SkillsPage'
+import { ArtifactsView } from '../../views/ArtifactsView'
 
 // Registro das páginas do dashboard (/app/<página>). Cada página lê `appParams.id` quando tem detalhe.
 export const PAGES: Record<AppPage, ComponentType> = {
@@ -49,4 +50,5 @@ export const PAGES: Record<AppPage, ComponentType> = {
   usage: UsagePage,
   reminders: RemindersPage,
   skills: SkillsPage,
+  artifacts: ArtifactsView, // entregas com pré-visualização, sites, relatórios e telas da Yui
 }

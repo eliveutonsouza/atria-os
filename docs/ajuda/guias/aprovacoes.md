@@ -27,7 +27,7 @@ relacionados: [celular, execucoes, missoes, workflows]
 Por padrão tudo roda no automático: agentes fazem push, deploy, docker, enviam e publicam sem perguntar. O Atria OS só para em quatro casos:
 - **Passo de Aprovação de workflow** marcado "Sempre me perguntar", ou em que a Yui não teve certeza. Nos demais, ela decide sozinha com base nas suas decisões anteriores naquele workflow.
 - **Etapa de missão** em que você pediu aprovação no pedido.
-- **Padrões do projeto** em atria.json › approvalPatterns.
+- **Padrões do projeto** em atria.json › approvalPatterns. Valem para comandos que mudam algo (push, deploy, apagar, instalar); comandos só de leitura (echo, ls, cat, git status) o Claude Code libera sozinho e nunca pedem aprovação.
 - **Exclusão de workflow ou missão** pedida à Yui (cartão vermelho).
 
 Algumas ações nunca rodam, nem com aprovação: apagar a raiz, o home, o workspace ou /data inteiros, formatar disco, DROP DATABASE, prune do Docker, mexer nos stacks de produção protegidos (Twenty qcjv, Twenty jonyxmidia, n8n wesu) e force push na main/master. O agente é avisado e segue sem elas.
