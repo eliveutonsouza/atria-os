@@ -138,3 +138,13 @@ test('"rodar agora" de rotina é manual: não espera o limite', () => {
   assert.match(budget.gate({ id: 'a', project: null, origin: 'routine', routine_id: 'r1', workflow_run_id: null }) ?? '', /Aguardando limite/);
   kvSet('claude_limits', JSON.stringify({ at: now(), limits: [] }));
 });
+
+test('evento de limite sem porcentagem não apaga o valor lido', async () => {
+  const cu = await import('../src/claudeUsage.ts');
+  kvSet('claude_limits', JSON.stringify({ at: now(), limits: [{ kind: 'five_hour', label: 'five_hour', pct: 97, resetsAt: '2030-01-01T00:00:00.000Z' }] }));
+  cu.saveRateLimit({ rateLimitType: 'five_hour', status: 'allowed', resetsAt: 1893456000 });
+  const l = cu.claudeLimits()!.limits.find((x) => x.kind === 'five_hour')!;
+  assert.equal(l.pct, 97);
+  assert.equal(l.status, 'allowed');
+  kvSet('claude_limits', JSON.stringify({ at: now(), limits: [] }));
+});

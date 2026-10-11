@@ -120,9 +120,12 @@ export function listArtifacts(opts: { project?: string | null; runId?: string; q
     where.push('(title LIKE ? OR path LIKE ?)');
     args.push(`%${opts.q}%`, `%${opts.q}%`);
   }
-  const rows = db.prepare(`SELECT * FROM artifacts ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY created_at DESC LIMIT ?`).all(...args, Math.min(200, opts.limit ?? 50)) as Row[];
-  // arquivo apagado do disco some da lista
-  return rows.map(toEntrega).filter((e) => existsSync(e.path));
+  const limit = Math.min(200, opts.limit ?? 50);
+  const rows = db.prepare(`SELECT * FROM artifacts ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY created_at DESC LIMIT ?`).all(...args, limit * 4) as Row[];
+  // arquivo apagado do disco sai do índice (e da lista) antes de contar o limite
+  const gone = rows.filter((r) => !existsSync(r.path));
+  for (const r of gone) db.prepare(`DELETE FROM artifacts WHERE id = ?`).run(r.id);
+  return rows.filter((r) => !gone.includes(r)).slice(0, limit).map(toEntrega);
 }
 
 // Arquivos novos (mtime ≥ início da execução) numa pasta; recursivo só na pasta da execução.

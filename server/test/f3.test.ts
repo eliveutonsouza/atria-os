@@ -75,3 +75,18 @@ test('checagens do fim da missão: vazio, falha no texto e arquivo prometido sem
   assert.match(w[1], /falha/);
   assert.match(w[2], /nenhuma entrega/);
 });
+
+test('lista de entregas: arquivo apagado sai do índice e não esconde os outros no limite', async () => {
+  const { rmSync } = await import('node:fs');
+  const a = join(ws, 'stoq', 'velha.md');
+  const b = join(ws, 'stoq', 'nova.md');
+  writeFileSync(a, 'a');
+  writeFileSync(b, 'b');
+  art.registerArtifact(a, { project: 'stoq', runId: null });
+  await new Promise((r) => setTimeout(r, 5));
+  art.registerArtifact(b, { project: 'stoq', runId: null });
+  rmSync(b);
+  const one = art.listArtifacts({ limit: 1 });
+  assert.equal(one.length, 1);
+  assert.notEqual(one[0].path, b);
+});

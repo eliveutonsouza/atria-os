@@ -30,7 +30,12 @@ export function claudeModels(): { value: string; displayName: string; descriptio
 function merge(next: UsageLimit[]) {
   const cur = claudeLimits()?.limits ?? [];
   const map = new Map(cur.map((l) => [l.kind, l]));
-  for (const l of next) map.set(l.kind, { ...map.get(l.kind), ...l });
+  // evento sem a porcentagem (só status/reinício) não apaga o que já foi lido
+  for (const l of next) {
+    const prev = map.get(l.kind);
+    const clean = Object.fromEntries(Object.entries(l).filter(([, v]) => v !== null && v !== undefined)) as Partial<UsageLimit>;
+    map.set(l.kind, { ...(prev ?? { kind: l.kind, label: l.label, pct: null, resetsAt: null }), ...clean } as UsageLimit);
+  }
   const order = (k: string) => (WINDOWS as readonly string[]).indexOf(k) === -1 ? 99 : (WINDOWS as readonly string[]).indexOf(k);
   kvSet('claude_limits', JSON.stringify({ at: now(), limits: [...map.values()].sort((a, b) => order(a.kind) - order(b.kind)) }));
 }
