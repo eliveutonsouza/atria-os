@@ -2,6 +2,9 @@
 
 Versões marcadas do Atria OS. Cada tag `vX.Y.Z` publica as imagens no GHCR e pode ser aplicada pelo Atria Central (Atualizações).
 
+## v1.6.3
+- Entregas: "Abrir em nova aba" para PDF e HTML (o leitor de PDF de alguns navegadores não abre dentro do painel).
+
 ## v1.6.2
 - Limite do Claude: aviso de limite sem porcentagem (que chega durante as execuções) não apaga mais o valor lido; o orçamento voltava a ficar cego no meio da janela.
 - Entregas: arquivo apagado do disco sai do índice antes de contar o limite (a página podia aparecer vazia).

@@ -122,6 +122,8 @@ export function Entregas() {
   const primary = { ...ghost, border: 'none', background: C.cyan, color: '#06221c', fontWeight: 700 } as const
   const chip = (on: boolean) => ({ height: 34, padding: '0 12px', borderRadius: 9, border: `1px solid ${on ? 'rgba(103,216,242,.4)' : 'rgba(255,255,255,.1)'}`, background: on ? 'rgba(103,216,242,.1)' : 'transparent', color: on ? '#a9e9f8' : '#c9cde0', fontSize: 13, fontWeight: on ? 600 : 500, cursor: 'pointer' }) as const
   const actions = (e: Entrega) => [
+    // leitor de PDF do navegador às vezes não abre dentro do painel (ou no celular): aba própria
+    ...(['pdf', 'html'].includes(ext(e)) ? [<a key="tab" style={ghost} href={fileUrl(e)} target="_blank" rel="noreferrer">Abrir em nova aba</a>] : []),
     <button key="pin" style={ghost} aria-pressed={e.pinned} onClick={() => void pin(e)}>{e.pinned ? 'Soltar' : 'Fixar'}</button>,
     ...(e.runId ? [<button key="run" style={ghost} onClick={() => useYui.getState().show('runs', { runId: e.runId! })}>Execução</button>] : []),
     <a key="dl" style={ghost} href={fileUrl(e, true)}>Baixar</a>,
