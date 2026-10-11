@@ -52,6 +52,41 @@ function writeAgent(a: AgentDef, keepHistory = true) {
   invalidateAgents();
 }
 
+export interface AgentVersion { file: string; at: string; name: string; description: string; promptChars: number }
+
+export function agentVersions(id: string): AgentVersion[] {
+  if (!existsSync(historyDir())) return [];
+  const re = new RegExp(`^${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-(\\d{4}-\\d{2}-\\d{2}T[\\d-]+Z)\\.md$`);
+  return readdirSync(historyDir())
+    .map((f) => ({ f, m: re.exec(f) }))
+    .filter((x): x is { f: string; m: RegExpExecArray } => !!x.m)
+    .map(({ f, m }) => {
+      const raw = readFileSync(join(historyDir(), f), 'utf8');
+      const fm = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(raw);
+      const field = (k: string) => (fm ? new RegExp(`^${k}:\\s*(.*)$`, 'm').exec(fm[1])?.[1]?.replace(/^["']|["']$/g, '') ?? '' : '');
+      // 2026-10-11T17-30-00-000Z -> ISO
+      const at = m[1].replace(/^(\d{4}-\d{2}-\d{2}T)(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/, '$1$2:$3:$4.$5Z');
+      return { file: f, at, name: field('name'), description: field('description').slice(0, 200), promptChars: (fm?.[2] ?? raw).trim().length };
+    })
+    .sort((x, y) => y.at.localeCompare(x.at))
+    .slice(0, 50);
+}
+
+export function restoreAgentVersion(id: string, file: string): AgentConfig | { error: string } {
+  if (!agentVersions(id).some((v) => v.file === file)) return { error: 'versão não encontrada' };
+  const target = join(agentsDir(), `${id}.md`);
+  if (existsSync(target)) {
+    mkdirSync(historyDir(), { recursive: true });
+    cpSync(target, join(historyDir(), `${id}-${new Date().toISOString().replace(/[:.]/g, '-')}.md`));
+  }
+  const tmp = `${target}.tmp`;
+  writeFileSync(tmp, readFileSync(join(historyDir(), file)));
+  renameSync(tmp, target);
+  invalidateAgents();
+  const a = findAny(id);
+  return a ? toConfig(a) : { error: 'a versão restaurada não é um agente válido' };
+}
+
 export const slugify = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'agente';
 
@@ -228,6 +263,30 @@ export function deleteAgent(id: string, replaceWith: string | null): { ok: true;
   return { ok: true, reassigned: rep ? usage.length : 0 };
 }
 
+// "Volta o Dev para a versão anterior": restaura a cópia mais recente (a atual vai para o histórico).
+registerBrain({
+  name: 'agentes-versoes',
+  instructions: '- "Volta o agente X para a versão anterior / desfaz a mudança no agente X" => restaurar_agente (1 frase de confirmação).',
+  tools: [
+    {
+      type: 'function', name: 'restaurar_agente', strict: true,
+      description: 'Restaura um agente para a versão salva antes da última edição (reversível: a versão atual vai para o histórico).',
+      parameters: { type: 'object', additionalProperties: false, properties: { agente: { type: 'string', description: 'id ou nome do agente' } }, required: ['agente'] },
+    },
+  ],
+  run(tool, args, ctx) {
+    if (tool !== 'restaurar_agente') return undefined;
+    const q = String(args.agente ?? '').toLowerCase();
+    const a = loadAllAgents().find((x) => x.id === q || x.name.toLowerCase() === q) ?? loadAllAgents().find((x) => x.name.toLowerCase().includes(q));
+    if (!a) return Promise.resolve({ ok: false, error: 'agente não encontrado' });
+    const v = agentVersions(a.id)[0];
+    if (!v) return Promise.resolve({ ok: false, error: `${a.name} não tem versão anterior salva` });
+    if (ctx.dryRun) return Promise.resolve({ ok: true, agente: a.name, versao_de: v.at });
+    const r = restoreAgentVersion(a.id, v.file);
+    return Promise.resolve('error' in r ? { ok: false, error: r.error } : { ok: true, agente: r.name, versao_de: v.at });
+  },
+});
+
 export function register(app: FastifyInstance): void {
   seedMissingAgents();
 
@@ -259,6 +318,22 @@ export function register(app: FastifyInstance): void {
     const copy: AgentDef = { ...a, id: uniqueId(`${a.id}-copia`), name: `${a.name} (cópia)`, archived: false };
     writeAgent(copy, false);
     return toConfig(copy);
+  });
+
+  // Versões anteriores do agente (cópia feita a cada edição) e restauração: a versão atual vai para o
+  // histórico antes, então dá para voltar atrás da restauração também.
+  app.get('/api/agents/:id/versions', async (req, reply) => {
+    const a = findAny((req.params as { id: string }).id);
+    if (!a) return reply.code(404).send({ error: 'not found' });
+    return agentVersions(a.id);
+  });
+
+  app.post('/api/agents/:id/restore', async (req, reply) => {
+    const a = findAny((req.params as { id: string }).id);
+    if (!a) return reply.code(404).send({ error: 'not found' });
+    const file = (req.body as { file?: unknown } | undefined)?.file;
+    const r = restoreAgentVersion(a.id, typeof file === 'string' ? file : '');
+    return 'error' in r ? reply.code(400).send(r) : r;
   });
 
   app.get('/api/agents/:id/usage', async (req, reply) => {

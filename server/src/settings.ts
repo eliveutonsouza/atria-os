@@ -37,6 +37,14 @@ export const SETTINGS: Record<string, Def> = {
   'models.embed': { kind: 'string', env: 'ATRIA_EMBED_MODEL', def: 'text-embedding-3-small', maxLen: 60 },
   'pricing.openai': { kind: 'string', def: '', maxLen: 4000 },
   'runs.concurrency': { kind: 'number', env: 'ATRIA_MAX_CONCURRENT_RUNS', def: 4, min: 1, max: 8 },
+  // Watchdog: minutos sem atividade para avisar (aborta no dobro); 0 = desligado.
+  'runs.silenceMin': { kind: 'number', def: 20, min: 0, max: 240 },
+  // Orçamento (budget.ts): % das janelas do plano Claude para avisar e para segurar o que é automático
+  // (rotinas e workflows disparados por rotina); teto diário da OpenAI em US$ (0 = sem teto); teto por execução automática (0 = sem).
+  'budget.warnPct': { kind: 'number', def: 80, min: 10, max: 100 },
+  'budget.stopPct': { kind: 'number', def: 95, min: 10, max: 100 },
+  'budget.openaiDailyUsd': { kind: 'number', def: 0, min: 0, max: 1000 },
+  'budget.runMaxUsd': { kind: 'number', def: 0, min: 0, max: 500 },
   'voice.name': { kind: 'string', env: 'ATRIA_VOICE', def: 'marin', maxLen: 40 },
   'voice.idleMin': { kind: 'number', env: 'ATRIA_LIVE_IDLE_MIN', def: 5, min: 1, max: 60 },
   'voice.pttKey': { kind: 'enum', def: 'Space', options: ['Space', 'Backquote', 'F8', 'AltRight'] },

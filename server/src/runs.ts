@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { query, type CanUseTool, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import type { ApprovalInfo, InboxItem, RunInfo, RunEventLine, RunState, RunStep } from '../../shared/protocol.ts';
+import type { ApprovalInfo, ApprovalRule, InboxItem, RunInfo, RunEventLine, RunState, RunStep } from '../../shared/protocol.ts';
 import { config } from './config.ts';
 import { db, kvGet, kvSet, now, uid } from './db.ts';
 import { emit } from './bus.ts';
@@ -13,16 +13,18 @@ import { designInboxItems } from './claudeDesign.ts';
 import { getSetting } from './settings.ts';
 import { blockedReason } from './safety.ts';
 import { saveRateLimit } from './claudeUsage.ts';
+import { addRule, matchRule, ruleKey } from './approvalRules.ts';
 
 // Eventos para a camada de conversa (live.ts / brain.ts) narrar o trabalho.
 export const runBus = new EventEmitter<{
   progress: [RunInfo];
   finished: [RunInfo];
+  stalled: [RunInfo];
   approval: [ApprovalInfo];
 }>();
 
 type RunRow = {
-  id: string; mission_id: string | null; step_id: string | null; workflow_run_id: string | null; display: 'blocks' | 'html' | null; agent_id: string; project: string | null; instruction: string; task: string; state: RunState;
+  id: string; mission_id: string | null; step_id: string | null; workflow_run_id: string | null; routine_id: string | null; origin: string; display: 'blocks' | 'html' | null; agent_id: string; project: string | null; instruction: string; task: string; state: RunState;
   progress: number; current_op: string | null; tools: string; steps: string; result: string | null;
   session_id: string | null; tokens_in: number; tokens_out: number; cost_usd: number; context_tokens?: number | null; context_window?: number | null; num_turns?: number | null;
   created_at: string; started_at: string | null; finished_at: string | null;
@@ -84,12 +86,17 @@ function patch(id: string, fields: Partial<Record<keyof RunRow, unknown>>): RunI
 }
 
 function logEvent(runId: string, kind: RunEventLine['kind'], text: string) {
+  lastEventAt.set(runId, Date.now());
   db.prepare('INSERT INTO run_events(run_id, t, kind, text) VALUES(?, ?, ?, ?)').run(runId, now(), kind, text.slice(0, 4000));
 }
 
 // ---------- fila ----------
 
 const running = new Map<string, AbortController>();
+// Watchdog (ideia do Paperclip): execução calada há N min avisa; 2N aborta. Quem espera o usuário fica de fora.
+const lastEventAt = new Map<string, number>();
+const stallWarned = new Set<string>();
+const abortReason = new Map<string, string>();
 // Execuções paradas esperando o usuário (aprovação/verificação humana) não ocupam vaga: o limite
 // vale para quem está de fato trabalhando. Teto rígido de 2× protege a memória do container.
 const waiting = new Set<string>();
@@ -116,6 +123,29 @@ export function holdQueue(on: boolean) {
   if (!on) setImmediate(pump);
 }
 export const queueHeld = () => held;
+
+// Portões de início (budget.ts): uma execução enfileirada que um portão segura continua na fila com o motivo
+// em current_op ("Aguardando limite…") e as outras seguem. kickQueue() reavalia quando o motivo passa.
+export interface GateRun { id: string; project: string | null; origin: string; routine_id: string | null; workflow_run_id: string | null }
+const gates: ((r: GateRun) => string | null)[] = [];
+export function addStartGate(g: (r: GateRun) => string | null) {
+  gates.push(g);
+}
+export const kickQueue = () => setImmediate(pump);
+/** Disparada sem o usuário pedir na hora: rotina, ou passo de workflow que uma rotina iniciou. */
+export function isAutomaticRun(r: Pick<GateRun, 'routine_id' | 'workflow_run_id'>): boolean {
+  if (r.routine_id) return true;
+  if (!r.workflow_run_id) return false;
+  const w = db.prepare(`SELECT origin FROM workflow_runs WHERE id = ?`).get(r.workflow_run_id) as { origin: string | null } | undefined;
+  return w?.origin === 'routine';
+}
+export const gateReason = (r: GateRun): string | null => {
+  for (const g of gates) {
+    const why = g(r);
+    if (why) return why;
+  }
+  return null;
+};
 /** Execuções em andamento (rodando ou esperando aprovação). */
 export const busyRuns = () => (db.prepare(`SELECT COUNT(*) AS n FROM runs WHERE state IN ('running','waiting_approval')`).get() as { n: number }).n;
 
@@ -156,17 +186,29 @@ export function enqueueRun(input: EnqueueInput): RunInfo {
 
 function pump() {
   while (!held && hasFreeSlot()) {
-    const queued = db.prepare(`SELECT id, project FROM runs WHERE state = 'queued' ORDER BY created_at LIMIT 50`).all() as { id: string; project: string | null }[];
+    const rows = db.prepare(`SELECT id, project, origin, routine_id, workflow_run_id, current_op FROM runs WHERE state = 'queued' ORDER BY created_at LIMIT 50`).all() as (GateRun & { current_op: string | null })[];
+    const queued = rows.filter((r) => {
+      const why = gateReason(r);
+      if (why && r.current_op !== why) patch(r.id, { current_op: why });
+      return !why;
+    });
     const pick = pickNext(queued, new Set([...projectOf.entries()].filter(([id]) => !waiting.has(id)).map(([, p]) => p)));
     if (!pick) return;
     const next = db.prepare(`SELECT * FROM runs WHERE id = ?`).get(pick.id) as RunRow;
     const ac = new AbortController();
     running.set(next.id, ac);
     projectOf.set(next.id, next.project);
+    lastEventAt.set(next.id, Date.now());
     patch(next.id, { state: 'running', started_at: now(), current_op: 'Acordando…' });
     emit({ type: 'agents.updated', agentsWorking: agentsWorking() });
     execute(next, ac)
       .catch((err) => {
+        const stalled = abortReason.get(next.id);
+        if (ac.signal.aborted && stalled) {
+          logEvent(next.id, 'error', stalled);
+          runBus.emit('finished', patch(next.id, { state: 'failed', finished_at: now(), current_op: 'Parada sem atividade', result: `Falhou: ${stalled}` }));
+          return;
+        }
         if (ac.signal.aborted) {
           logEvent(next.id, 'system', 'cancelado pelo usuário');
           runBus.emit('finished', patch(next.id, { state: 'cancelled', finished_at: now(), current_op: 'Cancelado', result: 'Cancelado.' }));
@@ -180,11 +222,36 @@ function pump() {
         running.delete(next.id);
         waiting.delete(next.id);
         projectOf.delete(next.id);
+        lastEventAt.delete(next.id);
+        stallWarned.delete(next.id);
+        abortReason.delete(next.id);
         emit({ type: 'agents.updated', agentsWorking: agentsWorking() });
         setImmediate(pump);
       });
   }
 }
+
+/** Minutos sem nenhum evento para avisar (0 = desligado); aborta no dobro. */
+export function checkStalled(nowMs = Date.now(), silenceMin = Number(getSetting('runs.silenceMin') ?? 20)) {
+  if (!silenceMin || silenceMin <= 0) return;
+  for (const [id, ac] of running) {
+    if (waiting.has(id)) {
+      lastEventAt.set(id, nowMs); // esperar o usuário não conta como silêncio
+      continue;
+    }
+    const idle = (nowMs - (lastEventAt.get(id) ?? nowMs)) / 60_000;
+    if (idle >= silenceMin * 2) {
+      abortReason.set(id, `sem nenhuma atividade há ${Math.round(idle)} min; parei para liberar a vaga.`);
+      ac.abort();
+    } else if (idle >= silenceMin && !stallWarned.has(id)) {
+      stallWarned.add(id);
+      const info = patch(id, { current_op: `Sem atividade há ${Math.round(idle)} min` });
+      logEvent(id, 'system', `Watchdog: sem atividade há ${Math.round(idle)} min (aborta em ${silenceMin * 2} min).`);
+      runBus.emit('stalled', info);
+    }
+  }
+}
+setInterval(() => checkStalled(), 60_000).unref();
 
 export function cancelRun(id: string): boolean {
   const ac = running.get(id);
@@ -253,10 +320,11 @@ function describeTool(name: string, input: Record<string, unknown>): string {
 }
 
 // Aprovação genérica (modal do painel). `ownerId` = run, missão ou execução de workflow.
-export async function askApproval(ownerId: string, title: string, rows: ApprovalInfo['rows'], signal?: AbortSignal, opts: { kind?: ApprovalInfo['kind'] } = {}): Promise<boolean> {
+export async function askApproval(ownerId: string, title: string, rows: ApprovalInfo['rows'], signal?: AbortSignal, opts: { kind?: ApprovalInfo['kind']; rule?: ApprovalRule | null } = {}): Promise<boolean> {
   const id = uid();
-  db.prepare(`INSERT INTO approvals(id, run_id, title, rows, created_at, kind) VALUES(?, ?, ?, ?, ?, ?)`).run(id, ownerId, title, JSON.stringify(rows), now(), opts.kind ?? null);
-  const approval: ApprovalInfo = { id, runId: ownerId, title, rows, createdAt: now(), ...(opts.kind ? { kind: opts.kind } : {}) };
+  const rule = opts.kind === 'destructive' ? null : (opts.rule ?? null);
+  db.prepare(`INSERT INTO approvals(id, run_id, title, rows, created_at, kind, rule) VALUES(?, ?, ?, ?, ?, ?, ?)`).run(id, ownerId, title, JSON.stringify(rows), now(), opts.kind ?? null, rule ? JSON.stringify(rule) : null);
+  const approval: ApprovalInfo = { id, runId: ownerId, title, rows, createdAt: now(), ...(opts.kind ? { kind: opts.kind } : {}), ...(rule ? { rule } : {}) };
   emit({ type: 'approval.requested', approval });
   emit({ type: 'inbox.updated', inbox: inboxItems() });
   runBus.emit('approval', approval);
@@ -268,10 +336,10 @@ export async function askApproval(ownerId: string, title: string, rows: Approval
   return approved;
 }
 
-async function requestApproval(run: RunRow, title: string, rows: ApprovalInfo['rows'], signal: AbortSignal): Promise<boolean> {
+async function requestApproval(run: RunRow, title: string, rows: ApprovalInfo['rows'], signal: AbortSignal, rule: ApprovalRule | null = null): Promise<boolean> {
   patch(run.id, { state: 'waiting_approval', current_op: 'Aguardando sua aprovação' });
   setWaiting(run.id, true);
-  const approved = await askApproval(run.id, title, rows, signal).finally(() => setWaiting(run.id, false));
+  const approved = await askApproval(run.id, title, rows, signal, { rule }).finally(() => setWaiting(run.id, false));
   patch(run.id, { state: 'running', current_op: approved ? 'Aprovado — continuando' : 'Rejeitado — ajustando' });
   return approved;
 }
@@ -297,9 +365,13 @@ export function expireApprovals(ownerId: string) {
 
 const waiters = new Map<string, (ok: boolean) => void>();
 
-export function resolveApproval(id: string, approved: boolean): boolean {
+export function resolveApproval(id: string, approved: boolean, remember = false): boolean {
   const r = db.prepare(`UPDATE approvals SET status = ?, resolved_at = ? WHERE id = ? AND status = 'pending'`).run(approved ? 'approved' : 'rejected', now(), id);
   if (!r.changes) return false;
+  if (remember) {
+    const row = db.prepare(`SELECT rule, kind FROM approvals WHERE id = ?`).get(id) as { rule: string | null; kind: string | null } | undefined;
+    if (row?.rule && row.kind !== 'destructive') addRule(JSON.parse(row.rule) as ApprovalRule, approved ? 'allow' : 'deny');
+  }
   waiters.get(id)?.(approved);
   emit({ type: 'approval.resolved', approvalId: id, approved });
   emit({ type: 'inbox.updated', inbox: inboxItems() });
@@ -308,9 +380,9 @@ export function resolveApproval(id: string, approved: boolean): boolean {
 
 export function pendingApprovals(): ApprovalInfo[] {
   const rows = db.prepare(`SELECT * FROM approvals WHERE status = 'pending' ORDER BY created_at`).all() as {
-    id: string; run_id: string; title: string; rows: string; created_at: string; kind: string | null;
+    id: string; run_id: string; title: string; rows: string; created_at: string; kind: string | null; rule: string | null;
   }[];
-  return rows.map((r) => ({ id: r.id, runId: r.run_id, title: r.title, rows: JSON.parse(r.rows), createdAt: r.created_at, ...(r.kind === 'destructive' ? { kind: 'destructive' as const } : {}) }));
+  return rows.map((r) => ({ id: r.id, runId: r.run_id, title: r.title, rows: JSON.parse(r.rows), createdAt: r.created_at, ...(r.kind === 'destructive' ? { kind: 'destructive' as const } : r.rule ? { rule: JSON.parse(r.rule) as ApprovalRule } : {}) }));
 }
 
 // Outros módulos (suporte remoto e avisos, support.ts) somam itens ao inbox e decidem como dispensá-los.
@@ -422,7 +494,7 @@ function excludeFromGit(projectDir: string) {
   } catch { /* repo somente leitura: segue sem */ }
 }
 
-function systemAppend(agent: AgentDef, projectName: string | null, runDir?: { dir: string; root: string } | null): string {
+function systemAppend(agent: AgentDef, projectName: string | null, runDir?: { dir: string; root: string } | null, goal?: string | null): string {
   return [
     `Você é o ${agent.name}, um agente da força de trabalho da Yui, no Atria OS.`,
     agent.prompt,
@@ -433,6 +505,7 @@ function systemAppend(agent: AgentDef, projectName: string | null, runDir?: { di
     '- Você trabalha no automático: não peça confirmação ao usuário, siga até entregar. Comandos catastróficos (apagar raiz/workspace, formatar disco, DROP DATABASE, mexer em stacks de produção protegidos, force push na main) são bloqueados; se um comando for negado, siga sem ele.',
     '- Resposta final: 1 a 3 frases em português, no estilo de status para ser falado em voz alta (o que foi feito, resultado, próximo passo).',
     projectName ? `- Projeto atual: ${projectName}.` : '- Sem projeto específico: trabalhe em /workspace/.atria/scratch.',
+    ...(projectName && goal ? [`- Objetivo do projeto (o "por quê" das tarefas daqui; use para decidir prioridades e detalhes): ${goal}`] : []),
     ...(runDir ? [
       `- Esta é uma execução de workflow com pasta própria: ${runDir.dir} (diretório atual). Grave aqui tudo o que gerar (relatórios, rascunhos, planilhas, screenshots, arquivos intermediários); os outros passos desta execução leem daqui. Outras execuções do mesmo workflow podem estar rodando ao mesmo tempo, cada uma na sua pasta: nunca grave arquivos gerados fora desta pasta.`,
       `- Arquivos do projeto ficam em ${runDir.root}: leia de lá à vontade; só altere arquivos do projeto quando o passo pedir isso explicitamente.`,
@@ -486,6 +559,16 @@ async function execute(run: RunRow, ac: AbortController) {
         return { behavior: 'deny', message: `Comando bloqueado por segurança (${blocked}). Não tente contornar; siga sem ele e explique no resultado.` };
       }
       if (extraPatterns.some((re) => re.test(cmd))) {
+        const saved = matchRule('bash', cmd, agent.id, run.project);
+        if (saved === 'allow') {
+          logEvent(run.id, 'system', `Regra salva: sempre permitir "${ruleKey('bash', cmd)}"`);
+          return { behavior: 'allow', updatedInput: input };
+        }
+        if (saved === 'deny') {
+          logEvent(run.id, 'system', `Regra salva: sempre bloquear "${ruleKey('bash', cmd)}"`);
+          return { behavior: 'deny', message: 'O usuário bloqueou este comando para você neste projeto. Continue sem ele e explique no resultado.' };
+        }
+        const bashKey = ruleKey('bash', cmd);
         const ok = await requestApproval(
           run,
           `${agent.name} quer executar um comando sensível${project ? ` no ${project.name}` : ''}.`,
@@ -495,6 +578,7 @@ async function execute(run: RunRow, ac: AbortController) {
             { label: 'Projeto', value: project?.name ?? '—' },
           ],
           signal,
+          bashKey ? { kind: 'bash', key: bashKey, agentId: agent.id, project: run.project } : null,
         );
         return ok ? { behavior: 'allow', updatedInput: input } : { behavior: 'deny', message: 'O usuário rejeitou este comando. Continue sem executá-lo e explique no resultado.' };
       }
@@ -502,6 +586,16 @@ async function execute(run: RunRow, ac: AbortController) {
     }
     // Conectores/MCP com efeito externo irreversível (enviar e-mail, publicar, pagar…) pedem aprovação.
     if (toolName.startsWith('mcp__') && getSetting('approvals.mcpSensitive') !== false && SENSITIVE_MCP.test(toolName.split('__').pop() ?? '')) {
+      const saved = matchRule('mcp', toolName, agent.id, run.project);
+      if (saved === 'allow') {
+        logEvent(run.id, 'system', `Regra salva: sempre permitir ${toolName}`);
+        return { behavior: 'allow', updatedInput: input };
+      }
+      if (saved === 'deny') {
+        logEvent(run.id, 'system', `Regra salva: sempre bloquear ${toolName}`);
+        return { behavior: 'deny', message: 'O usuário bloqueou esta ação para você neste projeto. Continue sem ela e explique no resultado.' };
+      }
+      const mcpKey = ruleKey('mcp', toolName);
       const ok = await requestApproval(
         run,
         `${agent.name} quer usar ${toolLabel(toolName)} (${toolName.split('__').pop()}).`,
@@ -511,6 +605,7 @@ async function execute(run: RunRow, ac: AbortController) {
           { label: 'Agente', value: agent.name },
         ],
         signal,
+        mcpKey ? { kind: 'mcp', key: mcpKey, agentId: agent.id, project: run.project } : null,
       );
       return ok ? { behavior: 'allow', updatedInput: input } : { behavior: 'deny', message: 'O usuário rejeitou esta ação. Continue sem ela e explique no resultado.' };
     }
@@ -532,7 +627,7 @@ async function execute(run: RunRow, ac: AbortController) {
       systemPrompt: {
         type: 'preset',
         preset: 'claude_code',
-        append: [systemAppend(agent, project?.name ?? null, runDir), runPromptExtras({ runId: run.id, agentId: agent.id, project: project?.slug ?? null, display: run.display })].filter(Boolean).join('\n'),
+        append: [systemAppend(agent, project?.name ?? null, runDir, project?.goal ?? null), runPromptExtras({ runId: run.id, agentId: agent.id, project: project?.slug ?? null, display: run.display })].filter(Boolean).join('\n'),
       },
       permissionMode: 'default',
       allowedTools: SAFE_TOOLS,
@@ -544,12 +639,15 @@ async function execute(run: RunRow, ac: AbortController) {
       extraArgs: { chrome: null },
       model: agent.model || config.claudeModel || undefined,
       maxTurns: 80,
+      // freio opcional contra loop em execução automática (estimativa do SDK em US$, não cobrança do plano)
+      ...(Number(getSetting('budget.runMaxUsd') ?? 0) > 0 && isAutomaticRun(run) ? { maxBudgetUsd: Number(getSetting('budget.runMaxUsd')) } : {}),
       env: claudeEnv(),
       ...perAgent,
     },
   });
 
   for await (const msg of q as AsyncIterable<SDKMessage>) {
+    lastEventAt.set(run.id, Date.now());
     if (msg.type === 'system' && msg.subtype === 'init') {
       patch(run.id, { session_id: msg.session_id });
       logEvent(run.id, 'system', `session ${msg.session_id} · cwd ${cwd}`);

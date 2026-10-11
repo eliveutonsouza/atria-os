@@ -59,3 +59,7 @@ Pela Yui: "Demite o agente X" abre um modal de aprovação vermelho; nada é apa
 - Precisa de um especialista em tráfego pago → "Yui, cria um agente de tráfego pago que analisa campanhas e sugere ajustes."
 - O Research falhou três vezes hoje → aba Execuções, abra a última e veja o erro.
 - Não usa mais o Security e quer limpar a equipe → Demitir, escolha quem assume as rotinas dele e confirme.
+
+## Versões anteriores
+Cada edição de um agente guarda uma cópia da versão anterior. Na ficha do agente, **Versões anteriores › Ver versões › Restaurar** volta para uma delas. A versão atual vai para o histórico antes, então dá para desfazer a restauração também.
+- Por voz: "Yui, volta o Dev para a versão anterior".

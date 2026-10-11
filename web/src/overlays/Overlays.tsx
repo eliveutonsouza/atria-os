@@ -215,6 +215,7 @@ export function CommandPalette() {
 }
 
 export function ApprovalModal() {
+  const [remember, setRemember] = useState(false)
   const id = useYui((s) => s.approvalOpen)
   const ap = useYui((s) => (s.approvalOpen ? s.approvals[s.approvalOpen] : null))
   const mode = useYui((s) => s.mode)
@@ -223,6 +224,7 @@ export function ApprovalModal() {
   const btnRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (ap) setTimeout(() => btnRef.current?.focus(), 50)
+    setRemember(false)
   }, [ap])
   if (!id || !ap) return null
   const phone = device === 'phone'
@@ -255,6 +257,14 @@ export function ApprovalModal() {
           </div>
         ))}
       </div>
+      {!danger && ap.rule && (
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, color: C.t2, cursor: 'pointer', lineHeight: 1.4 }}>
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} style={{ marginTop: 3, width: 18, height: 18, flexShrink: 0 }} />
+          <span>
+            Lembrar esta decisão para <span className="mono" style={{ color: C.text }}>{ap.rule.key}</span> deste agente neste projeto (revogável em Configurações › Agentes e aprovações)
+          </span>
+        </label>
+      )}
       <button ref={danger ? undefined : btnRef} onClick={review} style={{ height: tall - 4, flexShrink: 0, borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.03)', color: '#dfe3f3', fontSize: 14, cursor: 'pointer' }}>{danger ? 'Ver o que será excluído' : 'Revisar alterações'}</button>
       {/* botões de decisão sempre visíveis no pé (o resto rola se faltar altura) */}
       <div style={{ display: 'flex', gap: 10, position: 'sticky', bottom: 0, paddingTop: 4, background: phone ? '#0e1022' : 'rgba(14,16,34,.97)', flexShrink: 0 }}>
@@ -265,8 +275,8 @@ export function ApprovalModal() {
           </>
         ) : (
           <>
-            <button onClick={() => resolveApproval(ap.id, false)} style={{ flex: 1, height: tall, borderRadius: 12, border: '1px solid rgba(240,98,114,.35)', background: 'transparent', color: '#f39aa4', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Rejeitar</button>
-            <button onClick={() => resolveApproval(ap.id, true)} style={{ flex: 1, height: tall, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#4fe0b0,#67d8f2)', color: '#06221c', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Aprovar</button>
+            <button onClick={() => resolveApproval(ap.id, false, remember)} style={{ flex: 1, height: tall, borderRadius: 12, border: '1px solid rgba(240,98,114,.35)', background: 'transparent', color: '#f39aa4', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>{remember ? 'Sempre bloquear' : 'Rejeitar'}</button>
+            <button onClick={() => resolveApproval(ap.id, true, remember)} style={{ flex: 1, height: tall, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#4fe0b0,#67d8f2)', color: '#06221c', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>{remember ? 'Sempre permitir' : 'Aprovar'}</button>
           </>
         )}
       </div>

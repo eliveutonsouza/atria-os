@@ -214,6 +214,8 @@ export function AgentDetailView({ onGone }: { onGone?: () => void } = {}) {
         )}
       </section>
 
+      <AgentVersions agentId={data.id} agentName={data.name} onRestored={reload} />
+
       <section style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="eyebrow" style={{ marginBottom: 8 }}>Execuções nas últimas 24h</div>
         {data.runs.length ? (
@@ -234,6 +236,47 @@ export function AgentDetailView({ onGone }: { onGone?: () => void } = {}) {
         )}
       </section>
     </div>
+  )
+}
+
+// Versões anteriores (cópia a cada edição): restaurar guarda a atual no histórico, então dá para voltar.
+interface AgentVersion { file: string; at: string; name: string; description: string; promptChars: number }
+function AgentVersions({ agentId, agentName, onRestored }: { agentId: string; agentName: string; onRestored: () => void }) {
+  const versions = useApi<AgentVersion[]>(`/api/agents/${encodeURIComponent(agentId)}/versions`, [agentId])
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState<string | null>(null)
+  const list = versions.data ?? []
+  const restore = async (v: AgentVersion) => {
+    setBusy(v.file)
+    try {
+      await api.post(`/api/agents/${encodeURIComponent(agentId)}/restore`, { file: v.file })
+      useYui.getState().say(`${agentName} voltou para a versão de ${new Date(v.at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}. A anterior ficou no histórico.`, { state: 'success' })
+      versions.reload()
+      onRestored()
+    } catch (e) {
+      useYui.getState().say(`Não consegui restaurar: ${(e as Error).message}`, { state: 'warning' })
+    } finally {
+      setBusy(null)
+    }
+  }
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+        <span className="eyebrow">Versões anteriores</span>
+        <span style={{ fontSize: 12, color: C.t3 }}>{list.length ? `${list.length} salvas` : 'nenhuma ainda (é salva a cada edição)'}</span>
+        {list.length > 0 && <SmallBtn onClick={() => setOpen(!open)}>{open ? 'Esconder' : 'Ver versões'}</SmallBtn>}
+      </div>
+      {open &&
+        list.map((v) => (
+          <div key={v.file} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.05)', flexWrap: 'wrap', fontSize: 13 }}>
+            <span style={{ whiteSpace: 'nowrap' }}>{new Date(v.at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+            <span style={{ color: C.t2, flex: '1 1 180px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {v.name || agentName} · prompt com {v.promptChars} caracteres
+            </span>
+            <SmallBtn onClick={() => void restore(v)}>{busy === v.file ? 'Restaurando…' : 'Restaurar'}</SmallBtn>
+          </div>
+        ))}
+    </section>
   )
 }
 

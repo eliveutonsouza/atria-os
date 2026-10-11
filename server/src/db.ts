@@ -150,6 +150,7 @@ addColumn('runs', 'workflow_run_id', 'TEXT');
 addColumn('runs', 'display', 'TEXT');
 addColumn('routines', 'workflow_id', 'TEXT');
 addColumn('approvals', 'kind', 'TEXT');
+addColumn('approvals', 'rule', 'TEXT'); // regra que dá para salvar ao decidir (approvalRules.ts)
 addColumn('runs', 'context_tokens', 'INTEGER');
 addColumn('runs', 'context_window', 'INTEGER');
 addColumn('runs', 'num_turns', 'INTEGER');

@@ -167,6 +167,8 @@ export function usageSummary(days = 7) {
       custo_equivalente: usd(r.claude.cost),
       contexto_ultima_execucao: r.claude.lastContext ? `${Math.round((r.claude.lastContext.used / r.claude.lastContext.window) * 100)}% (${r.claude.lastContext.agent})` : null,
     },
+    // rotinas automáticas seguradas pelo orçamento (budget.ts)
+    pausadas_por_limite: (db.prepare(`SELECT COUNT(*) AS n FROM runs WHERE state = 'queued' AND (current_op LIKE 'Aguardando limite%' OR current_op LIKE 'Aguardando teto%')`).get() as { n: number }).n,
     openai: {
       hoje: usd(r.openai.today),
       sete_dias: usd(r.openai.d7),

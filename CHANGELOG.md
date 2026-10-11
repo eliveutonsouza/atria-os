@@ -2,6 +2,14 @@
 
 Versões marcadas do Atria OS. Cada tag `vX.Y.Z` publica as imagens no GHCR e pode ser aplicada pelo Atria Central (Atualizações).
 
+## v1.2.0
+Primeira fase das ideias trazidas do Paperclip e do Hermes (proteção, sem custo de tokens):
+- Orçamento pelo % do plano Claude: acima do limite (padrão 95%), rotinas e workflows disparados por rotina esperam a janela reiniciar; o que você pede na hora sempre roda. Aviso em 80%, teto diário opcional da OpenAI e teto opcional por execução automática.
+- Watchdog: execução sem atividade por 20 min gera aviso; no dobro, para e libera a vaga.
+- Aprovações com "Lembrar esta decisão": sempre permitir/bloquear uma ação exata, por agente e projeto, revogável (Configurações e por voz).
+- Objetivo do projeto: entra no prompt de todos os agentes do projeto; editável no painel e por voz.
+- Versões anteriores do agente: ver e restaurar (também por voz).
+
 ## v1.1.1
 - Cada execução de workflow tem pasta própria (`<projeto>/.atria/execucoes/<workflow>/<data>-<id>`), compartilhada pelos passos dela: dá para rodar o mesmo workflow várias vezes ao mesmo tempo sem uma sobrescrever os arquivos da outra. A pasta aparece no histórico de execuções do workflow e fica fora do git do projeto.
 

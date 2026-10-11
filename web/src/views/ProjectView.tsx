@@ -16,6 +16,7 @@ interface ProjectSettings {
   container?: string
   preview?: string
   approvalPatterns?: string[]
+  goal?: string
 }
 
 export function ProjectView() {
@@ -75,6 +76,7 @@ function ProjectSettingsCard({ slug, editing, setEditing, onSaved, onRemove }: {
   const c = cfg.data
   const rows: [string, string][] = c
     ? [
+        ['Objetivo', c.goal || '—'],
         ['URL de saúde', c.healthUrl || '—'],
         ['Container dos logs', c.container || '—'],
         ['Pasta de preview', c.preview || '—'],
@@ -122,7 +124,7 @@ function ProjectSettingsCard({ slug, editing, setEditing, onSaved, onRemove }: {
 
 function SettingsForm({ slug, initial: c, onCancel, onSaved }: { slug: string; initial: ProjectSettings; onCancel: () => void; onSaved: () => void }) {
   const phone = useYui((s) => s.device === 'phone')
-  const [form, setForm] = useState({ name: c.name ?? '', healthUrl: c.healthUrl ?? '', container: c.container ?? '', preview: c.preview ?? '', patterns: (c.approvalPatterns ?? []).join('\n') })
+  const [form, setForm] = useState({ name: c.name ?? '', healthUrl: c.healthUrl ?? '', container: c.container ?? '', preview: c.preview ?? '', patterns: (c.approvalPatterns ?? []).join('\n'), goal: c.goal ?? '' })
   const [err, setErr] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -136,6 +138,7 @@ function SettingsForm({ slug, initial: c, onCancel, onSaved }: { slug: string; i
         container: form.container,
         preview: form.preview,
         approvalPatterns: form.patterns.split('\n').map((l) => l.trim()).filter(Boolean),
+        goal: form.goal,
       })
       useYui.getState().say('Configuração do projeto salva.')
       onSaved()
@@ -151,6 +154,11 @@ function SettingsForm({ slug, initial: c, onCancel, onSaved }: { slug: string; i
       <Field label="Nome">
         <input style={input} value={form.name} onChange={set('name')} placeholder={slug} />
       </Field>
+      <div style={{ gridColumn: '1 / -1' }}>
+        <Field label="Objetivo do projeto" hint="O porquê do projeto. Os agentes leem isso em toda tarefa daqui.">
+          <textarea style={{ ...input, minHeight: 64, resize: 'vertical' }} maxLength={600} value={form.goal} onChange={set('goal')} placeholder="Ex.: levar o Stoqmate a 50 clientes pagantes até dezembro; prioridade é estabilidade." />
+        </Field>
+      </div>
       <Field label="URL de saúde" hint="Testada a cada minuto; fora do ar vira alerta.">
         <input style={input} value={form.healthUrl} onChange={set('healthUrl')} placeholder="https://meusite.com/health" inputMode="url" />
       </Field>

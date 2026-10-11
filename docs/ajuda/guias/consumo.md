@@ -45,3 +45,11 @@ A página reúne os dois lados do gasto com inteligência artificial. Do lado do
 - Antes de mandar uma missão grande → olhe a sessão de 5 h; se estiver acima de 80%, espere o reinício ou divida a missão.
 - Fim do mês → período **30 dias** para ver quanto a voz e o cérebro custaram e qual agente mais pesou.
 - Pergunta rápida por voz → "Yui, quanto falta do limite do Claude?" e ela responde com a porcentagem e o horário de reinício.
+
+## Limites automáticos
+Em Configurações › Agentes & aprovações › Limites e segurança:
+- **Avisar em (%)**: quando a janela de 5 h ou a semana do Claude passa disso, a Yui avisa (uma vez por janela).
+- **Pausar automáticas em (%)**: acima disso, rotinas e workflows disparados por rotina esperam na fila com "Aguardando limite do Claude (reinicia HH:MM)" e voltam sozinhos quando a janela reinicia. O que você pede na hora sempre roda. Você recebe aviso pela Yui, Telegram e push.
+- **Teto diário OpenAI (US$)**: acima dele, workflows automáticos esperam o dia seguinte; a conversa com a Yui continua.
+- **Teto por execução automática (US$)**: freio contra loop (estimativa do Claude Code). 0 = sem teto.
+- "Yui, quanto falta do limite?" também diz quantas rotinas estão pausadas pelo limite.

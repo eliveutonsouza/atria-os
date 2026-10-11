@@ -47,3 +47,6 @@ Cada vez que um agente trabalha nasce uma execução. Esta tela lista todas, das
 - Algo falhou de madrugada → filtre "falhou", abra e diga à Yui "tenta de novo corrigindo…".
 - Agente demorando demais numa tarefa errada → Cancelar e peça de novo com instrução mais clara.
 - Histórico poluído com testes antigos → Limpar antigas › 30 dias.
+
+## Execução calada
+Se uma execução fica sem nenhuma atividade por 20 min (ajustável em Configurações › Agentes & aprovações › Limites e segurança), a Yui avisa e a linha mostra "Sem atividade há N min". No dobro do tempo ela para, para liberar a vaga, e o resultado diz o motivo. Execuções esperando sua aprovação ou uma verificação no navegador não contam.

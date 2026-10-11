@@ -49,3 +49,10 @@ Algumas ações nunca rodam, nem com aprovação: apagar a raiz, o home, o works
 - "Cria uma missão para o site e me pede OK antes do deploy" → só a etapa de deploy para aqui.
 - Você pediu "exclui o workflow teste" → cartão vermelho; Excluir definitivamente apaga.
 - Para pedidos extras de um projeto (ex.: "npm run deploy"), o projeto pode listar padrões em atria.json › approvalPatterns.
+
+## Lembrar a decisão
+Em comando sensível de projeto e em ação de conector (enviar, publicar…), o card mostra **Lembrar esta decisão**. Marcado, **Aprovar** vira **Sempre permitir** e **Rejeitar** vira **Sempre bloquear**.
+- Vale só para aquela ação exata (uma ferramenta de conector, ou comando + subcomando como `git push`), só para aquele agente e só naquele projeto.
+- Comando encadeado (`&&`, `;`, `|`) nunca herda a regra e volta a pedir aprovação.
+- Exclusões (cartão vermelho) e o que é sempre bloqueado por segurança nunca viram regra.
+- Para ver ou remover: Configurações › Agentes & aprovações › Regras salvas, ou "Yui, o que eu liberei para os agentes?" / "volta a me pedir aprovação para o git push".

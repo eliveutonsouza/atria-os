@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import type { ModelOption, ModelsCatalog, SettingsPayload, SetupStatus } from '@shared/protocol'
+import type { ApprovalRuleInfo, ModelOption, ModelsCatalog, SettingsPayload, SetupStatus } from '@shared/protocol'
 import { api, ApiError } from '../../../api/client'
 import { C } from '../../../lib/colors'
 import { ago } from '../../../lib/format'
@@ -488,12 +488,73 @@ export function AgentsApprovalsSection() {
         </label>
         <SaveMsg msg={msg} />
       </Section>
+      <SavedRules />
+      <LimitsSection />
       <Section title="Agentes" hint="Prompt, modelo, MCP, skills e plugins de cada agente ficam na página Agentes.">
         <div>
           <SmallBtn onClick={() => useYui.getState().set({ shellMode: 'app', appPage: 'agents', appParams: {} })}>Abrir Agentes</SmallBtn>
         </div>
       </Section>
     </>
+  )
+}
+
+// Regras "sempre permitir / sempre bloquear" salvas pelo card de aprovação (por agente e projeto).
+function SavedRules() {
+  const [rules, setRules] = useState<ApprovalRuleInfo[] | null>(null)
+  const load = useCallback(() => api.get<ApprovalRuleInfo[]>('/api/approval-rules').then(setRules).catch(() => setRules([])), [])
+  useEffect(() => {
+    void load()
+  }, [load])
+  const remove = (id: string) => api.del(`/api/approval-rules/${id}`).then(load).catch(() => {})
+  return (
+    <Section title="Regras salvas" hint="Criadas pelo “Lembrar esta decisão” no card de aprovação. Valem só para aquele agente naquele projeto.">
+      {!rules?.length ? (
+        <span style={{ fontSize: 13, color: C.t3 }}>{rules ? 'Nenhuma regra salva. Toda ação sensível pede sua aprovação.' : 'Carregando…'}</span>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {rules.map((r) => (
+            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.05)', flexWrap: 'wrap' }}>
+              <StatusPill label={r.mode === 'allow' ? 'Sempre permitir' : 'Sempre bloquear'} color={r.mode === 'allow' ? C.ok : C.crit} />
+              <span className="mono" style={{ fontSize: 12.5, overflowWrap: 'anywhere', flex: '1 1 160px' }}>{r.key}</span>
+              <span style={{ fontSize: 12.5, color: C.t2 }}>{r.agentId} · {r.project ?? 'Geral'}</span>
+              <SmallBtn onClick={() => void remove(r.id)}>Remover</SmallBtn>
+            </div>
+          ))}
+        </div>
+      )}
+    </Section>
+  )
+}
+
+// Orçamento pelo % do plano Claude + teto da OpenAI + watchdog de execução calada.
+function LimitsSection() {
+  const { data, save, msg } = useSettings()
+  const keys = ['budget.warnPct', 'budget.stopPct', 'budget.openaiDailyUsd', 'budget.runMaxUsd', 'runs.silenceMin'] as const
+  const [v, setV] = useState<Record<string, number>>({})
+  useEffect(() => {
+    if (data) setV(Object.fromEntries(keys.map((k) => [k, Number(data.values[k] ?? 0)])))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data])
+  const row = (k: (typeof keys)[number], label: string, hint: string, min: number, max: number, step = 1) => (
+    <Field label={label} hint={hint}>
+      <input type="number" min={min} max={max} step={step} value={v[k] ?? ''} onChange={(e) => setV({ ...v, [k]: Number(e.target.value) })} aria-label={label} style={{ ...input, maxWidth: 140, height: 44 }} />
+    </Field>
+  )
+  return (
+    <Section title="Limites e segurança" hint="Protege o plano Claude e o bolso: o que é automático espera quando o limite chega; o que você pede na hora sempre roda.">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
+        {row('budget.warnPct', 'Avisar em (%)', 'Uso da janela de 5 h ou da semana do Claude.', 10, 100)}
+        {row('budget.stopPct', 'Pausar automáticas em (%)', 'Rotinas e workflows de rotina esperam a janela reiniciar.', 10, 100)}
+        {row('budget.openaiDailyUsd', 'Teto diário OpenAI (US$)', '0 = sem teto. Acima dele, workflows automáticos esperam o dia seguinte.', 0, 1000, 0.5)}
+        {row('budget.runMaxUsd', 'Teto por execução automática (US$)', 'Estimativa do Claude Code contra loop. 0 = sem teto.', 0, 500, 0.5)}
+        {row('runs.silenceMin', 'Execução calada (min)', 'Sem atividade por esse tempo: aviso. No dobro: a execução para. 0 = desligado.', 0, 240)}
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button type="button" style={bigBtn(true)} onClick={() => save(v)}>Salvar limites</button>
+        <SaveMsg msg={msg} />
+      </div>
+    </Section>
   )
 }
 

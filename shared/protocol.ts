@@ -158,6 +158,20 @@ export interface ApprovalInfo {
   rows: { label: string; value: string; tone?: Tone }[];
   createdAt: string;
   kind?: 'destructive'; // ação irreversível (ex.: excluir workflow/missão): modal em vermelho
+  rule?: ApprovalRule; // dá para lembrar a decisão ("sempre permitir/bloquear" para este agente neste projeto)
+}
+
+// Regra salva de aprovação (approvalRules.ts): ferramenta MCP exata ou comando + subcomando, por agente e projeto.
+export interface ApprovalRule {
+  kind: 'mcp' | 'bash';
+  key: string; // "mcp__gmail__send_email" | "git push"
+  agentId: string;
+  project: string | null;
+}
+export interface ApprovalRuleInfo extends ApprovalRule {
+  id: string;
+  mode: 'allow' | 'deny';
+  createdAt: string;
 }
 
 export interface InboxItem {
@@ -294,7 +308,8 @@ export type ServerEvent =
 // GET  /api/repos                          -> RepoInfo[]
 // GET  /api/capabilities                   -> {mcp, plugins} do último run
 // GET  /api/artifacts                      -> ArtifactInfo[]
-// POST /api/approvals/:id {approve:boolean}-> 204
+// POST /api/approvals/:id {approve:boolean, remember?:boolean}-> 204 (remember: salva a regra da aprovação, se houver)
+// GET /api/approval-rules -> ApprovalRuleInfo[] · DELETE /api/approval-rules/:id -> 204
 // POST /api/runs {agentId, project, instruction} -> RunInfo  (ação manual "Pedir correção")
 
 export interface ChatContext {

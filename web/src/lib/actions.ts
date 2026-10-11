@@ -43,11 +43,11 @@ export function sendContextDebounced() {
   }, 400)
 }
 
-export async function resolveApproval(id: string, approve: boolean) {
+export async function resolveApproval(id: string, approve: boolean, remember = false) {
   const s = useYui.getState()
   s.set({ approvalOpen: null })
   try {
-    await api.post(`/api/approvals/${id}`, { approve })
+    await api.post(`/api/approvals/${id}`, { approve, ...(remember ? { remember: true } : {}) })
   } catch {
     s.say('Não consegui registrar a decisão. Tente de novo.', { state: 'warning' })
   }

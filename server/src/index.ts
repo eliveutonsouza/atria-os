@@ -53,6 +53,8 @@ import * as claudeDesign from './claudeDesign.ts';
 import * as skillsHub from './skillsHub.ts';
 import * as central from './central.ts';
 import * as support from './support.ts';
+import * as approvalRules from './approvalRules.ts';
+import * as budget from './budget.ts';
 import { healthFull } from './health.ts';
 import { startClaudeUsage } from './claudeUsage.ts';
 import { agora, saudacao, startAmbiente } from './ambiente.ts';
@@ -97,7 +99,7 @@ await app.register(multipart, { limits: { fileSize: 500 * 1024 * 1024, files: 30
 registerAuth(app);
 initTerminal();
 registerTerminal(app);
-for (const mod of [missions, customViews, toolbox, agentsAdmin, workflowInputs, workflows, push, notify, stats, browserLive, browserChallenge, settings, onboarding, vault, company, help, usage, models, remindersApi, reportsApi, historyApi, projectsApi, telemetry, central, support, claudeDesign, skillsHub]) mod.register(app);
+for (const mod of [missions, customViews, toolbox, agentsAdmin, workflowInputs, workflows, push, notify, stats, browserLive, browserChallenge, settings, onboarding, vault, company, help, usage, models, remindersApi, reportsApi, historyApi, projectsApi, telemetry, central, support, claudeDesign, skillsHub, approvalRules, budget]) mod.register(app);
 // skill nova/removida na plataforma: relê as capacidades do Claude para aparecer nas listas
 skillsHub.setPlatformChangeHook(() => void captureInit());
 vaultAuto.register();
@@ -311,9 +313,10 @@ app.get('/api/capabilities', () => getInit() ?? JSON.parse(kvGet('claude_capabil
 app.post('/api/capabilities/refresh', async () => (await captureInit()) ?? { error: 'falhou' });
 app.get('/api/approvals', () => pendingApprovals());
 app.post('/api/approvals/:id', async (req, reply) => {
-  const approve = (req.body as { approve?: unknown } | undefined)?.approve;
+  const body = req.body as { approve?: unknown; remember?: unknown } | undefined;
+  const approve = body?.approve;
   if (typeof approve !== 'boolean') return reply.code(400).send({ error: 'approve' });
-  const ok = resolveApproval((req.params as { id: string }).id, approve);
+  const ok = resolveApproval((req.params as { id: string }).id, approve, body?.remember === true);
   return reply.code(ok ? 204 : 404).send();
 });
 

@@ -25,6 +25,7 @@ export interface ProjectConfig {
   container?: string;
   preview?: string;
   approvalPatterns?: string[];
+  goal?: string; // objetivo do projeto: entra no prompt dos agentes ("por quê" de cada tarefa)
 }
 
 function localProjects(): ProjectConfig[] {
@@ -323,12 +324,13 @@ export interface ProjectSettings {
   container?: string;
   preview?: string;
   approvalPatterns?: string[];
+  goal?: string;
 }
 
 export function readProjectSettings(slug: string): ProjectSettings & { repo?: string } {
   const p = localProject(slug);
   if (!p) throw Object.assign(new Error('projeto não está no Atria OS'), { code: 404 });
-  return { name: p.name, repo: p.repo, healthUrl: p.healthUrl, container: p.container, preview: p.preview, approvalPatterns: p.approvalPatterns ?? [] };
+  return { name: p.name, repo: p.repo, healthUrl: p.healthUrl, container: p.container, preview: p.preview, approvalPatterns: p.approvalPatterns ?? [], goal: p.goal ?? '' };
 }
 
 // Valida e normaliza; devolve a mensagem de erro em vez de lançar.
@@ -360,6 +362,9 @@ export function validateSettings(b: unknown): { ok: ProjectSettings } | { error:
   const pats = x.approvalPatterns ?? [];
   if (!Array.isArray(pats) || pats.length > 20 || pats.some((p) => typeof p !== 'string' || p.length > 200)) return { error: 'approvalPatterns: lista de até 20 textos (até 200 caracteres cada)' };
   out.approvalPatterns = (pats as string[]).map((p) => p.trim()).filter(Boolean);
+  const goal = str('goal');
+  if (goal === null || goal.length > 600) return { error: 'objetivo inválido (até 600 caracteres)' };
+  if (goal) out.goal = goal;
   return { ok: out };
 }
 
@@ -376,7 +381,7 @@ export function writeProjectSettings(slug: string, s: ProjectSettings): ProjectS
       /* atria.json inválido: recomeça */
     }
   }
-  for (const k of ['healthUrl', 'container', 'preview'] as const) {
+  for (const k of ['healthUrl', 'container', 'preview', 'goal'] as const) {
     if (s[k]) cfg[k] = s[k];
     else delete cfg[k];
   }

@@ -48,3 +48,7 @@ Cada projeto é um repositório seu no GitHub, guardado em /workspace/<nome> qua
 - Cliente diz que o site caiu → abra o projeto, veja a saúde, clique em Logs.
 - Quer mexer junto com o Claude → Claude no projeto.
 - Mostrar o site para alguém → Preview.
+
+## Objetivo do projeto
+Em Configuração do projeto › Editar › **Objetivo do projeto**, escreva o porquê do projeto (até 600 caracteres). Todo agente que trabalha nele lê isso junto com a tarefa, e usa para decidir prioridades e detalhes.
+- Por voz: "Yui, o objetivo do Stoqmate é chegar a 50 clientes até dezembro" ou "qual o objetivo deste projeto?".
