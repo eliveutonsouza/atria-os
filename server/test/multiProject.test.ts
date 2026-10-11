@@ -70,3 +70,25 @@ test('workflowRunDir: cada execução do mesmo workflow tem pasta própria e est
   assert.equal(a, runs.workflowRunDir('/w/proj', 'wfaaaaaa1'));
   assert.match(a, /^\/w\/proj\/\.atria\/execucoes\/posts\/2026-10-11_\d\dh30-wfaaaa$/);
 });
+
+test('selo de mensagens novas: conta só o que a Yui disse depois da última visita e zera ao abrir', async () => {
+  proj.setActiveProject('stoq');
+  const t0 = proj.unreadCounts(); // marca o início
+  assert.deepEqual(t0, {});
+  await new Promise((r) => setTimeout(r, 5)); // mensagens depois da marca (resolução de 1 ms)
+  brain.saveMessage('yui', 'No projeto Geral: tarefa pronta', 'voice', null);
+  brain.saveMessage('yui', 'outra no geral', 'voice', null);
+  brain.saveMessage('yui', 'resposta no ativo', 'voice', 'stoq');
+  assert.deepEqual(proj.unreadCounts(), { '': 2 }); // o ativo nunca conta
+  proj.setActiveProject(null); // abrir o Geral marca como lido
+  assert.deepEqual(proj.unreadCounts(), {});
+  proj.setActiveProject(null);
+});
+
+test('voz: aviso de outro projeto falado pelo GPT-Live é reconhecido pela transcrição', async () => {
+  const live = await import('../src/live.ts');
+  const said = 'No projeto Stoqmate: o deploy terminou e o site respondeu 200 no health.';
+  assert.equal(live.matchesForeign('No projeto Stoqmate, o deploy terminou e o site já responde no health.', said), true);
+  assert.equal(live.matchesForeign('Claro, abrindo o terminal para você agora.', said), false);
+  assert.equal(live.matchesForeign('ok', said), false);
+});

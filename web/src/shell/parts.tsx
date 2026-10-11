@@ -311,7 +311,18 @@ export const dockInput = {
   },
 }
 
+// Atalhos do "+": pré-preenchem o campo com o começo do pedido; a Yui continua a conversa por texto ou voz.
+const QUICK: { label: string; hint: string; text: string }[] = [
+  { label: 'Tarefa para um agente', hint: 'delega agora', text: 'Pede para o agente ' },
+  { label: 'Novo workflow', hint: 'passos que se repetem', text: 'Cria um workflow que ' },
+  { label: 'Rotina', hint: 'roda num horário', text: 'Todo dia às 8h, ' },
+  { label: 'Lembrete', hint: 'aviso na hora', text: 'Me lembra ' },
+  { label: 'Missão', hint: 'objetivo grande, várias etapas', text: 'Cria uma missão para ' },
+  { label: 'Buscar no histórico', hint: 'conversas e execuções', text: 'O que eu te pedi sobre ' },
+]
+
 export function Dock() {
+  const [quick, setQuick] = useState(false)
   const mode = useYui((s) => s.mode)
   const narrow = useYui((s) => s.narrow)
   const listening = useYui((s) => s.listening)
@@ -339,6 +350,15 @@ export function Dock() {
   }
   void pending
   const micOn = listening || connecting
+  const pickQuick = (text: string) => {
+    setQuick(false)
+    setInput(text)
+    setTimeout(() => {
+      const el = dockInput.yuiEl
+      el?.focus()
+      el?.setSelectionRange(text.length, text.length)
+    }, 20)
+  }
   return (
     <div
       style={{
@@ -354,15 +374,44 @@ export function Dock() {
           boxShadow: '0 18px 50px rgba(0,0,0,.35)', transition: 'border-color .3s',
         }}
       >
-        <button
-          title="Anexar"
-          aria-label="Anexar"
-          className="hov-icon"
-          onClick={() => useYui.getState().say('Pode anexar arquivo, screenshot, projeto, artifact ou link — é só arrastar para cá.')}
-          style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 12, border: 'none', background: 'transparent', color: C.t2, fontSize: 22, fontWeight: 300, cursor: 'pointer' }}
-        >
-          +
-        </button>
+        <span style={{ position: 'relative', flexShrink: 0 }}>
+          <button
+            title="Atalhos"
+            aria-label="Atalhos de pedido"
+            aria-haspopup="menu"
+            aria-expanded={quick}
+            className="hov-icon"
+            onClick={() => setQuick(!quick)}
+            style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: quick ? 'rgba(103,216,242,.12)' : 'transparent', color: quick ? C.cyan : C.t2, fontSize: 22, fontWeight: 300, cursor: 'pointer', transform: quick ? 'rotate(45deg)' : 'none', transition: 'transform .2s' }}
+          >
+            +
+          </button>
+          {quick && (
+            <>
+              <div onClick={() => setQuick(false)} style={{ position: 'fixed', inset: 0, zIndex: 0 }} />
+              <div
+                role="menu"
+                aria-label="Atalhos de pedido"
+                onKeyDown={(e) => e.key === 'Escape' && setQuick(false)}
+                style={{ position: 'absolute', bottom: 'calc(100% + 12px)', left: -2, zIndex: 1, width: 'min(300px, calc(100vw - 32px))', padding: 6, borderRadius: 14, background: 'rgba(16,20,42,.97)', border: '1px solid rgba(160,170,255,.16)', boxShadow: '0 20px 50px rgba(0,0,0,.5)', display: 'flex', flexDirection: 'column' }}
+              >
+                {QUICK.map((q, i) => (
+                  <button
+                    key={q.label}
+                    role="menuitem"
+                    autoFocus={i === 0}
+                    onClick={() => pickQuick(q.text)}
+                    className="hov-item"
+                    style={{ minHeight: 44, padding: '8px 12px', border: 'none', borderRadius: 10, background: 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 1 }}
+                  >
+                    <span style={{ fontSize: 14 }}>{q.label}</span>
+                    <span style={{ fontSize: 12, color: C.t3 }}>{q.hint}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </span>
         <input
           ref={(el) => {
             dockInput.yuiEl = el

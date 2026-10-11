@@ -2,6 +2,11 @@
 
 Versões marcadas do Atria OS. Cada tag `vX.Y.Z` publica as imagens no GHCR e pode ser aplicada pelo Atria Central (Atualizações).
 
+## v1.5.1
+- "+" do campo da Yui abre atalhos (tarefa para agente, workflow, rotina, lembrete, missão, busca) que pré-preenchem o pedido.
+- Selo de mensagens novas por projeto guardado no servidor: sobrevive a recarregar a página e a trocar de aparelho.
+- Voz: aviso de outro projeto falado pelo GPT-Live não entra mais no histórico do projeto ativo.
+
 ## v1.5.0
 Quarta fase das ideias do Paperclip/Hermes (aprendizado):
 - Memória da Yui: "lembra que…", "o que você sabe de mim?", "esquece que…"; só grava o que você pediu com as suas palavras; vale para voz, painel e Telegram; Configurações › Conta › Memória da Yui.

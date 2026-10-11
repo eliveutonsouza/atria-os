@@ -138,6 +138,7 @@ async function bootstrap() {
     inbox: b.inbox,
     hist: b.history,
     maxConcurrent: b.maxConcurrent ?? 4,
+    unread: b.unread ?? {},
     status: b.status,
     brief: b.greeting.brief,
     msg: b.greeting.msg,

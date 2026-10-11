@@ -16,7 +16,7 @@ import { db, kvGet, kvSet, now } from './db.ts';
 import { addClient, emit, setYuiState, yuiState } from './bus.ts';
 import { isAuthed, isAuthedCookieHeader, registerAuth, requireAuth } from './auth.ts';
 import { agentInfos, agentsWorking } from './agents.ts';
-import { activeProject, ensureProject, findProject, listProjectConfigs, projectDetail, projectLogs, projectSummaries, setActiveProject } from './projects.ts';
+import { activeProject, ensureProject, findProject, listProjectConfigs, projectDetail, projectLogs, projectSummaries, setActiveProject, unreadCounts } from './projects.ts';
 import { cancelRun, claudeLoggedIn, enqueueRun, getRun, inboxItems, listRuns, pendingApprovals, rateRun, recoverRuns, resolveApproval, runEvents } from './runs.ts';
 import { brief, infra, latestReport, overview } from './metrics.ts';
 import { getUiContext, recentMessages, setUiContext } from './brain.ts';
@@ -163,6 +163,7 @@ app.get('/api/bootstrap', async () => {
     inbox: inboxItems(),
     history: historyOf(activeProject()),
     maxConcurrent: config.maxConcurrentRuns,
+    unread: unreadCounts(),
     greeting: g,
     status: {
       claude: claudeLoggedIn() || !!config.claudeToken,

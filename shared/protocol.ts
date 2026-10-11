@@ -249,6 +249,7 @@ export interface Bootstrap {
   inbox: InboxItem[];
   history: ChatMessage[]; // conversa do projeto ativo
   maxConcurrent?: number; // execuções ao mesmo tempo
+  unread?: Record<string, number>; // mensagens novas da Yui por projeto ('' = Geral), fora o ativo
   greeting: { msg: string; showBrief: boolean; brief: Brief | null };
   status: { claude: boolean; openai: boolean; live: boolean; claudeAuth?: 'claude.ai' | 'token' | 'none'; github?: boolean; repos?: number };
 }

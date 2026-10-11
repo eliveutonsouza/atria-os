@@ -64,3 +64,6 @@ Quando a revisão das execuções encontra algo que vale guardar (um fato sobre 
 - Skill nova ou atualizada: **Ver texto da skill** / **Ver mudanças** antes de decidir. Skill aprovada vale só para o agente que a propôs.
 - **Depois** esconde o cartão até amanhã. Nada entra sem você aprovar.
 - Por voz: "Yui, salva isso como skill" prepara uma skill da última execução para você aprovar no cartão.
+
+## Atalhos do “+”
+O **+** à esquerda do campo abre atalhos que já escrevem o começo do pedido: tarefa para um agente, novo workflow, rotina, lembrete, missão e busca no histórico. Complete a frase e envie (ou continue por voz).

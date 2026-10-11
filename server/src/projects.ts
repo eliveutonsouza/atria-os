@@ -117,7 +117,29 @@ export async function ensureProject(p: ProjectConfig): Promise<ProjectConfig> {
 }
 
 export const activeProject = (): string | null => kvGet('active_project') || null;
-export const setActiveProject = (slug: string | null) => kvSet('active_project', slug ?? '');
+// Trocar de projeto marca como lida a conversa que você deixa e a que abre: o selo de mensagens novas
+// (unreadCounts) conta só o que a Yui disse num projeto depois da última vez que você esteve nele.
+export function setActiveProject(slug: string | null) {
+  markSeen(activeProject());
+  kvSet('active_project', slug ?? '');
+  markSeen(slug);
+}
+export const markSeen = (slug: string | null) => kvSet(`seen:${slug ?? ''}`, new Date().toISOString());
+
+/** Mensagens novas da Yui por projeto ('' = Geral), fora o ativo. Sem marca ainda: conta só a partir da 1ª consulta. */
+export function unreadCounts(): Record<string, number> {
+  let since = kvGet('unread_since');
+  if (!since) {
+    since = new Date().toISOString();
+    kvSet('unread_since', since);
+  }
+  const rows = db.prepare(`
+    SELECT COALESCE(m.project, '') AS k, COUNT(*) AS n FROM messages m
+    WHERE m.who = 'yui' AND m.at > COALESCE((SELECT value FROM kv WHERE key = 'seen:' || COALESCE(m.project, '')), ?)
+    GROUP BY COALESCE(m.project, '')`).all(since) as { k: string; n: number }[];
+  const active = activeProject() ?? '';
+  return Object.fromEntries(rows.filter((r) => r.k !== active && r.n > 0).map((r) => [r.k, r.n]));
+}
 
 const healthCache = new Map<string, { at: number; ok: boolean | null }>();
 async function probe(p: ProjectConfig): Promise<boolean | null> {

@@ -52,6 +52,27 @@ interface LiveState {
   watchTimer?: NodeJS.Timeout;
   inflight: Inflight | null;
   clockTimer?: NodeJS.Timeout;
+  // falas de outro projeto mandadas para o GPT-Live dizer: a transcrição delas não é da conversa ativa
+  foreign: { project: string | null; text: string; at: number; timer: NodeJS.Timeout }[];
+}
+
+// A fala transcrita corresponde a um aviso de outro projeto? (o GPT-Live parafraseia: compara palavras)
+const words = (t: string) => new Set(t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? []);
+export function matchesForeign(spoken: string, said: string): boolean {
+  const a = words(spoken);
+  if (a.size < 3) return false;
+  const b = words(said);
+  let hit = 0;
+  for (const w of a) if (b.has(w)) hit++;
+  return hit / a.size >= 0.5;
+}
+function takeForeign(st: LiveState, text: string): { project: string | null } | null {
+  const now = Date.now();
+  const i = st.foreign.findIndex((f) => now - f.at < 120_000 && matchesForeign(text, f.text));
+  if (i < 0) return null;
+  const [f] = st.foreign.splice(i, 1);
+  clearTimeout(f.timer);
+  return { project: f.project };
 }
 
 // Pedido sendo atendido pelo servidor (watchdog). Se a delegação do GPT-Live chegar depois,
@@ -134,10 +155,16 @@ async function serve(st: LiveState, request: string, delegationId: string | null
 function flushYui() {
   if (!live || !live.yuiBuf.trim()) return;
   const text = live.yuiBuf.trim();
+  live.yuiBuf = '';
+  // aviso de outro projeto falado em voz: já foi gravado na conversa daquele projeto (narrate)
+  const foreign = takeForeign(live, text);
+  if (foreign) {
+    emit({ type: 'yui.say', text, final: true, project: foreign.project });
+    return;
+  }
   const project = activeProject() ?? null;
   saveMessage('yui', text, 'voice', project);
   emit({ type: 'yui.say', text, final: true, project });
-  live.yuiBuf = '';
 }
 
 function seedInput(): OpenAI.Live.InitialItem[] {
@@ -177,7 +204,7 @@ export async function startLive(offerSdp: string): Promise<{ sdp: string; sessio
   });
   const sessionId = res.session.id;
   const sideband = new SidebandWS(openai, { session_id: sessionId, graceful_close: true });
-  live = { sessionId, startedAt: Date.now(), sideband, muted: false, userBuf: '', yuiBuf: '', pendingRequest: '', lastActivity: Date.now(), lastProgressNote: new Map(), inflight: null };
+  live = { sessionId, startedAt: Date.now(), sideband, muted: false, userBuf: '', yuiBuf: '', pendingRequest: '', lastActivity: Date.now(), lastProgressNote: new Map(), inflight: null, foreign: [] };
   wire(live);
   // Sessão longa: o relógio do prompt envelhece; manda o "agora" de novo a cada 5 min.
   const st = live;
@@ -284,7 +311,8 @@ export function endLive(reason = 'user') {
 
 function flushUserOf(st: LiveState) {
   if (st.userBuf.trim()) saveMessage('user', st.userBuf, 'voice');
-  if (st.yuiBuf.trim()) saveMessage('yui', st.yuiBuf, 'voice');
+  if (st.yuiBuf.trim() && !takeForeign(st, st.yuiBuf)) saveMessage('yui', st.yuiBuf, 'voice');
+  for (const f of st.foreign) clearTimeout(f.timer);
 }
 
 // Ociosidade: sessão cobrada por segundo.
@@ -328,8 +356,19 @@ export function narrate(text: string, opts: { speak: boolean; end?: 'success' | 
   if (other) text = `No projeto ${opts.project ? findProject(opts.project)?.name ?? opts.project : 'Geral'}: ${text}`;
   if (live) {
     if (other && opts.speak) {
-      saveMessage('yui', text, 'voice', opts.project ?? null);
-      emit({ type: 'yui.say', text, final: true, project: opts.project ?? null });
+      // grava no projeto de origem; o painel recebe a fala quando o GPT-Live terminar de dizê-la (flushYui),
+      // ou em 2 min se ela não for dita
+      const st = live;
+      const project = opts.project ?? null;
+      saveMessage('yui', text, 'voice', project);
+      const entry = { project, text, at: Date.now(), timer: setTimeout(() => {
+        const i = st.foreign.indexOf(entry);
+        if (i < 0) return;
+        st.foreign.splice(i, 1);
+        emit({ type: 'yui.say', text, final: true, project });
+      }, 120_000) };
+      entry.timer.unref();
+      st.foreign.push(entry);
     }
     send(live, { type: opts.speak ? 'session.commentary.append' : 'session.thinking.append', delegation_id: null, content: clip(text) });
     if (opts.end) setYuiState(opts.end);
