@@ -2,6 +2,13 @@
 
 Versões marcadas do Atria OS. Cada tag `vX.Y.Z` publica as imagens no GHCR e pode ser aplicada pelo Atria Central (Atualizações).
 
+## v1.3.0
+Segunda fase das ideias do Paperclip/Hermes (canal e lembrança):
+- Conversar com a Yui pelo Telegram: texto e áudio do chat vinculado, projeto próprio (/projeto), aprovações comuns com botões; exclusões só no painel.
+- Busca no histórico (FTS5): conversa e resultados das execuções, no painel Conversa e por voz ("o que eu te pedi sobre X?").
+- Balanço falado: "como foi minha semana?" (execuções, falhas, custo, uso do plano).
+- Rotinas: entrega do resultado por Telegram/e-mail/push (sempre, só se mudou ou só se falhar), não empilham disparos e recuperam o último disparo perdido.
+
 ## v1.2.0
 Primeira fase das ideias trazidas do Paperclip e do Hermes (proteção, sem custo de tokens):
 - Orçamento pelo % do plano Claude: acima do limite (padrão 95%), rotinas e workflows disparados por rotina esperam a janela reiniciar; o que você pede na hora sempre roda. Aviso em 80%, teto diário opcional da OpenAI e teto opcional por execução automática.

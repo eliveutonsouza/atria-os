@@ -40,3 +40,10 @@ Mostra as rotinas da semana num calendário. Uma rotina pode executar um workflo
 - Checagem de sites toda hora → Instrução para um agente, QA, "A cada hora".
 - Relatório de sexta → Report, "Toda sexta 17h".
 - Férias → Pausar as rotinas que geram trabalho para aprovar.
+
+## Entrega e segurança das rotinas
+No formulário da rotina:
+- **Entregar o resultado**: Telegram, e-mail e/ou push. **Sempre**, **Só se mudou desde a última** (bom para monitorar preço, status, site) ou **Só se falhar**.
+- **Pular o disparo se a anterior ainda estiver rodando** (ligado por padrão): rotina de 15 em 15 min não empilha execuções.
+- **Se o Atria estava fora do ar no horário, rodar uma vez quando voltar**: recupera só o último disparo perdido nas últimas 24 h.
+- Por voz: "todo dia às 8h checa o site do Stoq e me manda no Telegram só se mudar".

@@ -525,6 +525,10 @@ export interface RoutineInfo {
   project: string | null;
   instruction: string | null;
   enabled: boolean;
+  overlap?: 'skip' | 'queue'; // skip: pula o disparo se a anterior ainda roda
+  catchup?: boolean; // recupera o último disparo perdido com o servidor fora do ar
+  deliver?: NotifyChannel[]; // onde entregar o resultado
+  deliverMode?: 'always' | 'fail' | 'change'; // sempre | só se falhar | só se mudou
 }
 
 // ---------- v3: dashboard ----------

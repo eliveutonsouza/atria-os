@@ -50,3 +50,12 @@ A seção **Avisos** em Configurações liga os canais que os workflows usam: o 
 ## Exemplos do dia a dia
 - Workflow de lead manda o site demo e o roteiro da ligação no Telegram e no e-mail.
 - Depois da reunião, você responde o aviso do bot com a nota de voz e o fluxo segue com a transcrição.
+
+## Conversar com a Yui pelo Telegram
+Com o Telegram ligado, mande texto ou áudio para o bot e a Yui responde ali mesmo, como no painel.
+- Só o chat vinculado conversa. Mensagem de qualquer outro chat é ignorada.
+- A conversa do Telegram tem projeto próprio: **/projeto** mostra qual é, **/projeto stoq** troca, **/projeto geral** volta para Geral. Trocar ali não muda o projeto do painel.
+- Áudio é transcrito e a resposta mostra o que a Yui entendeu, entre aspas.
+- Aprovações comuns chegam com botões **Aprovar** e **Rejeitar**. Exclusões (cartão vermelho) só no painel.
+- Se um workflow estiver esperando resposta e a mensagem não for para ele, o bot pergunta; escolha **Não é pedido: falar com a Yui**.
+- A Yui responde em texto. Telas do painel não abrem pelo Telegram.

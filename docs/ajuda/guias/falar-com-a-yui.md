@@ -46,3 +46,8 @@ A Yui é a assistente que conversa com você por voz (OpenAI GPT-Live) ou texto.
 - Bug reportado por cliente → "O formulário de contato do site da clínica não envia, investiga e corrige."
 - Tarefa grande → "Cria uma landing page para uma clínica de fisioterapia." Ela monta uma missão com várias etapas.
 - Lembrar uma decisão → "Anota no vault que vamos cobrar setup separado a partir de outubro."
+
+## Buscar no que já conversamos
+- No painel Conversa, use **Buscar na conversa e nas execuções…** (palavras sem acento também acham). Execução encontrada abre ao clicar.
+- Por voz: "Yui, o que eu te pedi sobre o domínio semana passada?" ou "o que o DevOps fez sobre backup?".
+- Balanço: "Yui, como foi minha semana?" ou "balanço do mês" traz volume, o que mais rodou, falhas e custo.

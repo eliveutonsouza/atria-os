@@ -8,6 +8,7 @@ export interface ToolCtx {
   dryRun: boolean;
   calls?: { name: string; args: Record<string, unknown> }[];
   project?: string | null; // projeto ativo quando o pedido chegou (trocar no meio não muda o destino)
+  channel?: 'panel' | 'telegram'; // telegram: não mexe no painel (projeto ativo, telas) nem no estado do orb
 }
 
 export interface BrainExtension {

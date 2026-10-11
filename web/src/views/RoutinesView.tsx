@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import '../workflow/workflow.css'
-import type { AgentInfo, RoutineInfo, WorkflowDef } from '@shared/protocol'
+import type { AgentInfo, NotifyChannel, RoutineInfo, WorkflowDef } from '@shared/protocol'
 import { useApi } from '../api/useApi'
 import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
@@ -140,13 +140,18 @@ function RoutineForm({ initial, workflows, agents, phone, onClose, onSaved }: { 
   const [agentId, setAgentId] = useState(initial?.agentId ?? agents[0]?.id ?? '')
   const [project, setProject] = useState(initial?.project ?? '')
   const [instruction, setInstruction] = useState(initial?.instruction ?? '')
+  const [deliver, setDeliver] = useState<NotifyChannel[]>(initial?.deliver ?? [])
+  const [deliverMode, setDeliverMode] = useState<'always' | 'fail' | 'change'>(initial?.deliverMode ?? 'always')
+  const [overlap, setOverlap] = useState<'skip' | 'queue'>(initial?.overlap ?? 'skip')
+  const [catchup, setCatchup] = useState(initial?.catchup ?? true)
   const [err, setErr] = useState<string | null>(null)
 
   const save = async () => {
+    const extra = { deliver, deliverMode, overlap, catchup }
     const body =
       kind === 'workflow'
-        ? { name: name || `Workflow · ${workflows.find((w) => w.slug === workflow)?.name ?? workflow}`, cron, workflowId: workflow, agentId: null, instruction: null, project: null }
-        : { name, cron, workflowId: null, agentId, instruction, project: project.trim() || null }
+        ? { name: name || `Workflow · ${workflows.find((w) => w.slug === workflow)?.name ?? workflow}`, cron, workflowId: workflow, agentId: null, instruction: null, project: null, ...extra }
+        : { name, cron, workflowId: null, agentId, instruction, project: project.trim() || null, ...extra }
     try {
       await send(initial ? 'PUT' : 'POST', initial ? `/api/routines/${initial.id}` : '/api/routines', body)
       useYui.getState().say(initial ? 'Rotina atualizada.' : `Rotina criada: ${describeCron(cron)}.`)
@@ -213,6 +218,32 @@ function RoutineForm({ initial, workflows, agents, phone, onClose, onSaved }: { 
           <span style={{ fontSize: 12, color: C.t3 }}>{describeCron(cron)}</span>
         </div>
       </div>
+      <div>
+        <span className="wf-label">Entregar o resultado</span>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {(['telegram', 'email', 'push'] as const).map((c) => (
+            <button key={c} className="wf-btn" aria-pressed={deliver.includes(c)} style={deliver.includes(c) ? { borderColor: 'rgba(103,216,242,.45)', color: '#a9e9f8' } : undefined} onClick={() => setDeliver(deliver.includes(c) ? deliver.filter((x) => x !== c) : [...deliver, c])}>
+              {c === 'telegram' ? 'Telegram' : c === 'email' ? 'E-mail' : 'Push'}
+            </button>
+          ))}
+          {deliver.length > 0 && (
+            <select className="wf-input" aria-label="Quando entregar" value={deliverMode} onChange={(e) => setDeliverMode(e.target.value as typeof deliverMode)} style={{ width: phone ? '100%' : 220 }}>
+              <option value="always">Sempre</option>
+              <option value="change">Só se mudou desde a última</option>
+              <option value="fail">Só se falhar</option>
+            </select>
+          )}
+          {!deliver.length && <span style={{ fontSize: 12, color: C.t3 }}>só no painel</span>}
+        </div>
+      </div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+        <input type="checkbox" checked={overlap === 'skip'} onChange={(e) => setOverlap(e.target.checked ? 'skip' : 'queue')} />
+        Pular o disparo se a anterior ainda estiver rodando
+      </label>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+        <input type="checkbox" checked={catchup} onChange={(e) => setCatchup(e.target.checked)} />
+        Se o Atria estava fora do ar no horário, rodar uma vez quando voltar (até 24 h)
+      </label>
       {err && <div style={{ fontSize: 12.5, color: C.crit }}>{err}</div>}
       <div>
         <button className="wf-btn primary" onClick={() => void save()} style={phone ? { width: '100%', height: 48 } : undefined}>Salvar rotina</button>

@@ -55,6 +55,9 @@ import * as central from './central.ts';
 import * as support from './support.ts';
 import * as approvalRules from './approvalRules.ts';
 import * as budget from './budget.ts';
+import './telegramChat.ts';
+import * as search from './search.ts';
+import './insights.ts';
 import { healthFull } from './health.ts';
 import { startClaudeUsage } from './claudeUsage.ts';
 import { agora, saudacao, startAmbiente } from './ambiente.ts';
@@ -99,7 +102,7 @@ await app.register(multipart, { limits: { fileSize: 500 * 1024 * 1024, files: 30
 registerAuth(app);
 initTerminal();
 registerTerminal(app);
-for (const mod of [missions, customViews, toolbox, agentsAdmin, workflowInputs, workflows, push, notify, stats, browserLive, browserChallenge, settings, onboarding, vault, company, help, usage, models, remindersApi, reportsApi, historyApi, projectsApi, telemetry, central, support, claudeDesign, skillsHub, approvalRules, budget]) mod.register(app);
+for (const mod of [missions, customViews, toolbox, agentsAdmin, workflowInputs, workflows, push, notify, stats, browserLive, browserChallenge, settings, onboarding, vault, company, help, usage, models, remindersApi, reportsApi, historyApi, projectsApi, telemetry, central, support, claudeDesign, skillsHub, approvalRules, budget, search]) mod.register(app);
 // skill nova/removida na plataforma: relê as capacidades do Claude para aparecer nas listas
 skillsHub.setPlatformChangeHook(() => void captureInit());
 vaultAuto.register();

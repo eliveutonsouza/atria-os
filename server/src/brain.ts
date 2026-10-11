@@ -1,6 +1,6 @@
 import { trackOpenAI } from './usage.ts';
 import OpenAI from 'openai';
-import type { ChatContext, ViewName } from '../../shared/protocol.ts';
+import type { ChatContext, NotifyChannel, ViewName } from '../../shared/protocol.ts';
 import { VIEW_NAMES } from '../../shared/protocol.ts';
 import { config } from './config.ts';
 import { db, kvGet, now, uid } from './db.ts';
@@ -11,6 +11,7 @@ import { enqueueRun, inboxItems, listRuns, pendingApprovals } from './runs.ts';
 import { infra, overview } from './metrics.ts';
 import { createRoutine } from './routines.ts';
 import { brainExtensions, type ToolCtx } from './extensions.ts';
+import { approvalButtons } from './notify.ts';
 
 // "Cérebro" da Yui: modelo de texto (Responses API) com as ferramentas do Atria OS.
 // Recebe pedidos digitados ou delegações do GPT-Live e devolve uma frase curta para ser dita/mostrada.
@@ -29,7 +30,7 @@ export function setUiContext(ctx: ChatContext) {
 export const getUiContext = () => uiContext;
 
 // Cada projeto tem a própria conversa; NULL = Geral (sem projeto).
-export function saveMessage(who: 'user' | 'yui', text: string, source: 'text' | 'voice', project: string | null = activeProject() ?? null) {
+export function saveMessage(who: 'user' | 'yui', text: string, source: 'text' | 'voice' | 'telegram', project: string | null = activeProject() ?? null) {
   const t = text.trim();
   if (!t) return;
   db.prepare('INSERT INTO messages(id, who, text, source, at, project) VALUES(?, ?, ?, ?, ?, ?)').run(uid(), who, t, source, now(), project);
@@ -107,7 +108,7 @@ const TOOLS: OpenAI.Responses.FunctionTool[] = [
   },
   {
     type: 'function', name: 'create_routine', strict: true, description: `Agenda trabalho recorrente de um agente (cron, fuso ${config.timezone}).`,
-    parameters: S({ name: { type: 'string' }, cron: { type: 'string', description: 'expressão cron de 5 campos' }, agent: { type: 'string' }, project: nullableStr('slug'), instruction: { type: 'string' } }, ['name', 'cron', 'agent', 'project', 'instruction']),
+    parameters: S({ name: { type: 'string' }, cron: { type: 'string', description: 'expressão cron de 5 campos' }, agent: { type: 'string' }, project: nullableStr('slug'), instruction: { type: 'string' }, deliver: { type: ['array', 'null'], items: { type: 'string', enum: ['telegram', 'email', 'push'] }, description: 'onde entregar o resultado ("me manda no Telegram"); null = só no painel' }, deliver_mode: { type: ['string', 'null'], enum: ['always', 'fail', 'change', null], description: 'always | fail (só se falhar) | change (só se mudou); null = always' } }, ['name', 'cron', 'agent', 'project', 'instruction', 'deliver', 'deliver_mode']),
   },
   { type: 'function', name: 'list_repos', strict: true, description: 'Busca nos repositórios GitHub do usuário (catálogo completo, clonados ou não).', parameters: S({ query: nullableStr('trecho do nome/descrição; null lista os mais recentes') }, ['query']) },
   { type: 'function', name: 'open_approval', strict: true, description: 'Mostra ao usuário o modal da aprovação pendente mais antiga.', parameters: S({}, []) },
@@ -151,8 +152,10 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
   // Sem projeto explícito, vale o projeto em que a conversa está.
   const current = ctx.project !== undefined ? ctx.project : activeProject() ?? null;
   const projOrCurrent = () => proj() ?? (current ? findProject(current) : undefined);
+  const remote = ctx.channel === 'telegram';
   switch (name) {
     case 'show_view': {
+      if (remote) return { ok: false, error: 'no Telegram não abro telas do painel; responda em texto' };
       const view = args.view as ViewName;
       const p = proj() ?? (['project', 'logs', 'website'].includes(view) && current ? findProject(current) : undefined);
       if (['project', 'logs', 'website'].includes(view) && !p) return { ok: false, error: 'essa view precisa de um projeto existente' };
@@ -165,19 +168,26 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
       return { ok: true };
     }
     case 'suggest_view': {
+      if (remote) return { ok: true };
       const p = projOrCurrent();
       emit({ type: 'ui.action', action: { type: 'suggest_view', view: args.view as ViewName, params: { project: p?.slug } } });
       return { ok: true };
     }
     case 'close_canvas':
+      if (remote) return { ok: true };
       emit({ type: 'ui.action', action: { type: 'close_canvas' } });
       return { ok: true };
     case 'set_focus':
+      if (remote) return { ok: true };
       emit({ type: 'ui.action', action: { type: 'set_focus', on: !!args.on } });
       return { ok: true };
     case 'switch_project': {
       const p = proj();
       if (!p) return { ok: false, error: 'projeto não encontrado', projetos: listProjectConfigs().map((x) => x.name) };
+      if (remote) {
+        ctx.project = p.slug; // a conversa do Telegram troca de projeto; o painel continua onde está
+        return { ok: true, project: p.name };
+      }
       setActiveProject(p.slug);
       ctx.project = p.slug; // o resto deste pedido (e a resposta) já segue na conversa do novo projeto
       emit({ type: 'ui.action', action: { type: 'switch_project', project: p.slug, name: p.name } });
@@ -217,7 +227,11 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
       return { ok: true, run_id: run.id, agente: run.agent, estado: run.state };
     }
     case 'create_routine': {
-      const r = createRoutine({ name: String(args.name), cron: String(args.cron), agentId: String(args.agent), project: projOrCurrent()?.slug ?? null, instruction: String(args.instruction) });
+      const r = createRoutine({
+        name: String(args.name), cron: String(args.cron), agentId: String(args.agent), project: projOrCurrent()?.slug ?? null, instruction: String(args.instruction),
+        deliver: Array.isArray(args.deliver) ? (args.deliver as NotifyChannel[]) : [],
+        deliverMode: args.deliver_mode === 'fail' || args.deliver_mode === 'change' ? args.deliver_mode : 'always',
+      });
       return { ok: true, id: r.id };
     }
     case 'list_repos': {
@@ -230,6 +244,12 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
     case 'open_approval': {
       const a = pendingApprovals()[0];
       if (!a) return { ok: false, error: 'nenhuma aprovação pendente' };
+      if (remote) {
+        // exclusões (vermelhas) só no painel; as comuns ganham botões aqui
+        if (a.kind === 'destructive') return { ok: true, titulo: a.title, nota: 'é uma exclusão: só dá para decidir no painel' };
+        await approvalButtons(a);
+        return { ok: true, titulo: a.title, nota: 'mandei os botões Aprovar/Rejeitar aqui no Telegram' };
+      }
       emit({ type: 'ui.action', action: { type: 'open_approval', approvalId: a.id } });
       return { ok: true, titulo: a.title };
     }
@@ -249,6 +269,7 @@ export interface ThinkInput {
   dryRun?: boolean; // avaliação: tools só são registradas (scripts/eval-brain.ts)
   calls?: { name: string; args: Record<string, unknown> }[];
   project?: string | null; // conversa (projeto) do pedido; padrão = projeto ativo
+  channel?: 'panel' | 'telegram'; // telegram: troca de projeto e telas não mexem no painel
 }
 
 // Respostas plausíveis para o modo de avaliação (não toca em nada real).
@@ -268,8 +289,8 @@ const allInstructions = () => [instructionsText(), ...brainExtensions().map((e) 
 // input.project é atualizado se o pedido trocar de projeto (switch_project): quem chamou grava a resposta lá.
 export async function think(input: ThinkInput): Promise<string> {
   if (input.project === undefined) input.project = activeProject() ?? null;
-  const { request, dryRun = false, calls, project } = input;
-  const ctx: ToolCtx & { calls?: ThinkInput['calls'] } = { dryRun, calls, project };
+  const { request, dryRun = false, calls, project, channel = 'panel' } = input;
+  const ctx: ToolCtx & { calls?: ThinkInput['calls'] } = { dryRun, calls, project, channel };
   try {
     return await thinkLoop(request, dryRun, ctx, project ?? null);
   } finally {
@@ -279,7 +300,7 @@ export async function think(input: ThinkInput): Promise<string> {
 
 async function thinkLoop(request: string, dryRun: boolean, ctx: ToolCtx, project: string | null): Promise<string> {
   if (!config.openaiKey) return 'Ainda não tenho a chave da OpenAI configurada no servidor.';
-  if (!dryRun) setYuiState('thinking');
+  if (!dryRun && ctx.channel !== 'telegram') setYuiState('thinking');
   const history = recentMessages(20, project)
     .map((m) => `${m.who === 'user' ? 'Usuário' : 'Yui'}: ${m.text}`)
     .join('\n');

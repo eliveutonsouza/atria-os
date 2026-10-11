@@ -49,7 +49,18 @@ export function HistoryDrawer() {
   const [loading, setLoading] = useState(false)
   const [confirm, setConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [q, setQ] = useState('')
+  const [hits, setHits] = useState<HistoryHit[] | null>(null)
   const prepending = useRef(false)
+  // busca na conversa antiga e nos resultados das execuções (FTS no servidor)
+  useEffect(() => {
+    const term = q.trim()
+    if (term.length < 2) return setHits(null)
+    const t = setTimeout(() => {
+      api.get<HistoryHit[]>(`/api/history/search?q=${encodeURIComponent(term)}&limit=30`).then(setHits).catch(() => setHits([]))
+    }, 300)
+    return () => clearTimeout(t)
+  }, [q])
   useEffect(() => {
     // ao carregar mensagens antigas no topo, não pula para o fim
     if (prepending.current) prepending.current = false
@@ -98,7 +109,29 @@ export function HistoryDrawer() {
         {hist.length > 0 && <button onClick={() => setConfirm(true)} style={{ ...linkBtn, color: '#f39aa4' }}>Limpar conversa</button>}
         <button onClick={() => useYui.getState().set({ histOpen: false })} style={{ ...linkBtn, color: C.t2, fontSize: 14 }}>Fechar</button>
       </div>
-      <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ padding: '10px 16px 0' }}>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar na conversa e nas execuções…" aria-label="Buscar no histórico" style={{ width: '100%', boxSizing: 'border-box', height: 40, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)', color: C.text, fontSize: 14 }} />
+      </div>
+      {hits && (
+        <div style={{ flex: 1, overflow: 'auto', padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {!hits.length && <div style={{ fontSize: 14, color: C.t3 }}>Nada encontrado.</div>}
+          {hits.map((h) => (
+            <button
+              key={`${h.kind}:${h.id}`}
+              onClick={() => (h.kind === 'execucao' ? useYui.getState().show('runs', { runId: h.id }) : undefined)}
+              style={{ display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'left', border: 'none', background: 'transparent', color: C.text, padding: 0, cursor: h.kind === 'execucao' ? 'pointer' : 'default' }}
+            >
+              <span style={{ fontSize: 11, color: h.kind === 'execucao' ? C.lav : h.who === 'Yui' ? C.cyan : C.t2, letterSpacing: '.08em' }}>
+                {h.kind === 'execucao' ? `EXECUÇÃO · ${h.who}` : h.who.toUpperCase()} · {new Date(h.at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}{h.project ? ` · ${h.project}` : ''}
+              </span>
+              <span style={{ fontSize: 13.5, lineHeight: 1.5, color: '#d6d9e8' }}>
+                {h.snippet.split(/(«[^»]*»)/).map((part, i) => (part.startsWith('«') ? <mark key={i} style={{ background: 'rgba(103,216,242,.22)', color: C.text, borderRadius: 3 }}>{part.slice(1, -1)}</mark> : part))}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px', display: hits ? 'none' : 'flex', flexDirection: 'column', gap: 16 }}>
         {hist.length > 0 && more && (
           <button disabled={loading} onClick={() => void loadMore()} style={{ ...linkBtn, alignSelf: 'center', color: C.cyan }}>{loading ? 'Carregando…' : 'Carregar mais'}</button>
         )}
@@ -124,6 +157,8 @@ export function HistoryDrawer() {
     </aside>
   )
 }
+
+interface HistoryHit { kind: 'conversa' | 'execucao'; id: string; at: string; who: string; project: string | null; snippet: string }
 
 interface PalItem { label: string; hint: string; fn: () => void }
 

@@ -35,6 +35,39 @@ export function registerInputBridge(b: InputBridge): void {
   bridge = b;
 }
 
+// Conversa com a Yui pelo Telegram (telegramChat.ts): o que não é resposta a pedido de workflow vira pedido
+// para o cérebro, na conversa do projeto do Telegram (/projeto troca). Aprovações comuns ganham botões.
+export interface ChatBridge {
+  ask(text: string, source: 'text' | 'voice'): Promise<string>;
+  transcribe(path: string): Promise<string>;
+  project(): { slug: string | null; name: string };
+  setProject(q: string): { ok: true; name: string } | { ok: false; error: string; options: string[] };
+  resolveApproval(id: string, approve: boolean): { ok: boolean; title?: string };
+}
+let chatBridge: ChatBridge | null = null;
+export function registerChatBridge(c: ChatBridge | null): void {
+  chatBridge = c;
+}
+/** Telegram configurado e com chat vinculado. */
+export const telegramReady = () => !!(tgToken() && tgChat());
+/** Aprovação comum com botões Aprovar/Rejeitar (as vermelhas, de exclusão, ficam só no painel). */
+export function approvalButtons(a: { id: string; title: string; rows: { label: string; value: string }[]; kind?: string }): Promise<number | null> {
+  if (a.kind === 'destructive') return Promise.resolve(null);
+  const detail = a.rows.slice(0, 4).map((r) => `${r.label}: ${r.value}`).join('\n');
+  return sendTelegramButtons('Aprovação necessária', `${a.title}${detail ? `\n\n${detail}` : ''}`, [[{ text: 'Aprovar', data: `a:${a.id}` }, { text: 'Rejeitar', data: `r:${a.id}` }]]);
+}
+/** Mensagem do bot com botões (aprovações vindas de telegramChat.ts). Nunca lança. */
+export async function sendTelegramButtons(title: string, text: string, buttons: { text: string; data: string }[][]): Promise<number | null> {
+  if (!telegramReady()) return null;
+  try {
+    const r = await sendTg(`<b>${esc(title)}</b>\n\n${esc(text)}`, { reply_markup: { inline_keyboard: buttons.map((row) => row.map((b) => ({ text: b.text, callback_data: b.data }))) } });
+    return r.message_id;
+  } catch (e) {
+    console.error('notify telegram', errMsg(e));
+    return null;
+  }
+}
+
 // fetch trocável nos testes (Telegram e Resend falsos).
 let http: typeof fetch = (input, init) => fetch(input, init);
 export function setNotifyFetch(f: typeof fetch): void {
@@ -393,21 +426,94 @@ async function onMessage(m: TgMessage): Promise<void> {
     await reply(m, 'Este chat já está ligado ao Atria OS.');
     return;
   }
-  if (!bridge) {
-    await reply(m, 'Os pedidos de informação ainda não estão disponíveis neste Atria OS.');
-    return;
-  }
-  const pend = bridge.pending();
+  if (chatBridge && /^\/projeto(@\w+)?\b/i.test(text)) return projectCommand(m, text.replace(/^\/projeto(@\w+)?\s*/i, '').trim());
+  const pend = bridge?.pending() ?? [];
   if (!pend.length) {
-    await reply(m, 'Nenhum workflow está esperando resposta agora.');
+    if (chatBridge) return talk(m);
+    await reply(m, bridge ? 'Nenhum workflow está esperando resposta agora.' : 'Os pedidos de informação ainda não estão disponíveis neste Atria OS.');
     return;
   }
   const id = routeMessage(m, pend);
   if (id) return answerRequest(m, id);
   held = m;
-  await reply(m, 'Para qual pedido é isso?', {
-    reply_markup: { inline_keyboard: pend.slice(0, 8).map((p) => [{ text: `${p.title} · ${p.workflowName}`.slice(0, 60), callback_data: `p:${p.id}` }]) },
-  });
+  const rows = pend.slice(0, 8).map((p) => [{ text: `${p.title} · ${p.workflowName}`.slice(0, 60), callback_data: `p:${p.id}` }]);
+  if (chatBridge) rows.push([{ text: 'Não é pedido: falar com a Yui', callback_data: 'y:held' }]);
+  await reply(m, 'Para qual pedido é isso?', { reply_markup: { inline_keyboard: rows } });
+}
+
+async function projectCommand(m: TgMessage, q: string): Promise<void> {
+  if (!chatBridge) return;
+  if (!q) {
+    await reply(m, `Conversa do Telegram no projeto: <b>${esc(chatBridge.project().name)}</b>.\nPara trocar: /projeto nome (ou /projeto geral).`);
+    return;
+  }
+  const r = chatBridge.setProject(q);
+  if (r.ok) await reply(m, `Pronto: a conversa do Telegram agora é no projeto <b>${esc(r.name)}</b>.`);
+  else await reply(m, `${esc(r.error)}${r.options.length ? `\nProjetos: ${esc(r.options.slice(0, 20).join(', '))}` : ''}`);
+}
+
+// Telegram limita a 4096 caracteres por mensagem: corta em pedaços em quebra de linha.
+function chunks(text: string, max = 3900): string[] {
+  const out: string[] = [];
+  let rest = text.trim();
+  while (rest.length > max) {
+    let cut = rest.lastIndexOf('\n', max);
+    if (cut < max / 2) cut = rest.lastIndexOf(' ', max);
+    if (cut < max / 2) cut = max;
+    out.push(rest.slice(0, cut));
+    rest = rest.slice(cut).trimStart();
+  }
+  if (rest) out.push(rest);
+  return out.slice(0, 4);
+}
+
+// Conversa com a Yui: texto direto; áudio é transcrito antes. Mensagens do mesmo chat são atendidas em ordem.
+let talkQueue: Promise<void> = Promise.resolve();
+function talk(m: TgMessage): Promise<void> {
+  const job = talkQueue.then(() => talkNow(m)).catch((e) => console.error('notify telegram chat', errMsg(e)));
+  talkQueue = job;
+  return job;
+}
+async function talkNow(m: TgMessage): Promise<void> {
+  if (!chatBridge) return;
+  let text = (m.text ?? m.caption ?? '').trim();
+  let source: 'text' | 'voice' = 'text';
+  const media = mediaOf(m);
+  if (media?.kind === 'audio') {
+    if ((media.file.file_size ?? 0) > TG_DOWNLOAD_MAX) {
+      await reply(m, 'Áudio grande demais pelo Telegram (limite de 20 MB).');
+      return;
+    }
+    let tmp: string | null = null;
+    try {
+      const d = await download(media.file, media.name);
+      tmp = d.path;
+      text = (await chatBridge.transcribe(d.path)).trim();
+      source = 'voice';
+    } catch (e) {
+      await reply(m, `Não consegui ouvir o áudio: ${esc(errMsg(e))}`);
+      return;
+    } finally {
+      if (tmp) rmSync(dirname(tmp), { recursive: true, force: true });
+    }
+  } else if (media) {
+    await reply(m, 'Por aqui eu entendo texto e áudio. Arquivos e fotos só nos pedidos dos workflows.');
+    return;
+  }
+  if (!text || text.startsWith('/')) {
+    await reply(m, 'Mande texto ou áudio para falar com a Yui. /projeto mostra ou troca o projeto da conversa.');
+    return;
+  }
+  void tg('sendChatAction', { chat_id: tgChat(), action: 'typing' }).catch(() => {});
+  let answer: string;
+  try {
+    answer = await chatBridge.ask(text, source);
+  } catch (e) {
+    answer = `Tive um problema para responder: ${errMsg(e)}`;
+  }
+  const head = source === 'voice' ? `<i>“${esc(text.slice(0, 300))}${text.length > 300 ? '…' : ''}”</i>\n\n` : '';
+  const parts = chunks(answer || 'Pronto.');
+  for (let i = 0; i < parts.length; i++) await reply(i === 0 ? m : null, `${i === 0 ? head : ''}${esc(parts[i])}`);
 }
 
 async function onCallback(q: NonNullable<TgUpdate['callback_query']>): Promise<void> {
@@ -416,6 +522,21 @@ async function onCallback(q: NonNullable<TgUpdate['callback_query']>): Promise<v
   const answer = (text?: string) => tg('answerCallbackQuery', { callback_query_id: q.id, ...(text ? { text } : {}) }).catch(() => {});
   const dropButtons = () =>
     q.message ? tg('editMessageReplyMarkup', { chat_id: tgChat(), message_id: q.message.message_id, reply_markup: { inline_keyboard: [] } }).catch(() => {}) : Promise.resolve();
+  if (op === 'y' && chatBridge) {
+    await answer();
+    await dropButtons();
+    const m = held;
+    held = null;
+    if (m) await talk(m);
+    return;
+  }
+  if ((op === 'a' || op === 'r') && chatBridge && id) {
+    const r = chatBridge.resolveApproval(id, op === 'a');
+    await answer(r.ok ? (op === 'a' ? 'Aprovado' : 'Rejeitado') : 'Essa aprovação não está mais pendente.');
+    await dropButtons();
+    if (r.ok) await reply(q.message?.message_id ?? null, `${op === 'a' ? 'Aprovado' : 'Rejeitado'}${r.title ? `: ${esc(r.title)}` : ''}.`);
+    return;
+  }
   if (!bridge || !id) return void (await answer());
   if (!bridge.pending().some((p) => p.id === id)) {
     await answer('Esse pedido não está mais esperando.');
