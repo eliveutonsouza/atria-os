@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { switchProject } from '../shell/ProjectPicker'
 import type { ChatMessage, InboxItem, RepoInfo, ViewName } from '@shared/protocol'
 import { api } from '../api/client'
 import { enterApp } from '../app/nav'
@@ -152,6 +153,8 @@ export function CommandPalette() {
       { label: 'Dashboard', hint: 'view', fn: go('dashboard') },
       { label: 'Agentes', hint: 'view', fn: go('agents') },
       { label: 'Execuções', hint: 'view', fn: go('runs') },
+      { label: 'Trocar projeto da conversa', hint: 'Ctrl P', fn: () => s().set({ palette: false, shellMode: 'yui', projectsOpen: true }) },
+      ...projects.map((p) => ({ label: `Conversar no projeto · ${p.name}`, hint: 'projeto', fn: () => { close(); void switchProject(p.slug) } })),
       ...projects.map((p) => ({ label: `Projeto · ${p.name}`, hint: 'view', fn: go('project', { project: p.slug }) })),
       // demais repositórios do GitHub: abrir clona sob demanda
       ...repos

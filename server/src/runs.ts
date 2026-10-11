@@ -90,6 +90,23 @@ function logEvent(runId: string, kind: RunEventLine['kind'], text: string) {
 // ---------- fila ----------
 
 const running = new Map<string, AbortController>();
+// Execuções paradas esperando o usuário (aprovação/verificação humana) não ocupam vaga: o limite
+// vale para quem está de fato trabalhando. Teto rígido de 2× protege a memória do container.
+const waiting = new Set<string>();
+const projectOf = new Map<string, string | null>();
+function setWaiting(id: string, on: boolean) {
+  if (!running.has(id)) return;
+  if (on) waiting.add(id);
+  else waiting.delete(id);
+  setImmediate(pump);
+}
+export function hasFreeSlot(max = config.maxConcurrentRuns, total = running.size, idle = waiting.size) {
+  return total - idle < max && total < max * 2;
+}
+// Distribuição justa: primeiro o mais antigo de um projeto que ainda não tem execução rodando.
+export function pickNext(queued: { id: string; project: string | null }[], busyProjects: Set<string | null>) {
+  return queued.find((q) => !busyProjects.has(q.project)) ?? queued[0];
+}
 
 // Fila segurada (atualização remota, central.ts): nada novo começa; as em andamento terminam e as
 // enfileiradas esperam. O reinício do processo solta a fila (o estado não é persistido).
@@ -138,11 +155,14 @@ export function enqueueRun(input: EnqueueInput): RunInfo {
 }
 
 function pump() {
-  while (!held && running.size < config.maxConcurrentRuns) {
-    const next = db.prepare(`SELECT * FROM runs WHERE state = 'queued' ORDER BY created_at LIMIT 1`).get() as RunRow | undefined;
-    if (!next) return;
+  while (!held && hasFreeSlot()) {
+    const queued = db.prepare(`SELECT id, project FROM runs WHERE state = 'queued' ORDER BY created_at LIMIT 50`).all() as { id: string; project: string | null }[];
+    const pick = pickNext(queued, new Set([...projectOf.entries()].filter(([id]) => !waiting.has(id)).map(([, p]) => p)));
+    if (!pick) return;
+    const next = db.prepare(`SELECT * FROM runs WHERE id = ?`).get(pick.id) as RunRow;
     const ac = new AbortController();
     running.set(next.id, ac);
+    projectOf.set(next.id, next.project);
     patch(next.id, { state: 'running', started_at: now(), current_op: 'Acordando…' });
     emit({ type: 'agents.updated', agentsWorking: agentsWorking() });
     execute(next, ac)
@@ -158,6 +178,8 @@ function pump() {
       })
       .finally(() => {
         running.delete(next.id);
+        waiting.delete(next.id);
+        projectOf.delete(next.id);
         emit({ type: 'agents.updated', agentsWorking: agentsWorking() });
         setImmediate(pump);
       });
@@ -248,7 +270,8 @@ export async function askApproval(ownerId: string, title: string, rows: Approval
 
 async function requestApproval(run: RunRow, title: string, rows: ApprovalInfo['rows'], signal: AbortSignal): Promise<boolean> {
   patch(run.id, { state: 'waiting_approval', current_op: 'Aguardando sua aprovação' });
-  const approved = await askApproval(run.id, title, rows, signal);
+  setWaiting(run.id, true);
+  const approved = await askApproval(run.id, title, rows, signal).finally(() => setWaiting(run.id, false));
   patch(run.id, { state: 'running', current_op: approved ? 'Aprovado — continuando' : 'Rejeitado — ajustando' });
   return approved;
 }
@@ -258,6 +281,7 @@ export function holdRun(id: string, waiting: boolean, op: string) {
   const r = getRun(id);
   if (!r || (r.state !== 'running' && r.state !== 'waiting_approval')) return;
   patch(id, { state: waiting ? 'waiting_approval' : 'running', current_op: op });
+  setWaiting(id, waiting);
 }
 
 // Cancela todas as aprovações pendentes de um dono (missão/workflow cancelados).

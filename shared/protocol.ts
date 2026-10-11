@@ -232,7 +232,8 @@ export interface Bootstrap {
   projects: ProjectSummary[];
   agentsWorking: number;
   inbox: InboxItem[];
-  history: ChatMessage[];
+  history: ChatMessage[]; // conversa do projeto ativo
+  maxConcurrent?: number; // execuções ao mesmo tempo
   greeting: { msg: string; showBrief: boolean; brief: Brief | null };
   status: { claude: boolean; openai: boolean; live: boolean; claudeAuth?: 'claude.ai' | 'token' | 'none'; github?: boolean; repos?: number };
 }
@@ -244,12 +245,12 @@ export type UiAction =
   | { type: 'close_canvas' }
   | { type: 'set_focus'; on: boolean }
   | { type: 'suggest_view'; view: ViewName; params?: ViewParams; label?: string }
-  | { type: 'switch_project'; project: string; name: string }
+  | { type: 'switch_project'; project: string | null; name: string } // null = Geral (sem projeto)
   | { type: 'open_approval'; approvalId: string };
 
 export type ServerEvent =
   | { type: 'yui.state'; state: YuiState }
-  | { type: 'yui.say'; text: string; final: boolean } // texto da Yui (msg central + histórico quando final)
+  | { type: 'yui.say'; text: string; final: boolean; project?: string | null } // texto da Yui (msg central + histórico quando final); project = conversa de origem
   | { type: 'user.said'; text: string; final: boolean } // transcrição da voz do usuário
   | { type: 'ui.action'; action: UiAction }
   | { type: 'run.updated'; run: RunInfo }

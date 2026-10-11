@@ -14,6 +14,7 @@ import { toggleApp } from '../app/nav'
 import type { AppPage } from '@shared/protocol'
 import { useYui, type Mode } from '../store/yui'
 import { CanvasPanel } from './CanvasPanel'
+import { RunsPopover } from './ProjectPicker'
 import { SupportBanners } from './SupportBanners'
 import { Dock, dockInput, OrbButton, OrbLayer, TopBar, YuiCenter, YuiLeft } from './parts'
 
@@ -135,6 +136,7 @@ async function bootstrap() {
     agentsWorking: b.agentsWorking,
     inbox: b.inbox,
     hist: b.history,
+    maxConcurrent: b.maxConcurrent ?? 4,
     status: b.status,
     brief: b.greeting.brief,
     msg: b.greeting.msg,
@@ -210,6 +212,12 @@ function onKey(e: KeyboardEvent) {
     s.set({ palette: !s.palette, inboxOpen: false })
     return
   }
+  // Ctrl/⌘+P na tela da Yui: trocar de projeto
+  if (mod && !e.shiftKey && e.key.toLowerCase() === 'p' && s.shellMode === 'yui') {
+    e.preventDefault()
+    s.set({ projectsOpen: !s.projectsOpen, runsOpen: false, inboxOpen: false, palette: false })
+    return
+  }
   // Dentro do terminal, Esc e demais teclas pertencem ao programa (Claude/vim/etc.).
   if ((e.target as HTMLElement | null)?.closest?.('.atria-terminal')) return
   if (mod && e.key.toLowerCase() === 'l') {
@@ -220,7 +228,7 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape') {
     if (s.palette) return s.set({ palette: false })
     if (s.approvalOpen) return s.set({ approvalOpen: null })
-    if (s.inboxOpen || s.histOpen) return s.set({ inboxOpen: false, histOpen: false })
+    if (s.inboxOpen || s.histOpen || s.runsOpen || s.projectsOpen) return s.set({ inboxOpen: false, histOpen: false, runsOpen: false, projectsOpen: false })
     if (s.mode === 'focus') return s.set({ mode: 'canvas' })
     if (s.mode === 'canvas') return s.close()
   }
@@ -281,6 +289,7 @@ export function Shell() {
         <OrbButton w={size.w} h={size.h} />
         <Dock />
         <Inbox />
+        <RunsPopover />
         <HistoryDrawer />
         <CommandPalette />
         <ApprovalModal />

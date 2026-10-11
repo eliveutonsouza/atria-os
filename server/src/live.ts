@@ -2,8 +2,9 @@ import { SidebandWS } from 'openai/resources/live/sideband/ws';
 import type OpenAI from 'openai';
 import type { RunInfo, UiAction } from '../../shared/protocol.ts';
 import { config } from './config.ts';
-import { emit, setYuiState } from './bus.ts';
-import { openai, recentMessages, saveMessage, think } from './brain.ts';
+import { emit, onEmit, setYuiState } from './bus.ts';
+import { openai, recentMessages, saveMessage, think, type ThinkInput } from './brain.ts';
+import { activeProject, findProject } from './projects.ts';
 import { runBus } from './runs.ts';
 import { agentsWorking } from './agents.ts';
 import { contextoAgora } from './ambiente.ts';
@@ -118,7 +119,7 @@ async function serve(st: LiveState, request: string, delegationId: string | null
   st.inflight = inf;
   let answer: string;
   try {
-    answer = clip(await think({ request, source: 'voice' }));
+    answer = clip(await think({ request, source: 'voice', project: activeProject() ?? null }));
   } catch (err) {
     console.error('cérebro (voz) falhou', err);
     answer = 'Tive um problema para consultar isso agora. Pode tentar de novo?';
@@ -132,8 +133,9 @@ async function serve(st: LiveState, request: string, delegationId: string | null
 function flushYui() {
   if (!live || !live.yuiBuf.trim()) return;
   const text = live.yuiBuf.trim();
-  saveMessage('yui', text, 'voice');
-  emit({ type: 'yui.say', text, final: true });
+  const project = activeProject() ?? null;
+  saveMessage('yui', text, 'voice', project);
+  emit({ type: 'yui.say', text, final: true, project });
   live.yuiBuf = '';
 }
 
@@ -291,11 +293,13 @@ setInterval(() => {
 
 // Texto digitado: com voz ativa, a Yui fala a resposta; sem voz, resposta vai só para a tela.
 export async function handleText(text: string): Promise<void> {
-  saveMessage('user', text, 'text');
+  // Projeto preso no começo: trocar de projeto enquanto a Yui pensa não muda para onde vai o pedido.
+  const req: ThinkInput = { request: text, source: 'text', project: activeProject() ?? null };
+  saveMessage('user', text, 'text', req.project ?? null);
   if (live) live.lastActivity = Date.now();
   let answer: string;
   try {
-    answer = await think({ request: text, source: 'text' });
+    answer = await think(req);
   } catch (e) {
     console.error('brain', e);
     answer = 'Não consegui pensar nisso agora — algo falhou do meu lado.';
@@ -304,26 +308,33 @@ export async function handleText(text: string): Promise<void> {
     send(live, { type: 'session.commentary.append', delegation_id: null, content: clip(answer) });
     return;
   }
-  sayOnScreen(answer);
+  sayOnScreen(answer, 'idle', req.project ?? null);
 }
 
-function sayOnScreen(raw: string, end: 'idle' | 'success' | 'warning' = 'idle') {
+function sayOnScreen(raw: string, end: 'idle' | 'success' | 'warning' = 'idle', project: string | null = activeProject() ?? null) {
   const text = raw.replace(/`([^`]*)`/g, '$1').replace(/\*\*([^*]+)\*\*/g, '$1'); // fala/tela sem marcação
-  saveMessage('yui', text, 'text');
+  saveMessage('yui', text, 'text', project);
   setYuiState('speaking');
-  emit({ type: 'yui.say', text, final: true });
+  emit({ type: 'yui.say', text, final: true, project });
   setTimeout(() => setYuiState(end !== 'idle' ? end : agentsWorking() ? 'working' : 'idle'), 1300).unref();
   if (end !== 'idle') setTimeout(() => setYuiState(agentsWorking() ? 'working' : 'idle'), 3000).unref();
 }
 
 // Narração do trabalho dos agentes (também usada por missões/workflows).
-export function narrate(text: string, opts: { speak: boolean; end?: 'success' | 'warning' }) {
+// opts.project: conversa do projeto de origem; se não for o ativo, a fala diz de qual projeto é.
+export function narrate(text: string, opts: { speak: boolean; end?: 'success' | 'warning'; project?: string | null }) {
+  const other = opts.project !== undefined && opts.project !== (activeProject() ?? null);
+  if (other) text = `No projeto ${opts.project ? findProject(opts.project)?.name ?? opts.project : 'Geral'}: ${text}`;
   if (live) {
+    if (other && opts.speak) {
+      saveMessage('yui', text, 'voice', opts.project ?? null);
+      emit({ type: 'yui.say', text, final: true, project: opts.project ?? null });
+    }
     send(live, { type: opts.speak ? 'session.commentary.append' : 'session.thinking.append', delegation_id: null, content: clip(text) });
     if (opts.end) setYuiState(opts.end);
     return;
   }
-  if (opts.speak) sayOnScreen(brief(text), opts.end ?? 'idle');
+  if (opts.speak) sayOnScreen(brief(text), opts.end ?? 'idle', opts.project !== undefined ? opts.project : activeProject() ?? null);
 }
 
 // Na tela (sem voz) a narração precisa caber ao lado do orb: até ~2 frases.
@@ -348,7 +359,7 @@ runBus.on('finished', (run: RunInfo) => {
   if (run.missionId || run.workflowRunId) return;
   const ok = run.state === 'done';
   const prefix = ok ? `${run.agent} concluiu.` : run.state === 'cancelled' ? `${run.agent} foi cancelado.` : `${run.agent} não conseguiu concluir.`;
-  narrate(`${prefix} ${run.result ?? ''}`.trim(), { speak: true, end: ok ? 'success' : 'warning' });
+  narrate(`${prefix} ${run.result ?? ''}`.trim(), { speak: true, end: ok ? 'success' : 'warning', project: run.project });
 });
 
 runBus.on('approval', (a) => {
@@ -358,3 +369,9 @@ runBus.on('approval', (a) => {
 
 // Contexto de tela vai só para o cérebro (getUiContext); mandar ao GPT-Live fazia a Yui narrar a tela.
 export function setUiContextNote(_note: string) {}
+
+// Troca de projeto com a voz ligada: nota silenciosa para o GPT-Live saber em que conversa está.
+onEmit((ev) => {
+  if (!live || ev.type !== 'ui.action' || ev.action.type !== 'switch_project') return;
+  send(live, { type: 'session.thinking.append', delegation_id: null, content: `O usuário trocou para o projeto ${ev.action.project ? ev.action.name : 'Geral (sem projeto)'}. A conversa e as próximas tarefas agora são desse projeto.` });
+});

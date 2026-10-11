@@ -41,6 +41,10 @@ export interface YuiStore {
   pending: Pending | null
   hist: ChatMessage[]
   activeProject: string | null
+  unread: Record<string, number> // mensagens novas da Yui por projeto ('' = Geral) enquanto você está em outro
+  projectsOpen: boolean
+  runsOpen: boolean
+  maxConcurrent: number
   projects: ProjectSummary[]
   agentsWorking: number
   inbox: InboxItem[]
@@ -111,6 +115,10 @@ export const useYui = create<YuiStore>((set, get) => ({
   pending: null,
   hist: [],
   activeProject: null,
+  unread: {},
+  projectsOpen: false,
+  runsOpen: false,
+  maxConcurrent: 4,
   projects: [],
   agentsWorking: 0,
   inbox: [],

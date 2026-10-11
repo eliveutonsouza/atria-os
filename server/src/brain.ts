@@ -28,14 +28,15 @@ export function setUiContext(ctx: ChatContext) {
 }
 export const getUiContext = () => uiContext;
 
-export function saveMessage(who: 'user' | 'yui', text: string, source: 'text' | 'voice') {
+// Cada projeto tem a própria conversa; NULL = Geral (sem projeto).
+export function saveMessage(who: 'user' | 'yui', text: string, source: 'text' | 'voice', project: string | null = activeProject() ?? null) {
   const t = text.trim();
   if (!t) return;
-  db.prepare('INSERT INTO messages(id, who, text, source, at) VALUES(?, ?, ?, ?, ?)').run(uid(), who, t, source, now());
+  db.prepare('INSERT INTO messages(id, who, text, source, at, project) VALUES(?, ?, ?, ?, ?, ?)').run(uid(), who, t, source, now(), project);
 }
 
-export function recentMessages(limit = 24): { who: 'user' | 'yui'; text: string; at: string }[] {
-  return (db.prepare('SELECT who, text, at FROM messages ORDER BY at DESC LIMIT ?').all(limit) as { who: 'user' | 'yui'; text: string; at: string }[]).reverse();
+export function recentMessages(limit = 24, project: string | null = activeProject() ?? null): { who: 'user' | 'yui'; text: string; at: string }[] {
+  return (db.prepare('SELECT who, text, at FROM messages WHERE project IS ? ORDER BY at DESC LIMIT ?').all(project, limit) as { who: 'user' | 'yui'; text: string; at: string }[]).reverse();
 }
 
 // Nome do dono vem das Configurações (pode mudar com o servidor no ar).
@@ -55,6 +56,7 @@ Como responder:
 - Os agentes têm acesso real às contas do usuário pelos conectores listados em "Conectores dos agentes" (ex.: Google Calendar, Gmail, Drive, Linear, Vercel, Supabase) e a um navegador. NUNCA diga que não há acesso a um serviço dessa lista: delegue ao agente Assistente (agenda, e-mail, documentos, tarefas, consultas) com instrução completa (data, hora, fuso ${config.timezone}, título). Se faltar só a data, assuma a próxima ocorrência futura e diga qual assumiu.
 - Os projetos do usuário são os repositórios dele no GitHub (catálogo automático). Nunca peça para cadastrar projeto: se não reconhecer o nome, use list_repos. Projetos ainda não clonados são clonados sozinhos ao abrir ou delegar.
 - Se o usuário mudar de projeto ("agora no Stoqmate"), use switch_project.
+- Cada projeto tem a própria conversa e várias tarefas podem rodar ao mesmo tempo em projetos diferentes. Tarefas pedidas sem citar projeto vão para o projeto ativo; só passe outro project em delegate_task quando o usuário citar outro projeto.
 - Aprovações são sempre decididas pelo usuário no modal; use open_approval para mostrá-lo, nunca aprove sozinha.
 - Se a fala parecer transcrição truncada ou ambígua, pergunte só o detalhe que falta.
 
@@ -97,7 +99,7 @@ const TOOLS: OpenAI.Responses.FunctionTool[] = [
     description: 'Acorda um agente Claude Code para executar um trabalho real (código, pesquisa, relatório, site).',
     parameters: S({
       agent: { type: 'string', description: 'id ou nome do agente (ver list_agents)' },
-      project: nullableStr('slug do projeto onde trabalhar; null para tarefas sem projeto'),
+      project: nullableStr('slug do projeto onde trabalhar; null = projeto atual da conversa ("Projeto ativo" no contexto)'),
       instruction: { type: 'string', description: 'instrução completa e autossuficiente em português' },
       use_selected_element: { type: 'boolean', description: 'true se o pedido se refere ao elemento selecionado no preview' },
       display: { type: 'string', enum: ['blocks', 'html', 'none'], description: 'blocks = o agente devolve uma tela de dados que abre sozinha (e-mails, agenda, leads, listas); html = página visual sob medida; none = só resposta falada' },
@@ -122,9 +124,8 @@ function connectors(): string {
   }
 }
 
-function snapshot(): string {
+function snapshot(ap: string | null): string {
   const extra = brainExtensions().map((e) => e.snapshot?.()).filter(Boolean);
-  const ap = activeProject();
   const runs = listRuns(12);
   const lines = [
     `Projeto ativo: ${ap ?? 'nenhum'}.`,
@@ -147,18 +148,24 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
     return dryResult(name);
   }
   const proj = (k = 'project') => (typeof args[k] === 'string' && args[k] ? findProject(args[k] as string) : undefined);
+  // Sem projeto explícito, vale o projeto em que a conversa está.
+  const current = ctx.project !== undefined ? ctx.project : activeProject() ?? null;
+  const projOrCurrent = () => proj() ?? (current ? findProject(current) : undefined);
   switch (name) {
     case 'show_view': {
       const view = args.view as ViewName;
-      const p = proj() ?? (['project', 'logs', 'website'].includes(view) ? findProject(activeProject()) : undefined);
+      const p = proj() ?? (['project', 'logs', 'website'].includes(view) && current ? findProject(current) : undefined);
       if (['project', 'logs', 'website'].includes(view) && !p) return { ok: false, error: 'essa view precisa de um projeto existente' };
-      if (p) setActiveProject(p.slug);
+      if (p) {
+        setActiveProject(p.slug);
+        ctx.project = p.slug;
+      }
       emit({ type: 'ui.action', action: { type: 'show_view', view, params: { project: p?.slug, runId: (args.run_id as string) || undefined } } });
       setYuiState('showing');
       return { ok: true };
     }
     case 'suggest_view': {
-      const p = proj();
+      const p = projOrCurrent();
       emit({ type: 'ui.action', action: { type: 'suggest_view', view: args.view as ViewName, params: { project: p?.slug } } });
       return { ok: true };
     }
@@ -172,6 +179,7 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
       const p = proj();
       if (!p) return { ok: false, error: 'projeto não encontrado', projetos: listProjectConfigs().map((x) => x.name) };
       setActiveProject(p.slug);
+      ctx.project = p.slug; // o resto deste pedido (e a resposta) já segue na conversa do novo projeto
       emit({ type: 'ui.action', action: { type: 'switch_project', project: p.slug, name: p.name } });
       return { ok: true, project: p.name };
     }
@@ -197,7 +205,7 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
     case 'list_agents':
       return agentInfos().map((a) => ({ ...a, descricao: loadAgents().find((d) => d.id === a.id)?.description }));
     case 'delegate_task': {
-      const project = (args.project as string | null) ?? null;
+      const project = projOrCurrent()?.slug ?? null;
       const run = enqueueRun({
         agentId: String(args.agent),
         project,
@@ -209,7 +217,7 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx
       return { ok: true, run_id: run.id, agente: run.agent, estado: run.state };
     }
     case 'create_routine': {
-      const r = createRoutine({ name: String(args.name), cron: String(args.cron), agentId: String(args.agent), project: (args.project as string | null) ?? null, instruction: String(args.instruction) });
+      const r = createRoutine({ name: String(args.name), cron: String(args.cron), agentId: String(args.agent), project: projOrCurrent()?.slug ?? null, instruction: String(args.instruction) });
       return { ok: true, id: r.id };
     }
     case 'list_repos': {
@@ -240,6 +248,7 @@ export interface ThinkInput {
   source: 'text' | 'voice';
   dryRun?: boolean; // avaliação: tools só são registradas (scripts/eval-brain.ts)
   calls?: { name: string; args: Record<string, unknown> }[];
+  project?: string | null; // conversa (projeto) do pedido; padrão = projeto ativo
 }
 
 // Respostas plausíveis para o modo de avaliação (não toca em nada real).
@@ -256,15 +265,26 @@ const allTools = () => {
 const allInstructions = () => [instructionsText(), ...brainExtensions().map((e) => e.instructions).filter(Boolean)].join('\n');
 
 // Retorna a frase final da Yui. Efeitos de UI já foram emitidos durante o loop.
-export async function think({ request, dryRun = false, calls }: ThinkInput): Promise<string> {
-  const ctx: ToolCtx & { calls?: ThinkInput['calls'] } = { dryRun, calls };
+// input.project é atualizado se o pedido trocar de projeto (switch_project): quem chamou grava a resposta lá.
+export async function think(input: ThinkInput): Promise<string> {
+  if (input.project === undefined) input.project = activeProject() ?? null;
+  const { request, dryRun = false, calls, project } = input;
+  const ctx: ToolCtx & { calls?: ThinkInput['calls'] } = { dryRun, calls, project };
+  try {
+    return await thinkLoop(request, dryRun, ctx, project ?? null);
+  } finally {
+    input.project = ctx.project ?? null;
+  }
+}
+
+async function thinkLoop(request: string, dryRun: boolean, ctx: ToolCtx, project: string | null): Promise<string> {
   if (!config.openaiKey) return 'Ainda não tenho a chave da OpenAI configurada no servidor.';
   if (!dryRun) setYuiState('thinking');
-  const history = recentMessages(20)
+  const history = recentMessages(20, project)
     .map((m) => `${m.who === 'user' ? 'Usuário' : 'Yui'}: ${m.text}`)
     .join('\n');
   let input: OpenAI.Responses.ResponseInput = [
-    { role: 'developer', content: `Contexto do Atria OS:\n${snapshot()}\n\nConversa recente:\n${history || '(início)'}` },
+    { role: 'developer', content: `Contexto do Atria OS:\n${snapshot(project)}\n\nConversa recente:\n${history || '(início)'}` },
     { role: 'user', content: request },
   ];
   let previous: string | undefined;

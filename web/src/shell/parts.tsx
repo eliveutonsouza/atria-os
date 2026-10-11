@@ -5,6 +5,7 @@ import { submitText } from '../lib/actions'
 import { useYui } from '../store/yui'
 import { OrbEngine, orbTarget } from '../yui/orbEngine'
 import { toggleLive } from '../voice/live'
+import { ProjectPicker, RunsButton, useRunsFeed } from './ProjectPicker'
 
 export const STATE_META: Record<YuiState, [string, string]> = {
   idle: ['Disponível', C.t2],
@@ -78,9 +79,27 @@ export function OrbButton({ w, h }: { w: number; h: number }) {
   const mode = useYui((s) => s.mode)
   const narrow = useYui((s) => s.narrow)
   const app = useYui((s) => s.shellMode === 'app')
+  const listening = useYui((s) => s.listening)
+  const connecting = useYui((s) => s.liveConnecting)
   const isC = mode === 'center', isF = mode === 'focus'
-  if (app || !(isF || (narrow && !isC))) return null
+  if (app) return null
   const T = orbTarget(mode, narrow, w, h)
+  // Yui ao centro: tocar no orb liga/desliga a voz (a conversa continua sendo pela voz).
+  if (isC) {
+    const on = listening || connecting
+    const d = Math.round(T.r * 2.4)
+    return (
+      <button
+        onClick={toggleLive}
+        className="orb-hit"
+        title={on ? 'Encerrar voz' : 'Falar com a Yui'}
+        aria-label={on ? 'Encerrar conversa por voz' : 'Falar com a Yui'}
+        aria-pressed={on}
+        style={{ position: 'absolute', left: T.x, top: T.y, width: d, height: d, margin: `-${d / 2}px 0 0 -${d / 2}px`, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', zIndex: 26 }}
+      />
+    )
+  }
+  if (!(isF || narrow)) return null
   return (
     <button
       onClick={() => (isF ? useYui.getState().setFocus(false) : useYui.getState().close())}
@@ -97,16 +116,13 @@ function Dot({ c }: { c: string }) {
 }
 
 export function TopBar() {
-  const activeProject = useYui((s) => s.activeProject)
-  const projects = useYui((s) => s.projects)
-  const agentsWorking = useYui((s) => s.agentsWorking)
+  useRunsFeed()
   const inbox = useYui((s) => s.inbox)
   const status = useYui((s) => s.status)
   const narrow = useYui((s) => s.narrow)
   const coarse = useYui((s) => s.coarse)
   const app = useYui((s) => s.shellMode === 'app')
   const bh = coarse ? 44 : 32 // alvos de toque ≥44px
-  const name = projects.find((p) => p.slug === activeProject)?.name ?? activeProject ?? 'Nenhum'
   const set = useYui((s) => s.set)
   return (
     <div
@@ -117,34 +133,33 @@ export function TopBar() {
         transition: 'opacity .3s, transform .45s var(--ease), visibility .3s', opacity: app ? 0 : 1, transform: app ? 'translateY(-10px)' : 'none', pointerEvents: app ? 'none' : 'auto', visibility: app ? 'hidden' : 'visible',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: narrow ? 8 : 12, minWidth: 0, flex: narrow ? 1 : undefined }}>
         <button
           onClick={() => set({ palette: true, inboxOpen: false })}
           className="hov-bg"
           aria-label="Abrir comandos (Ctrl K)"
-          style={{ display: 'flex', alignItems: 'center', gap: 10, height: coarse ? 44 : 36, padding: '0 12px 0 10px', borderRadius: 12, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.03)', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 600, letterSpacing: '.14em' }}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, height: coarse ? 44 : 36, minWidth: coarse ? 44 : undefined, flexShrink: 0, padding: narrow ? 0 : '0 12px 0 10px', borderRadius: 12, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.03)', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 600, letterSpacing: '.14em' }}
         >
           <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, #fff, #67d8f2 45%, #a68cf7)' }} />
-          <span>ATRIA OS</span>
-          <span className="mono" style={{ fontSize: 11, letterSpacing: 0, color: C.t3, fontWeight: 400 }}>⌘K</span>
+          {!narrow && <span>ATRIA OS</span>}
+          {!narrow && <span className="mono" style={{ fontSize: 11, letterSpacing: 0, color: C.t3, fontWeight: 400 }}>⌘K</span>}
         </button>
-        {!narrow && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: C.t2, whiteSpace: 'nowrap', overflow: 'hidden' }}>
-            <span>Projeto</span>
-            <span style={{ color: C.text, fontWeight: 600 }}>{name}</span>
-            <span style={{ color: '#3c4160' }}>·</span>
-            <span>Escopo: Auto</span>
-          </div>
-        )}
+        <ProjectPicker />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         {!narrow && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '0 12px', height: 32, borderRadius: 10, fontSize: 12, color: C.t2 }}>
+          <button
+            onClick={() => set({ shellMode: 'app', appPage: 'settings', appParams: { id: 'models' }, inboxOpen: false, runsOpen: false })}
+            className="hov-bg"
+            title="Contas e modelos"
+            aria-label={`Claude ${status.claude ? 'conectado' : 'desconectado'}, OpenAI ${status.openai ? 'conectado' : 'desconectado'}. Abrir contas e modelos`}
+            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '0 12px', height: 32, borderRadius: 10, border: 'none', background: 'transparent', fontSize: 12, color: C.t2, cursor: 'pointer', fontFamily: 'inherit' }}
+          >
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Dot c={status.claude ? C.ok : C.crit} />Claude</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Dot c={status.openai ? C.ok : C.crit} />OpenAI</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Dot c={agentsWorking ? C.cyan : C.t3} />{agentsWorking} agentes trabalhando</span>
-          </div>
+          </button>
         )}
+        <RunsButton />
         {inbox.length > 0 && (
           <button
             onClick={() => set({ inboxOpen: !useYui.getState().inboxOpen })}
@@ -203,11 +218,23 @@ export function YuiCenter() {
         transition: 'opacity .3s, transform .55s var(--ease), visibility .3s', opacity: isC ? 1 : 0, transform: isC ? 'none' : app ? 'translateY(14px) scale(.97)' : 'translateX(-80px) scale(.96)', pointerEvents: isC ? 'auto' : 'none', visibility: app ? 'hidden' : 'visible',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, letterSpacing: '.32em', color: C.t2, fontWeight: 600 }}>
-        <span>YUI</span>
-        <span style={{ width: 3, height: 3, borderRadius: '50%', background: C.t4 }} />
-        <span style={{ color, letterSpacing: '.2em' }}>{label}</span>
-      </div>
+      {yst === 'working' || yst === 'delegating' ? (
+        <button
+          onClick={() => useYui.getState().set({ runsOpen: true, projectsOpen: false, inboxOpen: false })}
+          title="Ver execuções"
+          style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, letterSpacing: '.32em', color: C.t2, fontWeight: 600, border: 'none', background: 'transparent', cursor: 'pointer', padding: coarse ? '12px 4px' : '4px', fontFamily: 'inherit' }}
+        >
+          <span>YUI</span>
+          <span style={{ width: 3, height: 3, borderRadius: '50%', background: C.t4 }} />
+          <span style={{ color, letterSpacing: '.2em', textDecoration: 'underline', textUnderlineOffset: 4, textDecorationColor: 'rgba(103,216,242,.4)' }}>{label}</span>
+        </button>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, letterSpacing: '.32em', color: C.t2, fontWeight: 600 }}>
+          <span>YUI</span>
+          <span style={{ width: 3, height: 3, borderRadius: '50%', background: C.t4 }} />
+          <span style={{ color, letterSpacing: '.2em' }}>{label}</span>
+        </div>
+      )}
       <div style={{ fontSize: short ? 24 : 30, fontWeight: 300, lineHeight: 1.3, letterSpacing: '-.01em', maxWidth: 680, textWrap: 'pretty' }}>{msg}</div>
       {liveTranscript && <div style={{ fontSize: 14, color: C.t3, maxWidth: 640 }}>“{liveTranscript}”</div>}
       {showLines && brief && (

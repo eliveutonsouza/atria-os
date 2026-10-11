@@ -74,7 +74,7 @@ export const config = {
     return dyn('claude.model', 'ATRIA_CLAUDE_MODEL', '');
   },
   get maxConcurrentRuns() {
-    return Math.max(1, Math.min(8, Number(dyn('runs.concurrency', 'ATRIA_MAX_CONCURRENT_RUNS', '2')) || 2));
+    return Math.max(1, Math.min(8, Number(dyn('runs.concurrency', 'ATRIA_MAX_CONCURRENT_RUNS', '4')) || 4));
   },
   browserMcpUrl: env('ATRIA_BROWSER_MCP', 'http://atria-browser:8931/mcp'),
   browserCdp: env('ATRIA_BROWSER_CDP', 'http://atria-browser:9223'),

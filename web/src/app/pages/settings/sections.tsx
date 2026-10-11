@@ -432,7 +432,7 @@ export function ModelsSection() {
             </ModelRow>
           ))}
           <ModelRow title="Agentes ao mesmo tempo" desc="1 a 8. Mais = mais rápido, mais uso do plano.">
-            <input type="number" min={1} max={8} value={Number(v['runs.concurrency'] ?? 2)} onChange={(e) => set('runs.concurrency', Number(e.target.value))} aria-label="Agentes ao mesmo tempo" style={{ ...input, maxWidth: 120, height: 44 }} />
+            <input type="number" min={1} max={8} value={Number(v['runs.concurrency'] ?? 4)} onChange={(e) => set('runs.concurrency', Number(e.target.value))} aria-label="Agentes ao mesmo tempo" style={{ ...input, maxWidth: 120, height: 44 }} />
           </ModelRow>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>

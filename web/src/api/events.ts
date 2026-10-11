@@ -1,8 +1,8 @@
-import type { BrowserChallengeState, ServerEvent, UiAction } from '@shared/protocol'
+import type { BrowserChallengeState, ChatMessage, ServerEvent, UiAction } from '@shared/protocol'
 import { dropMission } from '../lib/actions'
 import { useYui } from '../store/yui'
 import { onInputUpdated } from '../workflow/inputs'
-import { MOCK } from './client'
+import { api, MOCK } from './client'
 
 let yuiStreaming = false
 
@@ -53,9 +53,19 @@ export function applyUiAction(a: UiAction) {
     case 'suggest_view':
       s.set({ pending: { view: a.view, params: a.params, label: a.label } })
       break
-    case 'switch_project':
-      s.set({ activeProject: a.project })
+    case 'switch_project': {
+      if (a.project === s.activeProject) break
+      const unread = { ...s.unread }
+      delete unread[a.project ?? '']
+      s.set({ activeProject: a.project, unread })
+      // troca vinda da voz/cérebro: carrega a conversa do novo projeto
+      api.get<ChatMessage[]>(`/api/history?project=${encodeURIComponent(a.project ?? '')}`)
+        .then((h) => {
+          if (useYui.getState().activeProject === a.project) useYui.getState().set({ hist: h })
+        })
+        .catch(() => {})
       break
+    }
     case 'open_approval':
       if (s.approvals[a.approvalId]) s.set({ approvalOpen: a.approvalId, inboxOpen: false, yst: 'warning' })
       else s.set({ pending: { view: 'approval', approvalId: a.approvalId, label: 'Revisar aprovação' } })
@@ -70,6 +80,12 @@ export function applyEvent(ev: ServerEvent) {
       s.set({ yst: ev.state })
       break
     case 'yui.say':
+      // fala de outro projeto (tarefa que terminou lá): aparece no centro, mas fica na conversa daquele projeto
+      if (ev.final && ev.project !== undefined && (ev.project ?? null) !== s.activeProject) {
+        const k = ev.project ?? ''
+        s.set({ msg: ev.text, showLines: false, unread: { ...s.unread, [k]: (s.unread[k] ?? 0) + 1 } })
+        break
+      }
       if (ev.final) {
         yuiStreaming = false
         s.set({ msg: ev.text, showLines: false })

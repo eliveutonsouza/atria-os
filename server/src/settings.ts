@@ -36,7 +36,7 @@ export const SETTINGS: Record<string, Def> = {
   'claude.model': { kind: 'string', env: 'ATRIA_CLAUDE_MODEL', def: '', maxLen: 60 },
   'models.embed': { kind: 'string', env: 'ATRIA_EMBED_MODEL', def: 'text-embedding-3-small', maxLen: 60 },
   'pricing.openai': { kind: 'string', def: '', maxLen: 4000 },
-  'runs.concurrency': { kind: 'number', env: 'ATRIA_MAX_CONCURRENT_RUNS', def: 2, min: 1, max: 8 },
+  'runs.concurrency': { kind: 'number', env: 'ATRIA_MAX_CONCURRENT_RUNS', def: 4, min: 1, max: 8 },
   'voice.name': { kind: 'string', env: 'ATRIA_VOICE', def: 'marin', maxLen: 40 },
   'voice.idleMin': { kind: 'number', env: 'ATRIA_LIVE_IDLE_MIN', def: 5, min: 1, max: 60 },
   'voice.pttKey': { kind: 'enum', def: 'Space', options: ['Space', 'Backquote', 'F8', 'AltRight'] },

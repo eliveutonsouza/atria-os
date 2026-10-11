@@ -7,6 +7,7 @@ import type { Options } from '@anthropic-ai/claude-agent-sdk';
 export interface ToolCtx {
   dryRun: boolean;
   calls?: { name: string; args: Record<string, unknown> }[];
+  project?: string | null; // projeto ativo quando o pedido chegou (trocar no meio não muda o destino)
 }
 
 export interface BrainExtension {

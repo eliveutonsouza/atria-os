@@ -46,6 +46,9 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2
 .hov-pal:hover { background: rgba(255,255,255,.06) !important; }
 .hov-txt:hover { color: var(--text) !important; }
 .hov-sugg:hover { color: var(--lav) !important; }
+.orb-hit { transition: box-shadow .3s; }
+.orb-hit:hover, .orb-hit:focus-visible { box-shadow: 0 0 0 1px rgba(103,216,242,.35), 0 0 0 10px rgba(103,216,242,.05); outline: none; }
+.orb-hit[aria-pressed="true"] { box-shadow: 0 0 0 1px rgba(103,216,242,.55), 0 0 0 12px rgba(103,216,242,.08); }
 .hov-icon:hover { background: rgba(255,255,255,.06) !important; color: var(--text) !important; }
 
 .eyebrow { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--text-3); font-weight: 600; }

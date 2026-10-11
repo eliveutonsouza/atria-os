@@ -153,7 +153,8 @@ app.get('/api/bootstrap', async () => {
     projects: await projectSummaries(),
     agentsWorking: agentsWorking(),
     inbox: inboxItems(),
-    history: recentMessages(60).map((m, i) => ({ id: `${m.at}-${i}`, who: m.who, text: m.text, at: m.at })),
+    history: historyOf(activeProject()),
+    maxConcurrent: config.maxConcurrentRuns,
     greeting: g,
     status: {
       claude: claudeLoggedIn() || !!config.claudeToken,
@@ -168,6 +169,26 @@ app.get('/api/bootstrap', async () => {
 });
 
 // ---------- conversa ----------
+// Histórico da conversa de um projeto (null = Geral).
+const historyOf = (project: string | null) => recentMessages(60, project).map((m, i) => ({ id: `${m.at}-${i}`, who: m.who, text: m.text, at: m.at }));
+
+app.get('/api/history', async (req) => {
+  const p = (req.query as { project?: string }).project;
+  return historyOf(p ? p : null);
+});
+
+// Troca o projeto em que a conversa está (seletor da tela principal). slug null = Geral.
+app.post('/api/projects/active', async (req, reply) => {
+  const slug = (req.body as { slug?: unknown } | undefined)?.slug;
+  if (slug !== null && typeof slug !== 'string') return reply.code(400).send({ error: 'slug' });
+  const proj = slug ? findProject(slug) : undefined;
+  if (slug && !proj) return reply.code(404).send({ error: 'projeto não encontrado' });
+  if ((proj?.slug ?? null) !== activeProject()) {
+    setActiveProject(proj?.slug ?? null);
+    emit({ type: 'ui.action', action: { type: 'switch_project', project: proj?.slug ?? null, name: proj?.name ?? 'Geral' } });
+  }
+  return { activeProject: proj?.slug ?? null, history: historyOf(proj?.slug ?? null) };
+});
 app.post('/api/chat', async (req, reply) => {
   const { text, context } = (req.body ?? {}) as { text?: unknown; context?: ChatContext };
   if (typeof text !== 'string' || !text.trim()) return reply.code(400).send({ error: 'text' });

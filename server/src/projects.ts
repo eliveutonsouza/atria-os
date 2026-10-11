@@ -115,8 +115,8 @@ export async function ensureProject(p: ProjectConfig): Promise<ProjectConfig> {
   return findProject(p.slug) ?? p;
 }
 
-export const activeProject = () => kvGet('active_project');
-export const setActiveProject = (slug: string) => kvSet('active_project', slug);
+export const activeProject = (): string | null => kvGet('active_project') || null;
+export const setActiveProject = (slug: string | null) => kvSet('active_project', slug ?? '');
 
 const healthCache = new Map<string, { at: number; ok: boolean | null }>();
 async function probe(p: ProjectConfig): Promise<boolean | null> {

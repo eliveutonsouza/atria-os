@@ -29,7 +29,7 @@ services:
       - /proc:/host/proc:ro
     expose:
       - "8080"
-    mem_limit: 2g
+    mem_limit: 3g
     cpus: "2.0"
     security_opt:
       - no-new-privileges:true

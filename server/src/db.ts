@@ -155,6 +155,8 @@ addColumn('runs', 'context_window', 'INTEGER');
 addColumn('runs', 'num_turns', 'INTEGER');
 addColumn('sessions', 'kind', "TEXT NOT NULL DEFAULT 'owner'"); // owner | support (suporte remoto, support.ts)
 addColumn('sessions', 'label', 'TEXT');
+addColumn('messages', 'project', 'TEXT'); // conversa por projeto (NULL = Geral)
+db.exec('CREATE INDEX IF NOT EXISTS messages_project_at ON messages(project, at)');
 
 export const now = () => new Date().toISOString();
 export const uid = () => randomUUID();
