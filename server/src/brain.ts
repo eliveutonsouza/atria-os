@@ -290,7 +290,7 @@ const allInstructions = () => [instructionsText(), ...brainExtensions().map((e) 
 export async function think(input: ThinkInput): Promise<string> {
   if (input.project === undefined) input.project = activeProject() ?? null;
   const { request, dryRun = false, calls, project, channel = 'panel' } = input;
-  const ctx: ToolCtx & { calls?: ThinkInput['calls'] } = { dryRun, calls, project, channel };
+  const ctx: ToolCtx & { calls?: ThinkInput['calls'] } = { dryRun, calls, project, channel, request };
   try {
     return await thinkLoop(request, dryRun, ctx, project ?? null);
   } finally {

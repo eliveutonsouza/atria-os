@@ -63,3 +63,9 @@ Pela Yui: "Demite o agente X" abre um modal de aprovação vermelho; nada é apa
 ## Versões anteriores
 Cada edição de um agente guarda uma cópia da versão anterior. Na ficha do agente, **Versões anteriores › Ver versões › Restaurar** volta para uma delas. A versão atual vai para o histórico antes, então dá para desfazer a restauração também.
 - Por voz: "Yui, volta o Dev para a versão anterior".
+
+## Lições aprendidas
+Depois de execuções longas, com falha, com aprovação rejeitada ou com 👎, a Yui revisa o que aconteceu e anota até 2 lições para o agente. Elas entram no prompt dele nas próximas tarefas.
+- Ficha do agente › **Lições aprendidas**: ver, **Desfazer** ou ensinar uma lição sua.
+- Até 15 lições por agente; aos domingos as repetidas são fundidas.
+- Por voz: "o que o DevOps aprendeu?".

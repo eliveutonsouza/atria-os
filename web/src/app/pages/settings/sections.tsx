@@ -170,6 +170,7 @@ export function AccountSection() {
           <SaveMsg msg={msg} />
         </div>
       </Section>
+      <UserMemory />
       <Section title="Senha do painel" hint="Trocar a senha encerra as outras sessões abertas.">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
           <Field label="Senha atual"><input type="password" value={cur} onChange={(e) => setCur(e.target.value)} style={input} autoComplete="current-password" /></Field>
@@ -181,6 +182,52 @@ export function AccountSection() {
         </div>
       </Section>
     </>
+  )
+}
+
+// Memória do usuário: o que a Yui leva para toda conversa ("Yui, lembra que…"). Só você grava.
+interface MemoryItem { id: string; text: string; source: 'fala' | 'proposta'; createdAt: string }
+function UserMemory() {
+  const [data, setData] = useState<{ items: MemoryItem[]; max: number; used: number } | null>(null)
+  const [text, setText] = useState('')
+  const [err, setErr] = useState<string | null>(null)
+  const load = useCallback(() => api.get<{ items: MemoryItem[]; max: number; used: number }>('/api/memory').then(setData).catch(() => {}), [])
+  useEffect(() => {
+    void load()
+  }, [load])
+  const add = async () => {
+    setErr(null)
+    try {
+      await api.post('/api/memory', { text })
+      setText('')
+      void load()
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Não consegui guardar.')
+    }
+  }
+  return (
+    <Section title="Memória da Yui" hint="Fatos e preferências que a Yui leva para toda conversa (voz, painel e Telegram). Por voz: “Yui, lembra que…”, “o que você sabe de mim?”, “esquece que…”.">
+      {data && (
+        <span style={{ fontSize: 12, color: C.t3 }}>
+          {data.used} de {data.max} caracteres usados
+        </span>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {data?.items.map((m) => (
+          <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+            <span style={{ flex: 1, fontSize: 13.5, overflowWrap: 'anywhere' }}>{m.text}</span>
+            {m.source === 'proposta' && <span style={{ fontSize: 11, color: C.t3 }}>aprendida</span>}
+            <SmallBtn onClick={() => void api.del(`/api/memory/${m.id}`).then(load)}>Esquecer</SmallBtn>
+          </div>
+        ))}
+        {data && !data.items.length && <span style={{ fontSize: 13, color: C.t3 }}>Nada guardado ainda.</span>}
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <input value={text} maxLength={200} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && text.trim() && void add()} placeholder="Ex.: Prefere reuniões depois das 10h" aria-label="Nova lembrança" style={{ ...input, flex: '1 1 240px' }} />
+        <button type="button" style={bigBtn()} disabled={!text.trim()} onClick={() => void add()}>Guardar</button>
+      </div>
+      {err && <span role="alert" style={{ fontSize: 12.5, color: '#f39aa4' }}>{err}</span>}
+    </Section>
   )
 }
 

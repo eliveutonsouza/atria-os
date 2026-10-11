@@ -43,7 +43,7 @@ export function listInstalled(): InstalledSkill[] {
     return [];
   }
 }
-function saveInstalled(list: InstalledSkill[]) {
+export function saveInstalled(list: InstalledSkill[]) {
   kvSet('skills_installed', JSON.stringify(list));
 }
 export const agentSkills = (agentId: string) => listInstalled().filter((s) => s.scope === 'agents' && s.agents.includes(agentId));
@@ -228,12 +228,12 @@ function ensurePack(agentId: string) {
   writeFileSync(manifest, `${JSON.stringify({ name: `atria-${agentId}`, version: '1.0.0', description: `Skills do agente ${agentId} instaladas pelo Atria OS (skills.sh)` }, null, 2)}\n`);
 }
 
-function removePlacements(s: InstalledSkill) {
+export function removePlacements(s: InstalledSkill) {
   rmSync(join(platformDir(), s.name), { recursive: true, force: true });
   for (const a of s.agents) rmSync(join(packDir(a), 'skills', s.name), { recursive: true, force: true });
 }
 
-function applyPlacements(s: InstalledSkill) {
+export function applyPlacements(s: InstalledSkill) {
   const src = join(libDir(), s.name);
   if (s.scope === 'platform') atomicCopy(src, join(platformDir(), s.name));
   else
@@ -390,6 +390,7 @@ export async function checkUpdates(): Promise<InstalledSkill[]> {
   const list = listInstalled();
   const trees = new Map<string, { sha: string; tree: TreeEntry[] }>();
   for (const s of list) {
+    if (s.origin === 'local') continue; // criada aqui (skills propostas): não tem repositório para comparar
     try {
       if (!trees.has(s.source)) trees.set(s.source, await repoTree(s.source));
       const { sha, tree } = trees.get(s.source)!;

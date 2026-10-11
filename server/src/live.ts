@@ -9,6 +9,7 @@ import { runBus } from './runs.ts';
 import { agentsWorking } from './agents.ts';
 import { contextoAgora } from './ambiente.ts';
 import { trackOpenAI } from './usage.ts';
+import { memoryBlock } from './memoria.ts';
 
 // Yui por voz = GPT-Live-1 (o mesmo modelo full-duplex do ChatGPT Voice/Codex).
 // Browser <-> OpenAI por WebRTC (áudio). Este servidor acompanha a sessão por um sideband WebSocket:
@@ -33,7 +34,7 @@ com o bloco "Agora" abaixo (ou com a "Atualização do relógio" mais recente qu
 "horas do quê?": "que horas são" é a hora atual. Previsão de outros dias/cidades, cotações e lembretes => delegue.
 Ajuste a saudação ao período (bom dia / boa tarde / boa noite).
 
-${contextoAgora(0)}`;
+${contextoAgora(0)}${memoryBlock() ? `\n\n${memoryBlock()}` : ''}`;
 
 interface LiveState {
   sessionId: string;

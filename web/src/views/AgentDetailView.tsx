@@ -214,6 +214,7 @@ export function AgentDetailView({ onGone }: { onGone?: () => void } = {}) {
         )}
       </section>
 
+      <AgentLessons agentId={data.id} />
       <AgentVersions agentId={data.id} agentName={data.name} onRestored={reload} />
 
       <section style={{ display: 'flex', flexDirection: 'column' }}>
@@ -236,6 +237,35 @@ export function AgentDetailView({ onGone }: { onGone?: () => void } = {}) {
         )}
       </section>
     </div>
+  )
+}
+
+// Lições que o agente aprendeu (revisão das execuções, vault e você): entram no prompt dele; desfazer tira.
+interface Lesson { id: string; text: string; source: string; createdAt: string; runId: string | null }
+const LESSON_SRC: Record<string, string> = { revisao: 'da revisão', vault: 'do vault', consolidado: 'consolidada', usuario: 'sua' }
+function AgentLessons({ agentId }: { agentId: string }) {
+  const lessons = useApi<Lesson[]>(`/api/agents/${encodeURIComponent(agentId)}/lessons`, [agentId])
+  const [text, setText] = useState('')
+  const list = lessons.data ?? []
+  const add = () => api.post(`/api/agents/${encodeURIComponent(agentId)}/lessons`, { text }).then(() => { setText(''); lessons.reload() }).catch((e: Error) => useYui.getState().say(e.message))
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+        <span className="eyebrow">Lições aprendidas</span>
+        <span style={{ fontSize: 12, color: C.t3 }}>{list.length ? `${list.length} no prompt dele` : 'nenhuma ainda (surgem de execuções longas, falhas e 👎)'}</span>
+      </div>
+      {list.map((l) => (
+        <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: '1px solid rgba(255,255,255,.05)', fontSize: 13 }}>
+          <span style={{ flex: 1, overflowWrap: 'anywhere' }}>{l.text}</span>
+          <span style={{ fontSize: 11, color: C.t3, whiteSpace: 'nowrap' }}>{LESSON_SRC[l.source] ?? l.source} · {ago(l.createdAt)}</span>
+          <SmallBtn onClick={() => void api.del(`/api/lessons/${l.id}`).then(lessons.reload)}>Desfazer</SmallBtn>
+        </div>
+      ))}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <input value={text} maxLength={240} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && text.trim() && void add()} placeholder="Ensinar uma lição a este agente…" aria-label="Nova lição" style={{ ...input, flex: '1 1 240px' }} />
+        <SmallBtn onClick={() => text.trim() && void add()}>Adicionar</SmallBtn>
+      </div>
+    </section>
   )
 }
 

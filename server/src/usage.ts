@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS ai_usage (
 CREATE INDEX IF NOT EXISTS ai_usage_at ON ai_usage(at);
 `);
 
-export type Feature = 'cerebro' | 'voz' | 'planejador' | 'workflow-decisao' | 'workflow-aprovacao' | 'workflow-gerar' | 'workflow-pedido' | 'workflow-transcricao' | 'workflow-aviso' | 'ajuda' | 'empresa' | 'empresa-embeddings';
+export type Feature = 'cerebro' | 'voz' | 'planejador' | 'workflow-decisao' | 'workflow-aprovacao' | 'workflow-gerar' | 'workflow-pedido' | 'workflow-transcricao' | 'workflow-aviso' | 'ajuda' | 'empresa' | 'empresa-embeddings' | 'aprendizado';
 
 export const FEATURE_LABEL: Record<string, string> = {
   cerebro: 'Cérebro da Yui',
@@ -41,6 +41,7 @@ export const FEATURE_LABEL: Record<string, string> = {
   ajuda: 'Ajuda',
   empresa: 'Empresa (extração e busca)',
   'empresa-embeddings': 'Empresa (embeddings)',
+  aprendizado: 'Aprendizado (lições e propostas)',
 };
 
 type AnyUsage = {

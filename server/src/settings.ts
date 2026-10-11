@@ -45,6 +45,8 @@ export const SETTINGS: Record<string, Def> = {
   'budget.stopPct': { kind: 'number', def: 95, min: 10, max: 100 },
   'budget.openaiDailyUsd': { kind: 'number', def: 0, min: 0, max: 1000 },
   'budget.runMaxUsd': { kind: 'number', def: 0, min: 0, max: 500 },
+  // Aprendizado (learning.ts): revisões por dia com o modelo do cérebro (execução longa, falha, rejeição ou 👎).
+  'learn.dailyReviews': { kind: 'number', def: 30, min: 0, max: 200 },
   'voice.name': { kind: 'string', env: 'ATRIA_VOICE', def: 'marin', maxLen: 40 },
   'voice.idleMin': { kind: 'number', env: 'ATRIA_LIVE_IDLE_MIN', def: 5, min: 1, max: 60 },
   'voice.pttKey': { kind: 'enum', def: 'Space', options: ['Space', 'Backquote', 'F8', 'AltRight'] },

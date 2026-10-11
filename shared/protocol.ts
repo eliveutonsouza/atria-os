@@ -443,6 +443,7 @@ export interface InstalledSkill {
   installedAt: string;
   updatedAt?: string;
   updateAvailable?: boolean;
+  origin?: 'hub' | 'local'; // local = criada no Atria a partir de uma proposta aprovada (sem source)
 }
 
 // ---------- agentes configuráveis ----------

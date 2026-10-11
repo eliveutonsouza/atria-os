@@ -51,3 +51,9 @@ A Yui é a assistente que conversa com você por voz (OpenAI GPT-Live) ou texto.
 - No painel Conversa, use **Buscar na conversa e nas execuções…** (palavras sem acento também acham). Execução encontrada abre ao clicar.
 - Por voz: "Yui, o que eu te pedi sobre o domínio semana passada?" ou "o que o DevOps fez sobre backup?".
 - Balanço: "Yui, como foi minha semana?" ou "balanço do mês" traz volume, o que mais rodou, falhas e custo.
+
+## Memória da Yui
+A Yui guarda fatos e preferências que você pedir e usa em toda conversa (voz, painel e Telegram).
+- "Yui, lembra que eu prefiro reuniões depois das 10h", "o que você sabe de mim?", "esquece que…".
+- Ela só guarda o que você pediu com as suas palavras naquele momento; nada vindo de e-mail, página ou resultado de agente entra sozinho.
+- Ver, adicionar e esquecer: Configurações › Conta › Memória da Yui (até 1.500 caracteres).
