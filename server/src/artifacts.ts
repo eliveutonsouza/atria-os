@@ -9,6 +9,7 @@ import { config } from './config.ts';
 import { db, now, uid } from './db.ts';
 import { emit } from './bus.ts';
 import { findProject } from './projects.ts';
+import { findAgent } from './agents.ts';
 import { runBus, workflowRunDir } from './runs.ts';
 import { registerAgentOptions, registerBrain, registerRunPrompt } from './extensions.ts';
 import { publicUrl, sendNotice } from './notify.ts';
@@ -33,6 +34,9 @@ export interface Entrega {
   size: number;
   pinned: boolean;
   createdAt: string;
+  mime: string | null;
+  agent: string | null; // quem gerou (pela execução)
+  task: string | null;
 }
 
 const MIME: Record<string, string> = {
@@ -65,8 +69,14 @@ export function insideWorkspace(p: string): string | null {
 // síncrono de propósito: missões conferem as entregas logo depois da varredura (arquivos ≤ 200 MB)
 const sha256 = (p: string) => createHash('sha256').update(readFileSync(p)).digest('hex');
 
-type Row = { id: string; kind: string; title: string; project: string | null; path: string; created_at: string; run_id: string | null; size: number | null; pinned: number };
-const toEntrega = (r: Row): Entrega => ({ id: r.id, title: r.title, kind: r.kind, project: r.project, path: r.path, runId: r.run_id, size: r.size ?? 0, pinned: !!r.pinned, createdAt: r.created_at });
+type Row = { id: string; kind: string; title: string; project: string | null; path: string; created_at: string; run_id: string | null; size: number | null; pinned: number; mime: string | null };
+const toEntrega = (r: Row): Entrega => {
+  const run = r.run_id ? (db.prepare(`SELECT agent_id, task FROM runs WHERE id = ?`).get(r.run_id) as { agent_id: string; task: string } | undefined) : undefined;
+  return {
+    id: r.id, title: r.title, kind: r.kind, project: r.project, path: r.path, runId: r.run_id, size: r.size ?? 0, pinned: !!r.pinned, createdAt: r.created_at,
+    mime: r.mime ?? MIME[extname(r.path).toLowerCase()] ?? null, agent: run ? findAgent(run.agent_id)?.name ?? run.agent_id : null, task: run?.task ?? null,
+  };
+};
 
 /** Registra (ou atualiza, se o caminho já existe) um arquivo como entrega. */
 export function registerArtifact(path: string, opts: { title?: string | null; project: string | null; runId: string | null }): Entrega | { error: string } {
@@ -279,8 +289,12 @@ export function register(app: FastifyInstance): void {
     reply.header('content-type', MIME[extname(e.path).toLowerCase()] ?? 'application/octet-stream');
     reply.header('content-disposition', `${download ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(basename(e.path))}`);
     reply.header('x-content-type-options', 'nosniff');
-    // html/svg abrem como download: não rodam script na origem do painel
-    if (/\.(html?|svg)$/i.test(e.path) && !download) reply.header('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'; img-src data:");
+    // a pré-visualização abre em iframe do próprio painel (o CSP global proíbe ser emoldurado);
+    // html/svg nunca rodam script na origem do painel
+    reply.header('x-frame-options', 'SAMEORIGIN');
+    reply.header('content-security-policy', /\.(html?|svg)$/i.test(e.path)
+      ? "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'self'; sandbox"
+      : "frame-ancestors 'self'");
     return reply.send(createReadStream(e.path));
   });
   app.post('/api/entregas/:id/pin', (req, reply) => {

@@ -2,6 +2,11 @@
 
 Versões marcadas do Atria OS. Cada tag `vX.Y.Z` publica as imagens no GHCR e pode ser aplicada pelo Atria Central (Atualizações).
 
+## v1.6.0
+- Entregas com pré-visualização: lista com filtros (documentos, imagens, planilhas, fixados, projeto, busca) e o arquivo aberto ao lado (PDF, imagem, CSV, Markdown, texto); no celular, tela cheia com as ações embaixo.
+- Refazer com outro modelo e comparar: a refeita roda numa cópia isolada do projeto (sem push, deploy ou envios); original e refeita lado a lado, com "Ficar com a refeita" (aplica no projeto) ou "Descartar cópia"; também por voz.
+- Telegram: a Yui pode responder também em áudio (Configurações › Avisos).
+
 ## v1.5.1
 - "+" do campo da Yui abre atalhos (tarefa para agente, workflow, rotina, lembrete, missão, busca) que pré-preenchem o pedido.
 - Selo de mensagens novas por projeto guardado no servidor: sobrevive a recarregar a página e a trocar de aparelho.

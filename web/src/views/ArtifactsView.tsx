@@ -8,6 +8,7 @@ import { useYui } from '../store/yui'
 import { PathPrompt } from '../vault/VaultDialogs'
 import { ActionSheet } from './Sheet'
 import { ConfirmDeleteModal, Empty, ErrorNote, Skeleton, useHeader } from './ui'
+import { Entregas } from './Entregas'
 
 const KIND: Record<ArtifactInfo['kind'], string> = { website: 'Site', report: 'Relatório', chart: 'Gráfico', table: 'Tabela', html: 'Página', image: 'Imagem', other: 'Arquivo' }
 
@@ -58,54 +59,10 @@ export function CustomViewDialogs({ view, action, onClose, onDone }: { view: { i
 const cardStyle = { textAlign: 'left', padding: '18px 20px', borderRadius: 16, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', color: C.text, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 } as const
 const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(220px,100%),1fr))', gap: 14 } as const
 
-interface Entrega { id: string; title: string; kind: string; project: string | null; path: string; runId: string | null; size: number; pinned: boolean; createdAt: string }
-const ENTREGA_KIND: Record<string, string> = { image: 'Imagem', table: 'Planilha', html: 'Página', report: 'Relatório', other: 'Arquivo' }
-const kb = (n: number) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1).replace('.', ',')} MB` : `${Math.max(1, Math.round(n / 1024))} KB`)
-
-// Arquivos entregues pelos agentes (pasta da execução, relatórios, screenshots e o que eles registram).
-function Entregas({ list, reload }: { list: Entrega[]; reload: () => void }) {
-  const [q, setQ] = useState('')
-  const coarse = useYui((s) => s.coarse)
-  const shown = list.filter((e) => !q || `${e.title} ${e.project ?? ''}`.toLowerCase().includes(q.toLowerCase()))
-  const send = (e: Entrega) =>
-    api
-      .post(`/api/entregas/${e.id}/send`, { channels: ['telegram'] })
-      .then(() => useYui.getState().say(`Mandei ${e.title} no Telegram.`))
-      .catch((err: Error) => useYui.getState().say(`Não consegui mandar: ${err.message}`))
-  const pin = (e: Entrega) => api.post(`/api/entregas/${e.id}/pin`, { pinned: !e.pinned }).then(reload).catch(() => {})
-  const h = coarse ? { height: 44 } : undefined
-  return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <div className="eyebrow" style={{ color: C.cyan }}>Entregas dos agentes · {list.length}</div>
-        {list.length > 6 && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filtrar…" aria-label="Filtrar entregas" style={{ height: 34, padding: '0 10px', borderRadius: 9, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)', color: C.text, fontSize: 13 }} />}
-        <span style={{ fontSize: 12, color: C.t3 }}>Fixe o que quiser guardar: as outras saem depois de 30 dias.</span>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        {shown.map((e) => (
-          <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.05)', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'rgba(255,255,255,.06)', color: C.t2, flexShrink: 0 }}>{ENTREGA_KIND[e.kind] ?? 'Arquivo'}</span>
-            <span style={{ flex: '1 1 200px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontSize: 14, overflowWrap: 'anywhere' }}>{e.pinned ? '📌 ' : ''}{e.title}</span>
-              <span style={{ fontSize: 12, color: C.t3 }}>{e.project ?? 'Geral'} · {kb(e.size)} · {ago(e.createdAt)}</span>
-            </span>
-            <a className="app-btn small" style={h} href={`/api/entregas/${e.id}/file`} target="_blank" rel="noreferrer">Abrir</a>
-            <a className="app-btn small" style={h} href={`/api/entregas/${e.id}/file?download=1`}>Baixar</a>
-            <button className="app-btn small" style={h} onClick={() => void send(e)}>Telegram</button>
-            {e.runId && <button className="app-btn small" style={h} onClick={() => useYui.getState().show('runs', { runId: e.runId! })}>Execução</button>}
-            <button className="app-btn small" style={h} aria-pressed={e.pinned} onClick={() => void pin(e)}>{e.pinned ? 'Soltar' : 'Fixar'}</button>
-          </div>
-        ))}
-        {!shown.length && <span style={{ fontSize: 13, color: C.t3 }}>Nada com esse filtro.</span>}
-      </div>
-    </section>
-  )
-}
-
 export function ArtifactsView() {
   const { data, loading, error } = useApi<ArtifactInfo[]>('/api/artifacts')
   const custom = useApi<CustomItem[]>('/api/custom')
-  const entregas = useApi<Entrega[]>('/api/entregas?limit=100')
+  const entregas = useApi<{ id: string }[]>('/api/entregas?limit=1')
   const phone = useYui((s) => s.device === 'phone')
   const coarse = useYui((s) => s.coarse)
   const [act, setAct] = useState<{ view: CustomItem; action: 'rename' | 'delete' } | null>(null)
@@ -119,7 +76,7 @@ export function ArtifactsView() {
   const openView = (v: CustomItem) => useYui.getState().show('custom', { customId: v.id })
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
-      {files.length > 0 && <Entregas list={files} reload={entregas.reload} />}
+      {files.length > 0 && <Entregas />}
       {data.length > 0 && (
         <div style={grid}>
           {data.map((a) => (

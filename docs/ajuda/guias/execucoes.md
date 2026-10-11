@@ -56,8 +56,15 @@ No fim de cada execução concluída há 👍 e 👎. A nota entra no balanço p
 - Por voz: "essa ficou ruim" ou "gostei do relatório" (vale para a última execução concluída; a Yui confirma qual foi).
 
 ## Entregas (arquivos que os agentes geram)
-Os arquivos que os agentes produzem aparecem em Artefatos › **Entregas dos agentes**:
+Os arquivos que os agentes produzem aparecem em Artefatos › **Entregas dos agentes**, com a lista à esquerda (filtros Documentos, Imagens, Planilhas, Fixados, projeto e busca) e o arquivo aberto à direita: PDF, imagem, planilha CSV, Markdown e texto aparecem ali mesmo. No celular, a entrega abre em tela cheia.
 - Entram sozinhos: o que cai na pasta da execução de workflow, os relatórios e as imagens novas do projeto (screenshots). Os agentes registram o resto (PDF, planilha, documento final).
 - Cada linha tem **Abrir**, **Baixar**, **Telegram** (manda o arquivo no seu Telegram), **Execução** e **Fixar**.
 - Entregas não fixadas saem da lista depois de 30 dias. Arquivos fora da pasta .atria do projeto nunca são apagados, só saem da lista.
 - Por voz: "Yui, me manda o PDF que o agente fez ontem" ou "quais arquivos saíram hoje?".
+
+## Refazer com outro modelo e comparar
+Numa execução concluída, **Refazer com outro modelo** roda a mesma tarefa, com o mesmo agente, em outro modelo.
+- Em projeto com git, a refeita trabalha numa cópia isolada do projeto e o original não muda. Sem git, ela só pode ler.
+- Push, deploy, publicação e envios por conectores ficam bloqueados na refeita.
+- **Comparar** mostra original e refeita lado a lado (modelo, tempo, turnos, custo, arquivos mudados e nota). **Ficar com a refeita** aplica as mudanças da cópia no projeto; **Descartar cópia** apaga a cópia. Cópias esquecidas saem em 7 dias.
+- Por voz: "Yui, refaz isso com o Opus e compara".

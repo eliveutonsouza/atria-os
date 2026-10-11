@@ -59,3 +59,4 @@ Com o Telegram ligado, mande texto ou áudio para o bot e a Yui responde ali mes
 - Aprovações comuns chegam com botões **Aprovar** e **Rejeitar**. Exclusões (cartão vermelho) só no painel.
 - Se um workflow estiver esperando resposta e a mensagem não for para ele, o bot pergunta; escolha **Não é pedido: falar com a Yui**.
 - A Yui responde em texto. Telas do painel não abrem pelo Telegram.
+- **Yui responde em áudio** (Configurações › Avisos › Telegram): Não, Quando eu mandar áudio, ou Sempre. O áudio vem além do texto.

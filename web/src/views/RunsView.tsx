@@ -6,6 +6,7 @@ import { C } from '../lib/colors'
 import { elapsed, fmtTokens } from '../lib/format'
 import { useYui } from '../store/yui'
 import { Empty, ErrorNote, Skeleton, useHeader } from './ui'
+import { CompareModal, RedoButton } from './Compare'
 
 interface RunsResp { running: number; queued: number; background: number; runs: RunInfo[] }
 
@@ -55,6 +56,8 @@ export function RunsView() {
   const tech = useYui((s) => s.tech)
   const { data, loading, error } = useApi<RunsResp>('/api/runs')
   const [now, setNow] = useState(Date.now())
+  const [compareId, setCompareId] = useState<string | null>(null)
+  const hasRedo = useMemo(() => new Set(Object.values(runsMap).map((r) => r.compareOf).filter(Boolean) as string[]), [runsMap])
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(id)
@@ -158,6 +161,8 @@ export function RunsView() {
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button onClick={() => openResult(r.id)} style={phone ? { ...resultBtn, height: 44 } : resultBtn}>Ver resultado</button>
                         {r.missionId && <button onClick={() => useYui.getState().show('mission', { missionId: r.missionId! })} style={phone ? { ...resultBtn, height: 44 } : resultBtn}>Ver missão</button>}
+                        <RedoButton run={r} phone={phone} style={phone ? { ...resultBtn, height: 44 } : resultBtn} />
+                        {(r.compareOf || hasRedo.has(r.id)) && <button onClick={() => setCompareId(r.id)} style={phone ? { ...resultBtn, height: 44 } : resultBtn}>Comparar</button>}
                         <RateRun run={r} phone={phone} />
                       </div>
                     </div>
@@ -169,6 +174,7 @@ export function RunsView() {
           )
         })}
       </div>
+      {compareId && <CompareModal runId={compareId} onClose={() => setCompareId(null)} />}
     </div>
   )
 }
