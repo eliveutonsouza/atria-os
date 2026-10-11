@@ -57,3 +57,10 @@ A Yui guarda fatos e preferências que você pedir e usa em toda conversa (voz, 
 - "Yui, lembra que eu prefiro reuniões depois das 10h", "o que você sabe de mim?", "esquece que…".
 - Ela só guarda o que você pediu com as suas palavras naquele momento; nada vindo de e-mail, página ou resultado de agente entra sozinho.
 - Ver, adicionar e esquecer: Configurações › Conta › Memória da Yui (até 1.500 caracteres).
+
+## Cartão “Yui aprendeu”
+Quando a revisão das execuções encontra algo que vale guardar (um fato sobre você ou um procedimento que se repete), aparece no máximo um cartão por dia em Aguardando você: **Yui aprendeu N coisas. Quer guardar?**
+- Abra, marque o que deve entrar e toque em **Guardar**. O que ficar desmarcado é descartado.
+- Skill nova ou atualizada: **Ver texto da skill** / **Ver mudanças** antes de decidir. Skill aprovada vale só para o agente que a propôs.
+- **Depois** esconde o cartão até amanhã. Nada entra sem você aprovar.
+- Por voz: "Yui, salva isso como skill" prepara uma skill da última execução para você aprovar no cartão.

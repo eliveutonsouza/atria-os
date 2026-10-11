@@ -138,6 +138,8 @@ export const FIELD_KIND_LABEL: Record<WorkflowInputRequest['fields'][number]['ki
 export function openInboxView(ib: InboxItem) {
   if (ib.action.type !== 'view') return
   const s = useYui.getState()
+  // cartão diário do aprendizado abre o modal de escolha (overlays/Learning.tsx), não uma tela
+  if (ib.id.startsWith('learn:')) return s.set({ learningOpen: true, inboxOpen: false })
   const p = ib.action.params ?? {}
   s.show(ib.action.view, p)
   const byId = /^input:(.+)$/.exec(ib.id)?.[1]

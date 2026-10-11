@@ -2,6 +2,13 @@
 
 Versões marcadas do Atria OS. Cada tag `vX.Y.Z` publica as imagens no GHCR e pode ser aplicada pelo Atria Central (Atualizações).
 
+## v1.5.0
+Quarta fase das ideias do Paperclip/Hermes (aprendizado):
+- Memória da Yui: "lembra que…", "o que você sabe de mim?", "esquece que…"; só grava o que você pediu com as suas palavras; vale para voz, painel e Telegram; Configurações › Conta › Memória da Yui.
+- Lições por agente: revisão automática de execuções longas, com falha, rejeição ou 👎 (até 30 por dia, modelo barato); até 15 lições por agente, desfazer na ficha; fusão semanal; lições antigas do vault importadas.
+- Skills propostas pelo agente, pela revisão ou por voz ("salva isso como skill"), com lint de segurança; viram skill local só do agente que propôs.
+- Cartão diário "Yui aprendeu": você marca o que guardar (memória e skills, com texto e mudanças); Depois esconde até amanhã.
+
 ## v1.4.0
 Terceira fase das ideias do Paperclip/Hermes (entregas e qualidade):
 - Entregas dos agentes: registro automático do que a execução gerou (pasta do workflow, relatórios, screenshots) e ferramenta para o agente registrar o resto; lista em Artefatos com abrir, baixar, mandar no Telegram e fixar; limpeza após 30 dias; "me manda o PDF que o agente fez" por voz.

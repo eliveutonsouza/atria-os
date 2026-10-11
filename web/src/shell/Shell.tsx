@@ -8,6 +8,7 @@ import { InputFormHost, InputToast } from '../workflow/InputForm'
 import { loadInputs } from '../workflow/inputs'
 import { sendContextDebounced } from '../lib/actions'
 import { ApprovalModal, CommandPalette, HistoryDrawer, Inbox, UpdateToast } from '../overlays/Overlays'
+import { LearningModal } from '../overlays/Learning'
 import { pttDown, pttUp, toggleLive } from '../voice/live'
 import { AppShell } from '../app/AppShell'
 import { toggleApp } from '../app/nav'
@@ -228,6 +229,7 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape') {
     if (s.palette) return s.set({ palette: false })
     if (s.approvalOpen) return s.set({ approvalOpen: null })
+    if (s.learningOpen) return s.set({ learningOpen: false })
     if (s.inboxOpen || s.histOpen || s.runsOpen || s.projectsOpen) return s.set({ inboxOpen: false, histOpen: false, runsOpen: false, projectsOpen: false })
     if (s.mode === 'focus') return s.set({ mode: 'canvas' })
     if (s.mode === 'canvas') return s.close()
@@ -293,6 +295,7 @@ export function Shell() {
         <HistoryDrawer />
         <CommandPalette />
         <ApprovalModal />
+        <LearningModal />
         <InputFormHost />
         <InputToast />
         <UpdateToast />

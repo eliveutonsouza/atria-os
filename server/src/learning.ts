@@ -9,7 +9,8 @@ import { config } from './config.ts';
 import { db, kvGet, kvSet, now, uid } from './db.ts';
 import { emit } from './bus.ts';
 import { findAgent, loadAllAgents } from './agents.ts';
-import { getRun, inboxItems, runBus } from './runs.ts';
+import { addInboxSource, getRun, inboxItems, runBus } from './runs.ts';
+import { narrate } from './live.ts';
 import { getSetting } from './settings.ts';
 import { registerAgentOptions, registerBrain, registerRunPrompt } from './extensions.ts';
 import { openai } from './brain.ts';
@@ -110,7 +111,7 @@ export function importVaultLessons(): number {
 // ---------- propostas (memória e skills) ----------
 
 export interface SkillDraft { nome: string; descricao: string; corpo: string }
-export interface Proposal { id: string; kind: 'memory' | 'skill'; agentId: string | null; runId: string | null; createdAt: string; memory?: { texto: string; motivo: string }; skill?: SkillDraft & { diff: 'nova' | 'atualiza' } }
+export interface Proposal { id: string; kind: 'memory' | 'skill'; agentId: string | null; agentName?: string | null; runId: string | null; createdAt: string; memory?: { texto: string; motivo: string }; skill?: SkillDraft & { diff: 'nova' | 'atualiza'; atual?: string } }
 type PropRow = { id: string; kind: string; agent_id: string | null; run_id: string | null; payload: string; status: string; created_at: string };
 
 const pendingDir = () => join(homedir(), '.atria', 'skills-pending');
@@ -118,9 +119,11 @@ const historyDir = () => join(homedir(), '.atria', 'skills-history');
 
 function toProposal(r: PropRow): Proposal {
   const p = JSON.parse(r.payload);
-  const base = { id: r.id, kind: r.kind as Proposal['kind'], agentId: r.agent_id, runId: r.run_id, createdAt: r.created_at };
+  const base = { id: r.id, kind: r.kind as Proposal['kind'], agentId: r.agent_id, agentName: r.agent_id ? findAgent(r.agent_id)?.name ?? r.agent_id : null, runId: r.run_id, createdAt: r.created_at };
   if (r.kind === 'memory') return { ...base, memory: p };
-  return { ...base, skill: { ...p, diff: existsSync(join(libDir(), p.nome, 'SKILL.md')) ? 'atualiza' : 'nova' } };
+  const cur = join(libDir(), p.nome, 'SKILL.md');
+  // atualização: o texto atual vai junto para o painel mostrar as mudanças
+  return { ...base, skill: { ...p, ...(existsSync(cur) ? { diff: 'atualiza' as const, atual: readFileSync(cur, 'utf8').replace(/^---[\s\S]*?---\s*/, '') } : { diff: 'nova' as const }) } };
 }
 
 export const pendingProposals = (): Proposal[] =>
@@ -163,6 +166,7 @@ export function propose(kind: 'memory' | 'skill', payload: { texto: string; moti
     writeFileSync(join(pendingDir(), id, 'meta.json'), JSON.stringify({ agentId, runId, createdAt: now() }, null, 2));
   }
   emit({ type: 'inbox.updated', inbox: inboxItems() });
+  announceOnce();
   return toProposal(db.prepare(`SELECT * FROM learn_proposals WHERE id = ?`).get(id) as PropRow);
 }
 
@@ -217,6 +221,32 @@ export function decide(approve: string[], reject: string[]): { approved: string[
   emit({ type: 'inbox.updated', inbox: inboxItems() });
   return out;
 }
+
+// ---------- cartão diário "Yui aprendeu" ----------
+// Um cartão por dia no inbox enquanto houver propostas; "Depois" esconde até amanhã. A Yui comenta uma vez por dia.
+
+const localDay = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+function announceOnce() {
+  if (kvGet('learn_announced') === localDay()) return;
+  kvSet('learn_announced', localDay());
+  narrate('Aprendi algumas coisas hoje. Quando quiser, revise no cartão “Yui aprendeu”.', { speak: false, project: null });
+}
+addInboxSource({
+  prefixes: ['learn:'],
+  items: () => {
+    const n = pendingProposals().length;
+    if (!n || kvGet('learn_later') === localDay()) return [];
+    return [{ id: `learn:${localDay()}`, tag: 'Aprendizado · hoje', label: `Yui aprendeu ${n} ${n === 1 ? 'coisa' : 'coisas'}. Quer guardar?`, tone: 'lav', action: { type: 'view', view: 'runs' } }];
+  },
+  dismiss: () => {
+    kvSet('learn_later', localDay());
+    emit({ type: 'inbox.updated', inbox: inboxItems() });
+    return true;
+  },
+});
 
 // ---------- revisão em segundo plano ----------
 

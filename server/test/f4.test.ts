@@ -94,3 +94,15 @@ test('skills propostas: lint barra rede/rm; aprovada vira skill local só do age
   assert.ok(existsSync(join(process.env.HOME!, '.atria', 'skill-packs', 'backend', 'skills', 'deploy-stoq', 'SKILL.md')));
   assert.equal(learning.pendingProposals().length, 0);
 });
+
+test('cartão diário: aparece com proposta pendente; "Depois" esconde até amanhã', async () => {
+  const { inboxItems, dismissInboxItem } = await import('../src/runs.ts');
+  assert.ok(!inboxItems().some((i) => i.id.startsWith('learn:')));
+  const p = learning.propose('memory', { texto: 'Trabalha de casa às sextas', motivo: 'disse no pedido' }, 'backend', null);
+  assert.ok(!('error' in p));
+  const card = inboxItems().find((i) => i.id.startsWith('learn:'));
+  assert.ok(card);
+  assert.match(card!.label, /Yui aprendeu 1 coisa/);
+  assert.ok(dismissInboxItem(card!.id));
+  assert.ok(!inboxItems().some((i) => i.id.startsWith('learn:')));
+});

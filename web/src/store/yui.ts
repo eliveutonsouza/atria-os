@@ -50,6 +50,7 @@ export interface YuiStore {
   inbox: InboxItem[]
   approvals: Record<string, ApprovalInfo>
   approvalOpen: string | null
+  learningOpen: boolean // cartão "Yui aprendeu" (overlays/Learning.tsx)
   selEl: string | null
   listening: boolean
   liveMuted: boolean
@@ -124,6 +125,7 @@ export const useYui = create<YuiStore>((set, get) => ({
   inbox: [],
   approvals: {},
   approvalOpen: null,
+  learningOpen: false,
   selEl: null,
   listening: false,
   liveMuted: false,
