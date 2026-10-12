@@ -11,6 +11,12 @@ export const C = {
   t2: '#9aa0bb',
   t3: '#6f7590',
   t4: '#4c5270',
+  critSoft: '#f39aa4',
+  cyanSoft: '#a9e9f8',
+  soft: '#c9cde0',
+  btn: '#dfe3f3',
+  dim: '#d6d9e8',
+  panel: '#10132a',
 } as const
 
 export function toneColor(t: Tone | undefined, fallback: string = C.text): string {

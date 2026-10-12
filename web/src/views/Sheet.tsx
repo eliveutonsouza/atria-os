@@ -40,6 +40,7 @@ export interface SheetAction {
   fn: () => void
   danger?: boolean
   hint?: string
+  disabled?: boolean
 }
 
 /** Menu ⋯ (prancha Phone-Acoes): linhas de 52px, destrutivas em vermelho por último, botão Fechar. */
@@ -52,13 +53,14 @@ export function ActionSheet({ title, actions, onClose }: { title?: string; actio
         {sorted.map((a, i) => (
           <button
             key={a.label}
+            disabled={a.disabled}
             onClick={() => {
               onClose()
               a.fn()
             }}
             style={{
               minHeight: 52, padding: '0 6px', border: 'none', borderBottom: i < sorted.length - 1 ? '1px solid rgba(255,255,255,.06)' : 'none', background: 'transparent',
-              color: a.danger ? '#f39aa4' : C.text, fontSize: 16, fontWeight: 500, textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+              color: a.danger ? C.critSoft : C.text, fontSize: 16, fontWeight: 500, textAlign: 'left', cursor: a.disabled ? 'default' : 'pointer', opacity: a.disabled ? 0.45 : 1, display: 'flex', alignItems: 'center', gap: 10,
             }}
           >
             <span style={{ flex: 1 }}>{a.label}</span>
@@ -66,7 +68,7 @@ export function ActionSheet({ title, actions, onClose }: { title?: string; actio
           </button>
         ))}
       </div>
-      <button onClick={onClose} style={{ height: 48, borderRadius: 14, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', color: '#dfe3f3', fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
+      <button onClick={onClose} style={{ height: 48, borderRadius: 14, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', color: C.btn, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
         Fechar
       </button>
     </BottomSheet>

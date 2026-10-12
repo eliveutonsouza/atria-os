@@ -15,6 +15,7 @@ export interface HeaderAction {
   fn: () => void
   primary?: boolean // celular: fica visível ao lado do título (as demais vão para o menu ⋯)
   danger?: boolean // destrutiva: vermelha e por último no menu ⋯
+  disabled?: boolean // em andamento (ex.: "Salvando…") ou indisponível
 }
 
 export type Device = 'phone' | 'tablet' | 'desktop'

@@ -6,13 +6,24 @@
 .app-card-title { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; }
 .app-card-title > span:first-child { font-weight: 600; }
 .app-muted { color: var(--text-3, #6f7590); font-size: 12px; }
-.app-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+.app-mono { font-family: var(--mono); }
 .app-btn { height: 34px; padding: 0 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03); color: #dfe3f3; font-size: 13px; cursor: pointer; white-space: nowrap; }
 .app-btn:hover { background: rgba(255,255,255,.08); }
 .app-btn.primary { border: none; background: linear-gradient(135deg, #67d8f2, #a68cf7); color: #0a0c1d; font-weight: 700; }
 .app-btn.primary:hover { filter: brightness(1.08); }
 .app-btn.small { height: 28px; padding: 0 10px; border-radius: 8px; font-size: 12px; }
-.app-btn.danger { border-color: rgba(240,98,114,.35); color: #f39aa4; background: transparent; }
+.app-btn.danger { border-color: rgba(240,98,114,.35); color: var(--crit-soft); background: transparent; }
+.app-btn.solid-danger { border: none; background: #e2566a; color: #fff; font-weight: 700; }
+.app-btn.solid-danger:hover { filter: brightness(1.08); }
+.app-btn:disabled, .app-btn[aria-disabled="true"] { opacity: .45; cursor: default; filter: none; }
+.app-btn:disabled:hover { background: rgba(255,255,255,.03); }
+.app-btn.primary:disabled:hover { background: linear-gradient(135deg, #67d8f2, #a68cf7); }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; padding: 0; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--text-2); font-size: 18px; line-height: 1; cursor: pointer; flex-shrink: 0; }
+.icon-btn:hover { color: var(--text); background: rgba(255,255,255,.06); }
+/* toque: alvos de 44 px (pequenos: 40 px) */
+html.is-coarse .app-btn { height: 44px; }
+html.is-coarse .app-btn.small { height: 40px; }
+html.is-coarse .icon-btn { min-width: 44px; min-height: 44px; }
 .app-row { transition: background .15s; }
 .app-row:hover { background: rgba(255,255,255,.035); }
 .app-scroll { scrollbar-width: thin; }

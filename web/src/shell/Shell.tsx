@@ -17,6 +17,7 @@ import { useYui, type Mode } from '../store/yui'
 import { CanvasPanel } from './CanvasPanel'
 import { RunsPopover } from './ProjectPicker'
 import { SupportBanners } from './SupportBanners'
+import { FeedbackHost } from '../views/ui'
 import { Dock, dockInput, OrbButton, OrbLayer, TopBar, YuiCenter, YuiLeft } from './parts'
 
 // ---------- rotas espelho (§80) ----------
@@ -300,6 +301,7 @@ export function Shell() {
         <InputFormHost />
         <InputToast />
         <UpdateToast />
+        <FeedbackHost />
       </main>
     </>
   )

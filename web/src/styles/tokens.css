@@ -12,6 +12,12 @@
   --ok: #4fe0b0;
   --warn: #f5b54a;
   --crit: #f06272;
+  --crit-soft: #f39aa4;
+  --cyan-soft: #a9e9f8;
+  --text-soft: #c9cde0;
+  --text-btn: #dfe3f3;
+  --text-dim: #d6d9e8;
+  --panel: #10132a;
   --glass: rgba(20, 24, 50, 0.62);
   --glass-2: rgba(12, 14, 32, 0.62);
   --line: rgba(255, 255, 255, 0.06);
@@ -27,7 +33,9 @@
   --rail: 76px;
   --kb: 0px;
   --vvh: 100dvh;
+  --toast-bottom: 24px;
 }
+html.is-phone { --toast-bottom: calc(var(--tabbar) + 12px); }
 html { color-scheme: dark; scrollbar-color: rgba(255,255,255,.12) transparent; scrollbar-width: thin; }
 html, body, #root { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; overflow: clip; overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 * { box-sizing: border-box; }

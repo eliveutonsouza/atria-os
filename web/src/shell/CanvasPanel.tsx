@@ -85,7 +85,7 @@ export function CanvasPanel() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {header.actions.map((a) => (
-            <button key={a.label} onClick={a.fn} className="hov-bg2" style={{ height: 34, padding: '0 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.03)', color: a.danger ? '#f39aa4' : '#dfe3f3', fontSize: 13, cursor: 'pointer' }}>
+            <button key={a.label} onClick={a.fn} disabled={a.disabled} className={`app-btn${a.primary ? ' primary' : a.danger ? ' danger' : ''}`}>
               {a.label}
             </button>
           ))}
@@ -111,7 +111,7 @@ function PhoneCanvasHeader({ isF }: { isF: boolean }) {
   const [menu, setMenu] = useState(false)
   const primary = pickPrimary(header.actions)
   const rest: SheetAction[] = [
-    ...header.actions.filter((a) => a !== primary).map((a) => ({ label: a.label, fn: a.fn, danger: a.danger })),
+    ...header.actions.filter((a) => a !== primary).map((a) => ({ label: a.label, fn: a.fn, danger: a.danger, disabled: a.disabled })),
     { label: isF ? 'Sair da tela cheia' : 'Tela cheia', fn: () => useYui.getState().setFocus(!isF) },
   ]
   const ib = { width: 44, height: 44, flexShrink: 0, borderRadius: 12, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)', color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer' } as const
@@ -125,7 +125,7 @@ function PhoneCanvasHeader({ isF }: { isF: boolean }) {
         <h1 style={{ margin: 0, fontSize: 17, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{header.title}</h1>
       </div>
       {primary && (
-        <button onClick={primary.fn} className="app-btn primary" style={{ height: 44, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 0 }}>
+        <button onClick={primary.fn} disabled={primary.disabled} className="app-btn primary" style={{ height: 44, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 0 }}>
           {primary.label}
         </button>
       )}

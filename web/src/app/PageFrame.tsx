@@ -27,7 +27,7 @@ export function PageHeader({ extra }: { extra?: ReactNode }) {
 
   if (phone) {
     const primary = pickPrimary(header.actions)
-    const rest: SheetAction[] = header.actions.filter((a) => a !== primary).map((a) => ({ label: a.label, fn: a.fn, danger: a.danger }))
+    const rest: SheetAction[] = header.actions.filter((a) => a !== primary).map((a) => ({ label: a.label, fn: a.fn, danger: a.danger, disabled: a.disabled }))
     if (helpGuide) rest.push({ label: 'Ajuda desta tela', fn: openHelp })
     return (
       <header style={{ display: 'flex', alignItems: 'flex-end', gap: 10, minWidth: 0 }}>
@@ -42,7 +42,7 @@ export function PageHeader({ extra }: { extra?: ReactNode }) {
         </div>
         {extra}
         {primary && (
-          <button onClick={primary.fn} className="app-btn primary" style={{ height: 44, maxWidth: 128, overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 0 }}>
+          <button onClick={primary.fn} disabled={primary.disabled} className="app-btn primary" style={{ height: 44, maxWidth: 128, overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 0 }}>
             {primary.label}
           </button>
         )}
@@ -77,7 +77,7 @@ export function PageHeader({ extra }: { extra?: ReactNode }) {
         {extra}
         {header.actions.map((a) => (
           // ação que começa com "+" (criar algo) ou marcada primary é o botão principal
-          <button key={a.label} onClick={a.fn} className={`app-btn${a.primary || a.label.trim().startsWith('+') ? ' primary' : a.danger ? ' danger' : ''}`}>
+          <button key={a.label} onClick={a.fn} disabled={a.disabled} className={`app-btn${a.primary || a.label.trim().startsWith('+') ? ' primary' : a.danger ? ' danger' : ''}`}>
             {a.label}
           </button>
         ))}
