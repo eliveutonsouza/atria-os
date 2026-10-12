@@ -319,7 +319,7 @@ function Editor({ mission, restricted = false, onClose }: { mission: MissionInfo
       ) : (
         <span style={{ fontSize: 12, color: C.t3, textAlign: 'center' }}>
           Ou{' '}
-          <button onClick={() => void manual()} disabled={!!busy} style={{ border: 'none', background: 'none', padding: 0, color: '#7fdcf5', cursor: 'pointer', font: 'inherit', textDecoration: 'underline' }}>
+          <button onClick={() => void manual()} disabled={!!busy} className="tap" style={{ border: 'none', background: 'none', padding: 0, color: '#7fdcf5', cursor: 'pointer', font: 'inherit', textDecoration: 'underline' }}>
             monte as etapas à mão
           </button>{' '}
           {tablet ? 'no quadro abaixo.' : 'no quadro ao lado.'}

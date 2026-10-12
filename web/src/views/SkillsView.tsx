@@ -188,7 +188,7 @@ export function SkillsView({ tab: initialTab }: { tab?: string }) {
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       {!(tab === 'installed' && !searching) && <span className="mono" style={{ fontSize: 12, color: C.t3 }}>#{i + 1}</span>}
-                      <button onClick={() => open(s)} className="hov-txt" style={{ background: 'transparent', border: 'none', padding: 0, color: C.text, fontSize: 16, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                      <button onClick={() => open(s)} className="hov-txt tap" style={{ background: 'transparent', border: 'none', padding: 0, color: C.text, fontSize: 16, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 44 }}>
                         {s.skillId}
                       </button>
                       {s.official && <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 999, background: 'rgba(103,216,242,.12)', color: C.cyan }}>oficial</span>}
@@ -207,7 +207,7 @@ export function SkillsView({ tab: initialTab }: { tab?: string }) {
                       {scopeLabel(ins, agents)}
                     </button>
                   ) : (
-                    <button onClick={() => open(s)} style={{ height: 34, padding: '0 14px', borderRadius: 10, border: 'none', background: 'rgba(166,140,247,.16)', color: C.lav, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    <button onClick={() => open(s)} className="tap" style={{ height: 34, padding: '0 14px', borderRadius: 10, border: 'none', background: 'rgba(166,140,247,.16)', color: C.lav, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                       + Instalar
                     </button>
                   )}

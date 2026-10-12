@@ -156,7 +156,7 @@ export function OverviewPage() {
           </Loaded>
         </Card>
 
-        <Card className="app-span-2" title="Trabalhando agora" right={<button onClick={() => openApp('ops')} style={linkBtn}>Ver operações →</button>}>
+        <Card className="app-span-2" title="Trabalhando agora" right={<button onClick={() => openApp('ops')} className="touch-link" style={linkBtn}>Ver operações →</button>}>
           <Loaded s={board} rows={2}>
           {working.length === 0 ? (
             <span className="app-muted">Nenhum agente trabalhando agora. Peça algo para a Yui ou rode um workflow.</span>
@@ -200,7 +200,7 @@ export function OverviewPage() {
           </Loaded>
         </Card>
 
-        <Card title="Próximos agendamentos" right={<button onClick={() => openApp('schedule')} style={linkBtn}>Agenda →</button>}>
+        <Card title="Próximos agendamentos" right={<button onClick={() => openApp('schedule')} className="touch-link" style={linkBtn}>Agenda →</button>}>
           <Loaded s={occ}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {next.length === 0 && <span className="app-muted">Nenhuma rotina agendada. Crie uma em Agendamentos ou peça para a Yui.</span>}
@@ -218,7 +218,7 @@ export function OverviewPage() {
           </Loaded>
         </Card>
 
-        <Card className="app-span-2" title="Projetos" right={<button onClick={() => openApp('projects')} style={linkBtn}>Todos →</button>}>
+        <Card className="app-span-2" title="Projetos" right={<button onClick={() => openApp('projects')} className="touch-link" style={linkBtn}>Todos →</button>}>
           <Loaded s={ov}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {(ov.data?.projects ?? []).length === 0 && <span className="app-muted">Nenhum projeto clonado ainda. Conecte o GitHub em Configurações.</span>}

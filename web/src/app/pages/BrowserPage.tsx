@@ -14,7 +14,7 @@ type Activity = Extract<BrowserServerMsg, { type: 'activity' }>
 type Frame = Extract<BrowserServerMsg, { type: 'frame' }>
 
 const btn: CSSProperties = { height: 28, padding: '0 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: '#dfe3f3', fontSize: 12, cursor: 'pointer' }
-const iconBtn: CSSProperties = { width: 28, height: 28, borderRadius: 8, border: 'none', background: 'transparent', color: C.t2, cursor: 'pointer', fontSize: 15 }
+const iconBtn: CSSProperties = { flexShrink: 0, width: 28, height: 28, borderRadius: 8, border: 'none', background: 'transparent', color: C.t2, cursor: 'pointer', fontSize: 15 }
 const TAP_SLOP = 8 // px de arrasto até o toque deixar de ser clique e virar rolagem
 const KB_SENTINEL = '\u200b' // mantém o input "não vazio" para o Backspace do Android gerar evento
 const panel: CSSProperties = { padding: '14px 16px', borderRadius: 16, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }
@@ -251,7 +251,7 @@ export function BrowserPage() {
                 aria-selected={t.active}
                 onClick={() => send({ type: 'select', targetId: t.id })}
                 title={t.url}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: '10px 10px 0 0', fontSize: 12, border: 'none', cursor: 'pointer', maxWidth: 220, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', background: t.active ? '#14172c' : 'transparent', color: t.active ? C.text : C.t3 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', minHeight: coarse ? 44 : undefined, borderRadius: '10px 10px 0 0', fontSize: 12, border: 'none', cursor: 'pointer', maxWidth: 220, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', background: t.active ? '#14172c' : 'transparent', color: t.active ? C.text : C.t3 }}
               >
                 <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: t.active ? C.cyan : C.t4 }} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.title || 'Nova aba'}</span>
@@ -280,9 +280,9 @@ export function BrowserPage() {
               className="mono"
               style={{ flex: 1, minWidth: 0, height: coarse ? 44 : narrow ? 36 : 28, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,.05)', padding: '0 12px', fontSize: 12, color: '#c9cde0', order: narrow ? 10 : undefined, flexBasis: narrow ? '100%' : undefined }}
             />
-            <button type="submit" disabled={!controlling} title={controlling ? 'Abrir endereço' : 'Ligue "Assumir controle" para navegar'} style={{ ...btn, height: bh, opacity: controlling ? 1 : 0.45 }}>Abrir URL</button>
+            <button type="submit" disabled={!controlling} title={controlling ? 'Abrir endereço' : 'Ligue "Assumir controle" para navegar'} style={{ ...btn, height: bh, flexShrink: 0, opacity: controlling ? 1 : 0.45 }}>Abrir URL</button>
             {coarse && (
-              <button type="button" disabled={!controlling} onClick={() => kbRef.current?.focus()} title={controlling ? 'Digitar na página' : 'Ligue "Assumir controle" para digitar'} style={{ ...btn, height: bh, opacity: controlling ? 1 : 0.45 }}>
+              <button type="button" disabled={!controlling} onClick={() => kbRef.current?.focus()} title={controlling ? 'Digitar na página' : 'Ligue "Assumir controle" para digitar'} style={{ ...btn, height: bh, flexShrink: 0, opacity: controlling ? 1 : 0.45 }}>
                 Teclado
               </button>
             )}

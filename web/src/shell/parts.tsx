@@ -156,7 +156,7 @@ export function TopBar() {
             className="hov-bg"
             title="Contas e modelos"
             aria-label={`Claude ${status.claude ? 'conectado' : 'desconectado'}, OpenAI ${status.openai ? 'conectado' : 'desconectado'}. Abrir contas e modelos`}
-            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '0 12px', height: 32, borderRadius: 10, border: 'none', background: 'transparent', fontSize: 12, color: C.t2, cursor: 'pointer', fontFamily: 'inherit' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '0 12px', height: coarse ? 44 : 32, borderRadius: 10, border: 'none', background: 'transparent', fontSize: 12, color: C.t2, cursor: 'pointer', fontFamily: 'inherit' }}
           >
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Dot c={status.claude ? C.ok : C.crit} />Claude</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Dot c={status.openai ? C.ok : C.crit} />OpenAI</span>

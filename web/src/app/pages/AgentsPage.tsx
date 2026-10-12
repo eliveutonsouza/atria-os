@@ -40,6 +40,7 @@ export function AgentsPage() {
   const paramId = useYui((s) => s.appParams.id)
   const device = useYui((s) => s.device)
   const phone = device === 'phone'
+  const coarse = useYui((s) => s.coarse)
   const agents = useApi<AgentInfo[]>('/api/agents', [working], 15000)
   const ov = useApi<StatsOverview>('/api/stats/overview?days=7', [], 60000)
   const list = agents.data ?? []
@@ -153,7 +154,7 @@ export function AgentsPage() {
               role="tab"
               aria-selected={filter === f}
               onClick={() => setFilter(f)}
-              style={{ padding: '6px 12px', minHeight: phone ? 44 : 32, fontSize: phone ? 14 : 12.5, borderRadius: 999, cursor: 'pointer', color: filter === f ? C.text : C.t2, background: filter === f ? 'rgba(103,216,242,.1)' : 'transparent', border: `1px solid ${filter === f ? 'rgba(103,216,242,.3)' : 'rgba(255,255,255,.08)'}` }}
+              style={{ padding: '6px 12px', minHeight: phone || coarse ? 44 : 32, fontSize: phone ? 14 : 12.5, borderRadius: 999, cursor: 'pointer', color: filter === f ? C.text : C.t2, background: filter === f ? 'rgba(103,216,242,.1)' : 'transparent', border: `1px solid ${filter === f ? 'rgba(103,216,242,.3)' : 'rgba(255,255,255,.08)'}` }}
             >
               {l}
             </button>

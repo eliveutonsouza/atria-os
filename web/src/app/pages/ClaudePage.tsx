@@ -147,6 +147,7 @@ function CommandsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Ag
       type="button"
       onClick={() => setMode(m)}
       aria-pressed={mode === m}
+      className="tap"
       style={{ height: phone ? 44 : 32, flex: phone ? '1 1 auto' : undefined, minWidth: 0, padding: phone ? '0 8px' : '0 12px', whiteSpace: 'nowrap', borderRadius: 9, cursor: 'pointer', fontSize: 12.5, fontFamily: 'inherit', border: `1px solid ${mode === m ? 'rgba(103,216,242,.3)' : 'rgba(255,255,255,.08)'}`, background: mode === m ? 'rgba(103,216,242,.12)' : 'transparent', color: mode === m ? '#a9e9f8' : C.t2 }}
     >
       {label}
@@ -195,7 +196,7 @@ function CommandsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Ag
                     aria-busy={sending === c.key}
                     onClick={() => run(c)}
                     title={ok ? (c.kind === 'nav' ? `Abrir ${c.label}` : mode === 'bg' ? `Rodar ${c.key} como agente` : `Abrir ${c.key} no terminal`) : 'Não instalado nesta conta'}
-                    className="hov-bg2"
+                    className="hov-bg2 tap"
                     style={{ display: 'flex', alignItems: 'center', gap: 6, height: phone ? 44 : 32, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.03)', color: C.btn, fontSize: 12.5, cursor: ok && !sending ? 'pointer' : 'not-allowed', opacity: ok && (!sending || sending === c.key) ? 1 : 0.45, fontFamily: 'inherit' }}
                   >
                     <span className="mono" style={{ color: cat.color, fontSize: 11.5 }}>{c.key}</span>

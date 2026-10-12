@@ -2,6 +2,10 @@
 
 Versões marcadas do Atria OS. Cada tag `vX.Y.Z` publica as imagens no GHCR e pode ser aplicada pelo Atria Central (Atualizações).
 
+## v1.7.1
+- Toque no celular e no tablet: abas, chips, seletor de projeto, status das contas, navegação das Configurações, comandos do Claude, Skills e barra do Navegador com alvo de 44 px também no iPad (antes só no celular).
+- Teste de celular ignora botões fora da tela e mostra o total de telas com aviso.
+
 ## v1.7.0
 Pente fino em toda a interface (canvas: https://claude.ai/artifact/KzQusrJAcd5ZwSPx3broNy).
 - Nada falha calado: erros de ações viram aviso no canto (com "Tentar de novo" quando faz sentido); sucesso também avisa.

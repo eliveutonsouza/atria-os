@@ -171,7 +171,7 @@ export function ProjectPicker() {
   }
 
   return (
-    <div ref={ref} style={{ position: 'relative', minWidth: 0, flex: narrow ? 1 : undefined }}>
+    <div ref={ref} style={{ position: 'relative', minWidth: coarse ? 44 : 0, flex: narrow ? 1 : undefined }}>
       <button
         onClick={() => useYui.getState().set({ projectsOpen: !open, inboxOpen: false, runsOpen: false })}
         aria-haspopup="listbox"
@@ -180,7 +180,7 @@ export function ProjectPicker() {
         title="Trocar projeto (Ctrl P)"
         className="hov-bg"
         style={{
-          display: 'flex', alignItems: 'center', gap: 8, height: h, maxWidth: narrow ? '100%' : 360, width: narrow ? '100%' : undefined, padding: '0 12px', borderRadius: 12, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 8, height: h, minWidth: coarse ? 44 : undefined, maxWidth: narrow ? '100%' : 360, width: narrow ? '100%' : undefined, padding: '0 12px', borderRadius: 12, cursor: 'pointer',
           border: `1px solid ${open ? 'rgba(103,216,242,.45)' : 'rgba(255,255,255,.08)'}`, background: open ? 'rgba(103,216,242,.08)' : 'rgba(255,255,255,.03)', color: C.t2, fontSize: 12, fontFamily: 'inherit',
         }}
       >

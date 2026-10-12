@@ -21,7 +21,10 @@
 .icon-btn { display: inline-flex; align-items: center; justify-content: center; padding: 0; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--text-2); font-size: 18px; line-height: 1; cursor: pointer; flex-shrink: 0; }
 .icon-btn:hover { color: var(--text); background: rgba(255,255,255,.06); }
 /* toque: alvos de 44 px (pequenos: 40 px) */
-html.is-coarse .app-btn { height: 44px; }
+html.is-coarse .app-btn { height: 44px; min-width: 44px; }
+html.is-coarse .touch-link { min-height: 44px; }
+/* toque (celular e tablet): abas, chips e botões marcados com .tap chegam a 44px; min-height vence o height inline */
+html.is-coarse :is([role='tab'], .co-chip, .wf-tab, .tap) { min-height: 44px; }
 html.is-coarse .app-btn.small { height: 40px; }
 html.is-coarse .icon-btn { min-width: 44px; min-height: 44px; }
 .app-row { transition: background .15s; }

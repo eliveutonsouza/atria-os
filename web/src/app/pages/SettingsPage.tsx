@@ -71,6 +71,7 @@ export function SettingsPage() {
               type="button"
               onClick={() => go(t.id)}
               aria-current={on ? 'page' : undefined}
+              className="tap"
               style={
                 phone
                   ? { flex: '0 0 auto', height: 44, padding: '0 16px', borderRadius: 22, whiteSpace: 'nowrap', cursor: 'pointer', fontSize: 14, fontFamily: 'inherit', color: on ? C.text : C.t2, background: on ? 'rgba(103,216,242,.12)' : 'rgba(255,255,255,.04)', border: `1px solid ${on ? 'rgba(103,216,242,.35)' : 'rgba(255,255,255,.08)'}` }

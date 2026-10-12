@@ -113,7 +113,7 @@ for (const [engine, device, shotDir] of DEVICES) {
         for (const b of document.querySelectorAll('button, [role=button], select, a.app-btn')) {
           if (b.closest(OWN) || !b.offsetParent) continue;
           const r = b.getBoundingClientRect();
-          if (r.width && r.height && r.bottom > 0 && r.top < innerHeight && Math.min(r.width, r.height) < 40) small.push((b.getAttribute('aria-label') || b.innerText || b.tagName).trim().slice(0, 20));
+          if (r.width && r.height && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth && Math.min(r.width, r.height) < 40) small.push((b.getAttribute('aria-label') || b.innerText || b.tagName).trim().slice(0, 20));
         }
       }
       return { issues: [...new Set(issues)].slice(0, 6), small: [...new Set(small)] };
@@ -125,7 +125,7 @@ for (const [engine, device, shotDir] of DEVICES) {
   }
   await browser.close();
 }
-if (warns.length) console.log(`avisos de toque:\n  ${warns.slice(0, 40).join('\n  ')}\n`);
+if (warns.length) console.log(`avisos de toque (${warns.length} telas):\n  ${warns.slice(0, 40).join('\n  ')}\n`);
 for (const f of fails) console.log(`✗ ${f.tag}\n   ${f.res.join('\n   ')}`);
 console.log(`\n${fails.length ? fails.length + ' tela(s) com problema' : 'mobile ok: nenhuma rolagem lateral'}`);
 process.exit(fails.length ? 1 : 0);
