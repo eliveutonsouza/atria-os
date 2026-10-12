@@ -143,3 +143,30 @@ test('rotinas: entrega "só se mudou" não repete o mesmo resultado', async () =
   assert.equal(await rt.deliverResult(r.id, true, 'R$ 13'), false);
   assert.equal(await rt.deliverResult(r.id, false, 'erro'), true);
 });
+
+// Fica por último: troca a ponte de pedidos de workflow por uma falsa.
+test('Telegram: pedido de workflow pendente não engole a conversa com a Yui', async () => {
+  const applied: string[] = [];
+  notify.registerInputBridge({
+    pending: () => [{ id: 'req1', title: 'Receber a gravação', workflowName: 'Site para lead', tgMessageId: 900 }],
+    applyPart: async (id, part) => (applied.push(`${id}:${part.kind}`), { summary: 'Recebi.', missing: [], complete: true }),
+    submit: async () => ({ ok: true }),
+  });
+  // mensagem solta: pergunta, com opção de falar com a Yui
+  await notify.handleUpdate(msg({ text: 'oi Yui, tudo bem?' }));
+  assert.equal(applied.length, 0);
+  assert.match(sentTexts().at(-1)!, /Para qual pedido/);
+  await notify.handleUpdate(cb('y:held'));
+  assert.deepEqual(asked, ['oi Yui, tudo bem?']);
+  // escolheu a Yui: as próximas seguem direto para ela
+  await notify.handleUpdate(msg({ text: 'e o clima?' }));
+  assert.deepEqual(asked, ['oi Yui, tudo bem?', 'e o clima?']);
+  assert.equal(applied.length, 0);
+  // responder à mensagem do pedido continua indo para o pedido
+  await notify.handleUpdate(msg({ text: 'segue a gravação', reply_to_message: { message_id: 900 } }));
+  assert.deepEqual(applied, ['req1:text']);
+  // e depois de escolher o pedido, as soltas vão para ele
+  await notify.handleUpdate(msg({ text: 'mais um detalhe' }));
+  assert.deepEqual(applied, ['req1:text', 'req1:text']);
+  assert.equal(asked.length, 2);
+});

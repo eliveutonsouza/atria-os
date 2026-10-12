@@ -2,6 +2,9 @@
 
 Versões marcadas do Atria OS. Cada tag `vX.Y.Z` publica as imagens no GHCR e pode ser aplicada pelo Atria Central (Atualizações).
 
+## v1.6.4
+- Telegram: um pedido de workflow pendente (ex.: esperando gravação há dias) não engole mais a conversa. Mensagem solta pergunta "para qual pedido?" com a opção "falar com a Yui"; a escolha vale por 15 min. Responder à mensagem do pedido continua indo direto para ele.
+
 ## v1.6.3
 - Entregas: "Abrir em nova aba" para PDF e HTML (o leitor de PDF de alguns navegadores não abre dentro do painel).
 

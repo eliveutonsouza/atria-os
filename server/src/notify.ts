@@ -295,6 +295,9 @@ export function unlinkTelegram(): void {
 
 const sentFor = new Map<number, string>(); // id de mensagem do bot → pedido (avisos e resumos)
 let activeRequest: string | null = null; // último pedido escolhido: mensagens soltas seguem para ele
+let activeAt = 0; // quando o usuário mexeu por último no pedido escolhido
+let yuiAt = 0; // quando o usuário escolheu "falar com a Yui" com pedido pendente
+const STICKY_MS = 15 * 60_000; // a escolha vale por 15 min sem mexer
 let held: TgMessage | null = null; // mensagem aguardando o usuário escolher o pedido
 
 const track = (messageId: number, requestId: string) => {
@@ -318,7 +321,11 @@ function chatName(c: TgMessage['chat']): string {
   return c.title || [c.first_name, c.last_name].filter(Boolean).join(' ') || (c.username ? `@${c.username}` : String(c.id));
 }
 
-/** Escolhe o pedido: resposta a um aviso/resumo > último escolhido > único pendente. null = perguntar ou nenhum. */
+/**
+ * Escolhe o pedido: resposta a um aviso/resumo > último escolhido > único pendente. null = perguntar ou nenhum.
+ * Com a conversa com a Yui ligada, mensagem solta só vai para um pedido escolhido há menos de 15 min; senão pergunta
+ * (um pedido esquecido há dias não pode engolir a conversa).
+ */
 function routeMessage(m: TgMessage, pend: ReturnType<InputBridge['pending']>): string | null {
   const ids = new Set(pend.map((p) => p.id));
   const rt = m.reply_to_message?.message_id;
@@ -326,7 +333,8 @@ function routeMessage(m: TgMessage, pend: ReturnType<InputBridge['pending']>): s
     const byTg = pend.find((p) => p.tgMessageId === rt)?.id ?? sentFor.get(rt);
     if (byTg && ids.has(byTg)) return byTg;
   }
-  if (activeRequest && ids.has(activeRequest)) return activeRequest;
+  if (activeRequest && ids.has(activeRequest) && (!chatBridge || Date.now() - activeAt < STICKY_MS)) return activeRequest;
+  if (chatBridge) return null;
   return pend.length === 1 ? pend[0].id : null;
 }
 
@@ -362,6 +370,8 @@ async function download(f: TgFile, name: string): Promise<{ path: string; size: 
 async function answerRequest(m: TgMessage, requestId: string): Promise<void> {
   if (!bridge) return;
   activeRequest = requestId;
+  activeAt = Date.now();
+  yuiAt = 0;
   const parts: Part[] = [];
   const tmp: string[] = [];
   const media = mediaOf(m);
@@ -437,6 +447,10 @@ async function onMessage(m: TgMessage): Promise<void> {
   }
   const id = routeMessage(m, pend);
   if (id) return answerRequest(m, id);
+  if (chatBridge && Date.now() - yuiAt < STICKY_MS) {
+    yuiAt = Date.now();
+    return talk(m);
+  }
   held = m;
   const rows = pend.slice(0, 8).map((p) => [{ text: `${p.title} · ${p.workflowName}`.slice(0, 60), callback_data: `p:${p.id}` }]);
   if (chatBridge) rows.push([{ text: 'Não é pedido: falar com a Yui', callback_data: 'y:held' }]);
@@ -546,6 +560,8 @@ async function onCallback(q: NonNullable<TgUpdate['callback_query']>): Promise<v
   if (op === 'y' && chatBridge) {
     await answer();
     await dropButtons();
+    activeRequest = null;
+    yuiAt = Date.now();
     const m = held;
     held = null;
     if (m) await talk(m);
@@ -714,6 +730,8 @@ export function register(app: FastifyInstance): void {
 export function resetTelegramState(): void {
   sentFor.clear();
   activeRequest = null;
+  activeAt = 0;
+  yuiAt = 0;
   held = null;
   pollError = null;
 }
