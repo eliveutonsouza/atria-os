@@ -164,7 +164,7 @@ await check('sidebar abre na borda e entra no dashboard', async () => {
   await openRoute('/');
   await page.mouse.move(3, 450);
   await page.waitForTimeout(700);
-  const nav = page.locator('nav[aria-label]').filter({ hasText: 'Visão geral' }).first();
+  const nav = page.locator('nav[aria-label]').filter({ hasText: 'Início' }).first();
   if (!(await nav.isVisible())) throw new Error('sidebar não apareceu');
   await nav.getByText('Agentes', { exact: true }).first().click();
   await page.waitForURL((u) => u.pathname === '/app/agents', { timeout: 8000 });

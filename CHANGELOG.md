@@ -2,6 +2,18 @@
 
 Versões marcadas do Atria OS. Cada tag `vX.Y.Z` publica as imagens no GHCR e pode ser aplicada pelo Atria Central (Atualizações).
 
+## v1.7.0
+Pente fino em toda a interface (canvas: https://claude.ai/artifact/KzQusrJAcd5ZwSPx3broNy).
+- Nada falha calado: erros de ações viram aviso no canto (com "Tentar de novo" quando faz sentido); sucesso também avisa.
+- Sem clique duplo: salvar, rodar, iniciar, aprovar, novo agente, mandar no Telegram etc. ficam bloqueados enquanto trabalham.
+- Ações perigosas perguntam antes: cancelar execução, parar workflow, cancelar missão, arquivar agente, descartar cópia refeita, nova sessão do terminal, encerrar sessão do Claude, parar navegador, esquecer memória, remover regra, restaurar padrões.
+- Edição não salva protegida: workflow, agente, missão, Vault no celular, dados do documento e perfil da empresa perguntam antes de sair (inclusive pelo menu). Apagar passo no workflow tem "Desfazer".
+- Carregando, erro e vazio separados em ~15 telas (Aprovações não diz mais "nada pendente" quando falhou; Conta não grava campos em branco antes de carregar).
+- Login: servidor fora não aparece mais como "Senha incorreta".
+- Textos em português simples: sem "Live operations", "Timeline", "RUNNING", "Qdrant", cron cru, "(done)"; plurais certos; "Início" em todos os menus; status de rotina e agenda legíveis ("dias úteis às 8h").
+- Um modal só (Esc, foco preso, gaveta no celular), botão desabilitado visível, foco visível no teclado, toques de 44 px.
+- Empresa: PDF com mais de 60 páginas navegável; detalhes técnicos recolhidos.
+
 ## v1.6.4
 - Telegram: um pedido de workflow pendente (ex.: esperando gravação há dias) não engole mais a conversa. Mensagem solta pergunta "para qual pedido?" com a opção "falar com a Yui"; a escolha vale por 15 min. Responder à mensagem do pedido continua indo direto para ele.
 

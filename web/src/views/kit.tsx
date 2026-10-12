@@ -1,3 +1,4 @@
+import { useYui } from '../store/yui'
 import type { CSSProperties, ReactNode } from 'react'
 import type { ToolStatus } from '@shared/protocol'
 import { C, glow } from '../lib/colors'
@@ -57,10 +58,11 @@ export function Tabs<T extends string>({ value, onChange, items }: { value: T; o
 }
 
 export function Chip({ children, on, onClick, title }: { children: ReactNode; on?: boolean; onClick?: () => void; title?: string }) {
+  const coarse = useYui((s) => s.coarse)
   const style: CSSProperties = {
-    fontSize: 12, padding: '4px 10px', borderRadius: 8, cursor: onClick ? 'pointer' : 'default', whiteSpace: 'nowrap', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis',
+    fontSize: 12, padding: '4px 10px', minHeight: onClick && coarse ? 44 : undefined, borderRadius: 8, cursor: onClick ? 'pointer' : 'default', whiteSpace: 'nowrap', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis',
     border: `1px solid ${on ? 'rgba(103,216,242,.35)' : 'rgba(255,255,255,.08)'}`,
-    background: on ? 'rgba(103,216,242,.1)' : 'rgba(255,255,255,.02)', color: on ? '#a9e9f8' : C.t2,
+    background: on ? 'rgba(103,216,242,.1)' : 'rgba(255,255,255,.02)', color: on ? C.cyanSoft : C.t2,
   }
   return onClick ? (
     <button type="button" onClick={onClick} aria-pressed={on} title={title} style={{ ...style, fontFamily: 'inherit' }}>{children}</button>

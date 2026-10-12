@@ -72,7 +72,7 @@ await check('sem inglês/jargão nas páginas principais', async () => {
   for (const p of ['', 'ops', 'agents', 'runs', 'artifacts', 'inbox', 'missions', 'workflows', 'schedule', 'projects', 'company', 'vault', 'skills', 'tools', 'settings', 'usage']) {
     await page.goto(`${B}/app${p ? `/${p}` : ''}`);
     await page.waitForTimeout(1800);
-    const m = (await page.locator('main').innerText()).match(ENGLISH);
+    const m = (await page.locator('.app-main').first().innerText()).match(ENGLISH);
     if (m) bad.push(`${p || 'início'}: "${m[0]}"`);
   }
   assert(!bad.length, bad.join(' · '));
@@ -89,7 +89,7 @@ await check('Aprovações: erro de rede mostra erro, não "nada pendente"', asyn
   await page.route('**/api/approvals*', (r) => r.abort());
   await page.goto(B + '/app/inbox');
   await page.waitForTimeout(2500);
-  const txt = await page.locator('main').innerText();
+  const txt = await page.locator('.app-main').first().innerText();
   await page.unroute('**/api/approvals*');
   assert(!/Nada precisa de você/.test(txt), 'mostrou vazio com erro');
   assert(/Não consegui|Tentar de novo/.test(txt), `sem estado de erro: ${txt.slice(0, 160)}`);
@@ -140,11 +140,14 @@ await check('agente: sair com edição não salva pergunta', async () => {
   const a = (list.agents ?? list)[0];
   await page.goto(`${B}/app/agents/${a.id}`);
   await page.waitForTimeout(2000);
-  const field = page.locator('main textarea, main input[type=text]').first();
-  await field.click();
+  await page.locator('.app-main button, .app-main [role=tab]').filter({ hasText: /^Configuração$/ }).first().click();
+  await page.waitForTimeout(800);
+  const field = page.locator('.app-main textarea:visible, .app-main input[type=text]:visible').first();
+  await field.click({ timeout: 10000 });
   await page.keyboard.type(' teste');
-  await page.waitForTimeout(300);
-  await page.locator('nav >> text=Execuções').first().click().catch(async () => page.goBack());
+  await page.waitForTimeout(500);
+  // sai escolhendo outro agente na lista (troca de tela)
+  await page.locator('.app-main :text-is("Backend"):visible').first().click({ timeout: 5000 });
   await page.waitForTimeout(800);
   const asked = await dialog().isVisible().catch(() => false);
   if (asked) await dialog().locator('button', { hasText: /Continuar editando|Cancelar/ }).first().click();
@@ -170,7 +173,7 @@ await check('foco visível com Tab nos campos', async () => {
 await check('Execuções: textos em português', async () => {
   await page.goto(B + '/app/runs');
   await page.waitForTimeout(1500);
-  const txt = await page.locator('main').innerText();
+  const txt = await page.locator('.app-main').first().innerText();
   assert(!/RUNNING|QUEUED|TIMELINE/.test(txt), 'textos em inglês');
 });
 

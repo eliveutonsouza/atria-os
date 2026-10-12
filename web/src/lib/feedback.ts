@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { create } from 'zustand'
 import { ApiError } from '../api/client'
+import { setLeaveGuard } from '../store/yui'
 
 // Retorno das ações do painel: avisos que somem sozinhos, confirmação antes de ações perigosas e guarda de
 // edição não salva. Nada falha calado, nada roda duas vezes, nada destrutivo sem perguntar.
@@ -127,12 +128,24 @@ export function useUnsavedGuard(dirty: boolean, what = 'as mudanças'): () => Pr
   }, [dirty])
   const dirtyRef = useRef(dirty)
   dirtyRef.current = dirty
-  return useCallback(
-    () => (dirtyRef.current
-      ? confirmAction({ title: 'Sair sem salvar?', text: `Se sair agora, ${what} se perdem.`, confirmLabel: 'Sair sem salvar', cancelLabel: 'Continuar editando', danger: true, undoable: true })
-      : Promise.resolve(true)),
-    [what],
-  )
+  const confirmLeave = useCallback(async () => {
+    // deixa a tela renderizar antes: salvar e navegar no mesmo clique já zerou o "dirty"
+    await new Promise((r) => setTimeout(r, 0))
+    if (!dirtyRef.current) return true
+    const ok = await confirmAction({ title: 'Sair sem salvar?', text: `Se sair agora, ${what} se perdem.`, confirmLabel: 'Sair sem salvar', cancelLabel: 'Continuar editando', danger: true, undoable: true })
+    if (ok) {
+      dirtyRef.current = false // já confirmado: a navegação que vem a seguir não pergunta de novo
+      setLeaveGuard(null)
+    }
+    return ok
+  }, [what])
+  // trocar de página pelo menu, abas ou Yui também pergunta
+  useEffect(() => {
+    if (!dirty) return
+    setLeaveGuard(confirmLeave)
+    return () => setLeaveGuard(null)
+  }, [dirty, confirmLeave])
+  return confirmLeave
 }
 
 /** Plural simples: plural(3, 'missão', 'missões') → "3 missões". */

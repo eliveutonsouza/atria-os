@@ -20,6 +20,12 @@ export interface HeaderAction {
 
 export type Device = 'phone' | 'tablet' | 'desktop'
 
+// Guarda de saída da tela atual (registrada por useUnsavedGuard enquanto há edição não salva).
+let leaveGuard: (() => Promise<boolean>) | null = null
+export function setLeaveGuard(g: (() => Promise<boolean>) | null): void {
+  leaveGuard = g
+}
+
 export interface ViewHeader {
   eyebrow: string
   title: string
@@ -160,7 +166,16 @@ export const useYui = create<YuiStore>((set, get) => ({
   status: { claude: false, openai: false, live: false },
   loadedAt: Date.now(),
 
-  set: (p) => set(p),
+  set: (p) => {
+    // edição não salva na tela atual (useUnsavedGuard): trocar de página espera a confirmação
+    const s0 = get()
+    const nav = ('appPage' in p && p.appPage !== s0.appPage) || ('appParams' in p && JSON.stringify(p.appParams) !== JSON.stringify(s0.appParams)) || ('shellMode' in p && p.shellMode !== s0.shellMode)
+    if (nav && leaveGuard) {
+      void leaveGuard().then((ok) => { if (ok) set(p) })
+      return
+    }
+    set(p)
+  },
 
   baseState: () => {
     const s = get()

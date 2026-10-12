@@ -108,7 +108,7 @@ export function Sidebar() {
           <button
             onClick={() => exitApp()}
             title="Conversar com a Yui (Ctrl+J)"
-            style={{ display: 'flex', alignItems: 'center', gap: 10, border: 'none', background: 'transparent', color: C.text, cursor: 'pointer', padding: 0 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, border: 'none', background: 'transparent', color: C.text, cursor: 'pointer', padding: 0, minHeight: coarse ? 44 : undefined }}
           >
             <img src="/favicon.svg" alt="" width={24} height={24} style={{ borderRadius: 6 }} />
             <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '.18em' }}>ATRIA</span>

@@ -29,7 +29,7 @@ for (const [engine, device, shotDir] of DEVICES) {
   if (B.startsWith('http://')) {
     // tira CSP/HSTS das respostas (o WebKit insiste em subir para https mesmo com bypassCSP)
     await ctx.route('**/*', async (route) => {
-      if (route.request().url().includes('/api/events')) return route.continue(); // SSE não termina
+      if (route.request().url().includes('/api/events') || !route.request().url().startsWith('http')) return route.continue(); // SSE não termina; blob:/data: passam direto
       const res = await route.fetch();
       const headers = { ...res.headers() };
       delete headers['content-security-policy'];
