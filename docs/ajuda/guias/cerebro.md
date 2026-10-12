@@ -27,15 +27,16 @@ O Cérebro desenha todas as notas do vault como estrelas. Pastas viram galáxias
 ## Passo a passo
 1. **Abra o universo.** Pelo menu (Conhecimento › Cérebro), por "Ver no Cérebro" no Vault ou pedindo à Yui.
 2. **Ache uma estrela.** Digite na busca e tecle Enter para voar até ela, ou filtre pelas galáxias.
-3. **Abra a estrela.** Clique: o painel mostra trecho, conexões e sugestões, com **Abrir no editor**, **Constelação** e **Perguntar à Yui sobre esta nota**.
+3. **Abra a estrela.** Clique (ou toque) nela: o painel mostra trecho, quantas notas ela **cita**, por quantas é **citada por** e as sugestões, com **Abrir no editor**, **Constelação** e **Perguntar à Yui sobre esta nota**. No computador, duplo clique na estrela vai direto para a Constelação.
 4. **Explore a Constelação.** Ajuste a **Profundidade**, aceite sugestões em "Yui percebeu" (**Ligar**) e use "Caminho até" para outra nota. **Voltar ao universo** sai.
 5. **Ajuste a vista.** Aproximar, Afastar e Centralizar; liga e desliga Partículas, Rótulos e Sugestões da Yui.
 
 ## O que você vê na tela
 - Estrelas maiores: notas com mais ligações.
+- Cores: cada pasta (galáxia) tem uma cor; os chips de cima mostram a cor e quantas notas cada pasta tem.
 - Linha do tempo do cérebro: notas novas por dia.
-- Legenda das cores por pasta.
-- Clique numa estrela para centralizar; duplo clique abre no editor.
+- Na Constelação: clique numa estrela para centralizar nela; no computador, duplo clique abre no editor. No celular e no tablet, toque na estrela para centralizar e use o botão **Ler / editar nota** (ou **Abrir no editor**) para abrir.
+- Legenda da Constelação: azul = a nota cita a outra; lilás = citada por outra nota; âmbar tracejado = sugestão da Yui.
 
 ## Exemplos do dia a dia
 - Antes de uma reunião com cliente → constelação da nota do cliente para ver projetos, decisões e execuções ligados.

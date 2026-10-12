@@ -91,7 +91,7 @@ export function SmallBtn({ children, onClick, primary, disabled, title }: { chil
 
 export const input: CSSProperties = {
   width: '100%', padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(0,0,0,.25)',
-  color: C.text, fontSize: 14, fontFamily: 'inherit', outline: 'none',
+  color: C.text, fontSize: 14, fontFamily: 'inherit',
 }
 
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {

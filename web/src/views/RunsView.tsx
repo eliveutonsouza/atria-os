@@ -7,6 +7,7 @@ import { elapsed, fmtTokens } from '../lib/format'
 import { useYui } from '../store/yui'
 import { Empty, ErrorNote, Skeleton, useHeader } from './ui'
 import { CompareModal, RedoButton } from './Compare'
+import { toastErr } from '../lib/feedback'
 
 interface RunsResp { running: number; queued: number; background: number; runs: RunInfo[] }
 
@@ -39,14 +40,14 @@ function TechLines({ run }: { run: RunInfo }) {
   )
 }
 
-const resultBtn = { height: 30, padding: '0 12px', borderRadius: 9, border: '1px solid rgba(103,216,242,.3)', background: 'rgba(103,216,242,.08)', color: '#a9e9f8', fontSize: 12, cursor: 'pointer' } as const
+const resultBtn = { height: 30, padding: '0 12px', borderRadius: 9, borderColor: 'rgba(103,216,242,.3)', background: 'rgba(103,216,242,.08)', color: C.cyanSoft, fontSize: 12 } as const
 
 // Abre o que a execução produziu (tela sob medida, preview, relatório ou missão).
 function openResult(id: string) {
   api
     .get<{ view: ViewName; params: ViewParams }>(`/api/runs/${id}/result-view`)
     .then((rv) => useYui.getState().show(rv.view, rv.params))
-    .catch(() => {})
+    .catch((e) => toastErr(e, 'Não consegui abrir o resultado'))
 }
 
 export function RunsView() {
@@ -81,10 +82,11 @@ export function RunsView() {
     const first = Object.values(s.runs).find((r) => r.state === 'running')
     if (first) s.set({ expandedRun: first.id })
   }, [runsMap])
-  useHeader('Live operations', 'Execuções', [
+  useHeader('Ao vivo', 'Execuções', [
     { label: tech ? 'Ocultar detalhes técnicos' : 'Detalhes técnicos', fn: () => useYui.getState().set({ tech: !useYui.getState().tech }) },
   ], [tech])
 
+  const total = Object.keys(runsMap).length
   const runs = useMemo(() => {
     const order: Record<string, number> = { running: 0, waiting_approval: 1, queued: 2, done: 3, failed: 3, cancelled: 4 }
     return Object.values(runsMap).sort((a, b) => (order[a.state] - order[b.state]) || (b.startedAt ?? '').localeCompare(a.startedAt ?? '')).slice(0, 40)
@@ -97,9 +99,9 @@ export function RunsView() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       <div style={{ display: 'flex', gap: phone ? 24 : 36, flexWrap: 'wrap' }}>
-        <div><div className="eyebrow">RUNNING</div><div style={{ fontSize: 36, fontWeight: 300, color: C.cyan }}>{running}</div></div>
-        <div><div className="eyebrow">QUEUED</div><div style={{ fontSize: 36, fontWeight: 300 }}>{queued}</div></div>
-        <div><div className="eyebrow">BACKGROUND</div><div style={{ fontSize: 36, fontWeight: 300, color: C.t2 }}>{data?.background ?? 0}</div></div>
+        <div><div className="eyebrow">Rodando</div><div style={{ fontSize: 36, fontWeight: 300, color: C.cyan }}>{running}</div></div>
+        <div><div className="eyebrow">Na fila</div><div style={{ fontSize: 36, fontWeight: 300 }}>{queued}</div></div>
+        <div><div className="eyebrow">Em segundo plano</div><div style={{ fontSize: 36, fontWeight: 300, color: C.t2 }}>{data?.background ?? 0}</div></div>
       </div>
       {!runs.length && <Empty text="Ainda não há execuções para mostrar." hint="Peça algo para a Yui e os agentes acordam." />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -135,12 +137,12 @@ export function RunsView() {
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {r.tools.length === 0 && <span style={{ fontSize: 12, color: C.t3 }}>—</span>}
                         {r.tools.map((tl) => (
-                          <span key={tl} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 8, background: 'rgba(103,216,242,.08)', border: '1px solid rgba(103,216,242,.18)', color: '#a9e9f8' }}>{tl}</span>
+                          <span key={tl} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 8, background: 'rgba(103,216,242,.08)', border: '1px solid rgba(103,216,242,.18)', color: C.cyanSoft }}>{tl}</span>
                         ))}
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <div className="eyebrow" style={{ letterSpacing: '.16em', fontSize: 11, marginBottom: 6 }}>TIMELINE</div>
+                      <div className="eyebrow" style={{ letterSpacing: '.16em', fontSize: 11, marginBottom: 6 }}>ETAPAS</div>
                       {r.steps.length === 0 && <span style={{ fontSize: 13, color: C.t3 }}>Sem etapas ainda.</span>}
                       {r.steps.map((st, i) => {
                         const c = st.status === 'done' ? C.ok : st.status === 'active' ? C.cyan : C.t3
@@ -156,13 +158,13 @@ export function RunsView() {
                   {(r.state === 'done' || r.state === 'failed') && (
                     <div style={{ padding: phone ? '0 14px 14px' : '0 18px 18px 46px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {r.result && (
-                        <div style={{ fontSize: 13, color: '#d6d9e8', lineHeight: 1.6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 220, overflowY: 'auto' }}>{r.result}</div>
+                        <div style={{ fontSize: 13, color: C.dim, lineHeight: 1.6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 220, overflowY: 'auto' }}>{r.result}</div>
                       )}
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button onClick={() => openResult(r.id)} style={phone ? { ...resultBtn, height: 44 } : resultBtn}>Ver resultado</button>
-                        {r.missionId && <button onClick={() => useYui.getState().show('mission', { missionId: r.missionId! })} style={phone ? { ...resultBtn, height: 44 } : resultBtn}>Ver missão</button>}
-                        <RedoButton run={r} phone={phone} style={phone ? { ...resultBtn, height: 44 } : resultBtn} />
-                        {(r.compareOf || hasRedo.has(r.id)) && <button onClick={() => setCompareId(r.id)} style={phone ? { ...resultBtn, height: 44 } : resultBtn}>Comparar</button>}
+                        <button onClick={() => openResult(r.id)} className="app-btn small" style={phone ? { ...resultBtn, height: 44 } : resultBtn}>Ver resultado</button>
+                        {r.missionId && <button onClick={() => useYui.getState().show('mission', { missionId: r.missionId! })} className="app-btn small" style={phone ? { ...resultBtn, height: 44 } : resultBtn}>Ver missão</button>}
+                        <RedoButton run={r} phone={phone} className="app-btn small" style={phone ? { ...resultBtn, height: 44 } : resultBtn} />
+                        {(r.compareOf || hasRedo.has(r.id)) && <button onClick={() => setCompareId(r.id)} className="app-btn small" style={phone ? { ...resultBtn, height: 44 } : resultBtn}>Comparar</button>}
                         <RateRun run={r} phone={phone} />
                       </div>
                     </div>
@@ -174,6 +176,7 @@ export function RunsView() {
           )
         })}
       </div>
+      {total > runs.length && <span style={{ fontSize: 12.5, color: C.t3 }}>Mostrando {runs.length} de {total} execuções (as mais recentes e as ativas primeiro).</span>}
       {compareId && <CompareModal runId={compareId} onClose={() => setCompareId(null)} />}
     </div>
   )

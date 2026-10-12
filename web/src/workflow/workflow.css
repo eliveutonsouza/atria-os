@@ -33,7 +33,7 @@
 }
 .wf-input:focus { border-color: rgba(103, 216, 242, 0.45); }
 textarea.wf-input { resize: vertical; line-height: 1.5; }
-.wf-mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.wf-mono { font-family: var(--mono); font-size: 12px; }
 .wf-btn {
   height: 32px;
   padding: 0 12px;

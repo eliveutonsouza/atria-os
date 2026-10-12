@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { C } from '../lib/colors'
+import { confirmAction } from '../lib/feedback'
 import { useYui } from '../store/yui'
 import { BottomSheet } from '../views/Sheet'
+import { ErrorNote } from '../views/ui'
 
 // Cartão diário "Yui aprendeu" (canvas Atria — Yui aprendeu): o que a revisão em segundo plano propôs guardar —
 // memória sobre o usuário e skills novas/atualizadas. Só entra o que for marcado; o resto é descartado.
@@ -37,9 +39,10 @@ export function LearningModal() {
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [shown, setShown] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
-  useEffect(() => {
-    if (!open) return
+  const [loadErr, setLoadErr] = useState(false)
+  const load = useCallback(() => {
     setItems(null)
+    setLoadErr(false)
     api
       .get<Proposal[]>('/api/learning/proposals')
       .then((list) => {
@@ -47,8 +50,11 @@ export function LearningModal() {
         setChecked(new Set(list.map((p) => p.id)))
         setShown(new Set())
       })
-      .catch(() => setItems([]))
-  }, [open])
+      .catch(() => setLoadErr(true))
+  }, [])
+  useEffect(() => {
+    if (open) load()
+  }, [open, load])
   if (!open) return null
   const close = () => useYui.getState().set({ learningOpen: false })
   const toggle = (set: Set<string>, id: string) => {
@@ -72,6 +78,10 @@ export function LearningModal() {
       setBusy(false)
     }
   }
+  const discardAll = async () => {
+    if (!(await confirmAction({ title: 'Descartar tudo?', text: `Nada do que a Yui propôs hoje será guardado (${list.length} ${list.length === 1 ? 'item' : 'itens'}).`, confirmLabel: 'Descartar tudo', danger: true }))) return
+    void decide([])
+  }
   const later = () => {
     void api.post(`/api/inbox/${encodeURIComponent(`learn:${today()}`)}/dismiss`).catch(() => {})
     close()
@@ -92,7 +102,8 @@ export function LearningModal() {
         <span id="ya-title" style={{ fontSize: phone ? 19 : 22, fontWeight: phone ? 500 : 400, lineHeight: 1.35 }}>Escolha o que eu devo guardar</span>
         {!phone && <span style={{ fontSize: 13, color: C.t2 }}>Só entra o que você marcar; o resto é descartado. Lições dos agentes já valem sozinhas e podem ser desfeitas na ficha de cada um.</span>}
       </div>
-      {!items && <span style={{ fontSize: 13, color: C.t3 }}>Carregando…</span>}
+      {loadErr && <ErrorNote text="Não consegui buscar o que a Yui aprendeu." retry={load} />}
+      {!items && !loadErr && <span style={{ fontSize: 13, color: C.t3 }}>Carregando…</span>}
       {items && !list.length && <span style={{ fontSize: 13, color: C.t3 }}>Nada para revisar agora.</span>}
       {memories.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -148,20 +159,20 @@ export function LearningModal() {
       <div style={phone ? { display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 4 } : { display: 'flex', gap: 10, paddingTop: 4 }}>
         {phone ? (
           <>
-            <button disabled={busy || !list.length} onClick={() => void decide(list.filter((p) => checked.has(p.id)).map((p) => p.id))} style={{ height: 52, borderRadius: 12, border: 'none', background: C.cyan, color: '#06221c', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
-              {n ? `Guardar ${n} ${n === 1 ? 'marcada' : 'marcadas'}` : 'Descartar as desmarcadas'}
+            <button disabled={busy || !n} onClick={() => void decide(list.filter((p) => checked.has(p.id)).map((p) => p.id))} style={{ height: 52, borderRadius: 12, border: 'none', background: C.cyan, color: '#06221c', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+              {n ? `Guardar ${n} ${n === 1 ? 'marcada' : 'marcadas'}` : 'Marque o que guardar'}
             </button>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10 }}>
               <button onClick={later} style={{ height: tall, borderRadius: 12, border: '1px solid rgba(255,255,255,.18)', background: 'transparent', color: '#dfe3f3', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Depois</button>
-              <button disabled={busy || !list.length} onClick={() => void decide([])} style={{ height: tall, borderRadius: 12, border: '1px solid rgba(240,98,114,.35)', background: 'transparent', color: '#f39aa4', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Descartar tudo</button>
+              <button disabled={busy || !list.length} onClick={() => void discardAll()} style={{ height: tall, borderRadius: 12, border: '1px solid rgba(240,98,114,.35)', background: 'transparent', color: '#f39aa4', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Descartar tudo</button>
             </div>
           </>
         ) : (
           <>
             <button onClick={later} style={{ flex: 1, height: tall, borderRadius: 12, border: '1px solid rgba(255,255,255,.18)', background: 'transparent', color: '#dfe3f3', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Depois</button>
-            <button disabled={busy || !list.length} onClick={() => void decide([])} style={{ flex: 1, height: tall, borderRadius: 12, border: '1px solid rgba(240,98,114,.35)', background: 'transparent', color: '#f39aa4', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Descartar tudo</button>
-            <button disabled={busy || !list.length} onClick={() => void decide(list.filter((p) => checked.has(p.id)).map((p) => p.id))} style={{ flex: 1.4, height: tall, borderRadius: 12, border: 'none', background: C.cyan, color: '#06221c', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-              {n ? `Guardar ${n} ${n === 1 ? 'marcada' : 'marcadas'}` : 'Descartar as desmarcadas'}
+            <button disabled={busy || !list.length} onClick={() => void discardAll()} style={{ flex: 1, height: tall, borderRadius: 12, border: '1px solid rgba(240,98,114,.35)', background: 'transparent', color: '#f39aa4', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Descartar tudo</button>
+            <button disabled={busy || !n} onClick={() => void decide(list.filter((p) => checked.has(p.id)).map((p) => p.id))} style={{ flex: 1.4, height: tall, borderRadius: 12, border: 'none', background: C.cyan, color: '#06221c', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+              {n ? `Guardar ${n} ${n === 1 ? 'marcada' : 'marcadas'}` : 'Marque o que guardar'}
             </button>
           </>
         )}

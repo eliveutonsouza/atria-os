@@ -160,9 +160,9 @@ export function ClaudeGuideView() {
                       {isInstalled === false && init && <span style={{ color: C.t3 }}> · não encontrado</span>}
                     </span>
                   </div>
-                  <span style={{ fontSize: 13, color: '#c9cde0', lineHeight: 1.5 }}>{k.what}</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-soft)', lineHeight: 1.5 }}>{k.what}</span>
                   <span style={{ fontSize: 12, color: C.t3, lineHeight: 1.5 }}>Quando: {k.when}</span>
-                  <code className="mono" style={{ fontSize: 12, color: '#a9e9f8', background: 'rgba(0,0,0,.3)', borderRadius: 8, padding: '6px 10px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{k.example}</code>
+                  <code className="mono" style={{ fontSize: 12, color: 'var(--cyan-soft)', background: 'rgba(0,0,0,.3)', borderRadius: 8, padding: '6px 10px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{k.example}</code>
                   <div style={{ display: 'flex', gap: 6, marginTop: 'auto', paddingTop: 4, flexWrap: 'wrap' }}>
                     {k.command && <SmallBtn onClick={() => openInTerminal(k)}>Abrir no terminal</SmallBtn>}
                     <SmallBtn onClick={() => submitText(`Sobre o Claude Code: ${k.title} — ${k.what} Me ajuda a usar isso agora.`)}>Pedir à Yui</SmallBtn>

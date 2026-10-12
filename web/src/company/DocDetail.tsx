@@ -5,7 +5,9 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { api } from '../api/client'
 import { onCompanyEvent } from '../api/events'
 import { C } from '../lib/colors'
+import { toastErr, toastOk, useAction, useUnsavedGuard } from '../lib/feedback'
 import { useYui } from '../store/yui'
+import { ErrorNote } from '../views/ui'
 import { renderNote } from '../vault/markdown'
 import '../vault/vault.css'
 import { CAT_COLORS, fmtDate, fmtSize, goTab, isImage, isPdf, noExt, statusOf, Icon, useStacked } from './api'
@@ -96,7 +98,9 @@ export function DocDetail({ id }: { id: string }) {
   const [tab, setTab] = useState<Tab>('data')
   const [del, setDel] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [msg, setMsg] = useState<string | null>(null)
+  const [dataDirty, setDataDirty] = useState(false)
+  const [goPage, setGoPage] = useState('')
+  const confirmLeave = useUnsavedGuard(dataDirty, 'os dados editados')
   const viewerRef = useRef<HTMLDivElement>(null)
   const [vw, setVw] = useState(360)
 
@@ -130,16 +134,28 @@ export function DocDetail({ id }: { id: string }) {
   const patch = (body: Partial<Pick<CompanyDoc, 'category' | 'fields' | 'summary' | 'tags'>>) =>
     api.patch<CompanyDoc>(`/api/company/documents/${id}`, body).then((d) => {
       setDoc(d)
-      setMsg('Salvo.')
-    }).catch((e: Error) => setMsg(e.message))
-  const reprocess = () => api.post<CompanyDoc>(`/api/company/documents/${id}/reprocess`).then((d) => d && setDoc(d)).catch((e: Error) => setMsg(e.message))
+      toastOk('Salvo.')
+    }).catch((e: unknown) => toastErr(e, 'Não consegui salvar'))
+  const { run: reprocess, busy: reprocessing } = useAction(
+    async () => {
+      const d = await api.post<CompanyDoc>(`/api/company/documents/${id}/reprocess`)
+      if (d) setDoc(d)
+    },
+    { ok: 'Reprocessando — aviso quando terminar.', error: 'Não consegui reprocessar' },
+  )
   const remove = () => {
     setDeleting(true)
-    api.del(`/api/company/documents/${id}`).then(() => goTab('documentos')).catch((e: Error) => {
-      setMsg(`Não consegui excluir: ${e.message}`)
+    api.del(`/api/company/documents/${id}`).then(() => goTab('documentos')).catch((e: unknown) => {
+      toastErr(e, 'Não consegui excluir')
       setDeleting(false)
       setDel(false)
     })
+  }
+  // sair da aba Dados (ou da página) com edição não salva pergunta antes
+  const leaveTo = async (go: () => void) => {
+    if (tab === 'data' && !(await confirmLeave())) return
+    setDataDirty(false)
+    go()
   }
 
   if (err) {
@@ -157,6 +173,7 @@ export function DocDetail({ id }: { id: string }) {
   const img = isImage(doc)
   const totalPages = pdf ? pdfPages || doc.pages : img ? 1 : doc.pages
   const curPage = pages.find((p) => p.page === pageNo)
+  const thumbStart = Math.floor((pageNo - 1) / 60) * 60 + 1
   const st = statusOf(doc)
   const stateChip =
     doc.state === 'ready' ? ['rgba(79,224,176,0.12)', '#7ff0c8', '#4fe0b0', 'Pronto'] : doc.state === 'error' ? ['rgba(240,98,114,0.12)', '#f39aa4', '#f06272', 'Erro'] : ['rgba(103,216,242,0.12)', '#a9e9f8', '#67d8f2', doc.state === 'queued' ? 'Na fila' : 'Processando']
@@ -192,9 +209,29 @@ export function DocDetail({ id }: { id: string }) {
           </div>
         )}
       </div>
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', gap: 8, padding: '10px 14px 0', alignItems: 'center', flexWrap: 'wrap', fontSize: 12.5, color: C.t2 }}>
+          <button className="app-btn small" disabled={pageNo <= 1} onClick={() => setPageNo(pageNo - 1)}>‹ Anterior</button>
+          <button className="app-btn small" disabled={pageNo >= totalPages} onClick={() => setPageNo(pageNo + 1)}>Próxima ›</button>
+          <form
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            onSubmit={(e) => {
+              e.preventDefault()
+              const n = Number.parseInt(goPage, 10)
+              if (n >= 1 && n <= totalPages) setPageNo(n)
+              setGoPage('')
+            }}
+          >
+            <label htmlFor="co-go-page">Ir para página</label>
+            <input id="co-go-page" className="co-input" type="number" inputMode="numeric" min={1} max={totalPages} value={goPage} onChange={(e) => setGoPage(e.target.value)} placeholder={String(pageNo)} style={{ width: 72, height: 32, fontSize: narrow ? 16 : 13 }} />
+            <button className="app-btn small" type="submit" disabled={!goPage}>Ir</button>
+          </form>
+        </div>
+      )}
       <div data-own-scroll style={{ display: 'flex', gap: 8, padding: '12px 14px', borderTop: '1px solid rgba(255,255,255,0.06)', alignItems: 'center', overflowX: 'auto' }}>
         {totalPages > 1 &&
-          Array.from({ length: Math.min(totalPages, 60) }, (_, i) => i + 1).map((n) => (
+          // miniaturas em blocos de 60 em volta da página atual
+          Array.from({ length: Math.min(totalPages - thumbStart + 1, 60) }, (_, i) => thumbStart + i).map((n) => (
             <button
               key={n}
               aria-label={`Página ${n}`}
@@ -208,9 +245,7 @@ export function DocDetail({ id }: { id: string }) {
           ))}
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 11.5, color: '#8c92ad', textAlign: 'right', whiteSpace: 'nowrap' }}>
-          Lido por Docling
-          <br />
-          {doc.ocrPages ? `${doc.ocrPages} ${doc.ocrPages === 1 ? 'página' : 'páginas'} com OCR` : 'texto nativo · sem OCR'}
+          {doc.ocrPages ? `${doc.ocrPages} ${doc.ocrPages === 1 ? 'página lida' : 'páginas lidas'} da imagem (OCR)` : 'Texto digital, sem OCR'}
         </span>
       </div>
     </div>
@@ -226,16 +261,16 @@ export function DocDetail({ id }: { id: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {narrow && (
-        <button className="app-btn" style={{ height: 44, alignSelf: 'flex-start' }} onClick={() => goTab('documentos')}>
+        <button className="app-btn" style={{ height: 44, alignSelf: 'flex-start' }} onClick={() => leaveTo(() => goTab('documentos'))}>
           ‹ Documentos
         </button>
       )}
       <header style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0, flex: '1 1 360px' }}>
           <nav aria-label="Trilha" style={{ display: narrow ? 'none' : 'flex', gap: 8, fontSize: 12, color: C.t2, minWidth: 0 }}>
-            <button className="vault-link-btn" style={{ padding: 0 }} onClick={() => goTab('perfil')}>Empresa</button>
+            <button className="vault-link-btn" style={{ padding: 0 }} onClick={() => leaveTo(() => goTab('perfil'))}>Empresa</button>
             <span>›</span>
-            <button className="vault-link-btn" style={{ padding: 0 }} onClick={() => goTab('documentos')}>Documentos</button>
+            <button className="vault-link-btn" style={{ padding: 0 }} onClick={() => leaveTo(() => goTab('documentos'))}>Documentos</button>
             <span>›</span>
             <span style={{ color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name}</span>
           </nav>
@@ -264,8 +299,8 @@ export function DocDetail({ id }: { id: string }) {
           <a className="app-btn" href={fileUrl} download={doc.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36 }}>
             <Svg d={Icon.download} size={14} /> Baixar original
           </a>
-          <button className="app-btn" disabled={doc.state === 'processing' || doc.state === 'queued'} onClick={reprocess} style={{ height: 36 }}>
-            Reprocessar
+          <button className="app-btn" disabled={reprocessing || doc.state === 'processing' || doc.state === 'queued'} onClick={() => reprocess()} style={{ height: 36 }}>
+            {reprocessing ? 'Reprocessando…' : 'Reprocessar'}
           </button>
           <button className="app-btn danger" onClick={() => setDel(true)} style={{ height: 36, fontWeight: 600 }}>
             Excluir
@@ -273,7 +308,6 @@ export function DocDetail({ id }: { id: string }) {
         </div>
       </header>
 
-      {msg && <div role="status" style={{ fontSize: 12.5, color: msg === 'Salvo.' ? C.ok : C.crit }}>{msg}</div>}
       {doc.state !== 'ready' && (
         <div className="co-card" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={{ fontSize: 13, color: st.color, overflowWrap: 'anywhere' }}>{st.text}</span>
@@ -286,12 +320,12 @@ export function DocDetail({ id }: { id: string }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
           <div role="tablist" aria-label="Seções do documento" className="co-seg">
             {tabs.map(([t, l]) => (
-              <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
+              <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'on' : ''} onClick={() => t !== tab && void leaveTo(() => setTab(t))}>
                 {l}
               </button>
             ))}
           </div>
-          {tab === 'data' && <DataTab doc={doc} narrow={narrow} onSave={patch} />}
+          {tab === 'data' && <DataTab doc={doc} narrow={narrow} onSave={patch} onDirty={setDataDirty} />}
           {tab === 'text' && <TextTab id={id} />}
           {tab === 'chunks' && <ChunksTab id={id} />}
           {tab === 'use' && <UsesTab id={id} />}
@@ -302,7 +336,7 @@ export function DocDetail({ id }: { id: string }) {
   )
 }
 
-function DataTab({ doc, narrow, onSave }: { doc: CompanyDoc; narrow: boolean; onSave: (b: Partial<Pick<CompanyDoc, 'fields' | 'summary' | 'tags'>>) => Promise<void> }) {
+function DataTab({ doc, narrow, onSave, onDirty }: { doc: CompanyDoc; narrow: boolean; onSave: (b: Partial<Pick<CompanyDoc, 'fields' | 'summary' | 'tags'>>) => Promise<void>; onDirty: (dirty: boolean) => void }) {
   const [fields, setFields] = useState(doc.fields)
   const [summary, setSummary] = useState(doc.summary ?? '')
   const [saving, setSaving] = useState(false)
@@ -315,6 +349,7 @@ function DataTab({ doc, narrow, onSave }: { doc: CompanyDoc; narrow: boolean; on
     setSummary(doc.summary ?? '')
   }
   const dirty = JSON.stringify(fields) !== JSON.stringify(doc.fields) || summary !== (doc.summary ?? '')
+  useEffect(() => onDirty(dirty), [dirty, onDirty])
   const save = () => {
     setSaving(true)
     onSave({ fields: fields.filter((f) => f.key.trim() || f.value.trim()), summary }).finally(() => setSaving(false))
@@ -401,7 +436,7 @@ function DataTab({ doc, narrow, onSave }: { doc: CompanyDoc; narrow: boolean; on
           <div style={{ padding: 16, borderRadius: 16, background: 'rgba(166,140,247,0.06)', border: '1px solid rgba(166,140,247,0.22)', display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 600 }}>Também no vault</span>
             <span style={{ fontSize: 12.5, color: '#c9cde0', lineHeight: 1.5, overflowWrap: 'anywhere' }}>
-              Virou a nota <span style={{ color: C.lav }}>{vaultNote.replace(/\.md$/, '')}</span> e aparece no Cérebro, ligada a [[Empresa]].
+              Virou a nota <span style={{ color: C.lav }}>{vaultNote.replace(/\.md$/, '')}</span> e aparece no Cérebro, ligada à nota Empresa.
             </span>
             <button className="app-btn small" style={{ alignSelf: 'flex-start' }} onClick={() => useYui.getState().set({ appPage: 'vault', appParams: { id: vaultNote } })}>
               Abrir no vault →
@@ -433,9 +468,13 @@ function TextTab({ id }: { id: string }) {
 
 function ChunksTab({ id }: { id: string }) {
   const [chunks, setChunks] = useState<CompanyChunk[] | null>(null)
-  useEffect(() => {
-    api.get<CompanyChunk[]>(`/api/company/documents/${id}/chunks`).then(setChunks).catch(() => setChunks([]))
+  const [err, setErr] = useState(false)
+  const load = useCallback(() => {
+    setErr(false)
+    api.get<CompanyChunk[]>(`/api/company/documents/${id}/chunks`).then(setChunks).catch(() => setErr(true))
   }, [id])
+  useEffect(load, [load])
+  if (err) return <ErrorNote text="Não consegui carregar os trechos." retry={load} />
   if (!chunks) return <div style={{ color: C.t2, fontSize: 13 }}>Carregando…</div>
   if (!chunks.length) return <div style={{ color: C.t2, fontSize: 13 }}>Nenhum trecho indexado ainda.</div>
   return (
@@ -445,10 +484,11 @@ function ChunksTab({ id }: { id: string }) {
           <div style={{ display: 'flex', gap: 10, fontFamily: 'var(--mono)', fontSize: 11, color: '#8c92ad', flexWrap: 'wrap' }}>
             <span style={{ color: C.cyan }}>#{c.ord + 1}</span>
             {c.page != null && <span>pág. {c.page}</span>}
-            <span>{c.tokens} tokens</span>
-            <span>{c.kind}</span>
             <span style={{ flex: 1 }} />
-            <span>vetor 1536d · qdrant</span>
+            <details>
+              <summary style={{ cursor: 'pointer' }}>Detalhes técnicos</summary>
+              {c.tokens} tokens · {c.kind} · vetor 1536d · qdrant
+            </details>
           </div>
           <span style={{ fontSize: 13, color: '#dfe3f3', lineHeight: 1.55, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{c.text}</span>
         </div>
@@ -460,9 +500,13 @@ function ChunksTab({ id }: { id: string }) {
 function UsesTab({ id }: { id: string }) {
   const narrow = useYui((s) => s.narrow)
   const [uses, setUses] = useState<CompanyUse[] | null>(null)
-  useEffect(() => {
-    api.get<CompanyUse[]>(`/api/company/documents/${id}/uses`).then(setUses).catch(() => setUses([]))
+  const [err, setErr] = useState(false)
+  const load = useCallback(() => {
+    setErr(false)
+    api.get<CompanyUse[]>(`/api/company/documents/${id}/uses`).then(setUses).catch(() => setErr(true))
   }, [id])
+  useEffect(load, [load])
+  if (err) return <ErrorNote text="Não consegui carregar quem usou este documento." retry={load} />
   if (!uses) return <div style={{ color: C.t2, fontSize: 13 }}>Carregando…</div>
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

@@ -8,7 +8,7 @@ const pctTone = (v: number | null) => (v == null ? C.text : v >= 90 ? C.crit : v
 
 export function InfraView() {
   const { data, loading, error } = useApi<InfraPayload>('/api/infra', [], 10000)
-  useHeader('Infrastructure · Live', 'Minha VPS')
+  useHeader('Infraestrutura · ao vivo', 'Minha VPS')
   if (loading && !data) return <Skeleton rows={6} />
   if (error || !data) return <ErrorNote />
   const healthy = data.containers.filter((c) => c.tone === 'ok').length

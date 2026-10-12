@@ -3,10 +3,11 @@ import type { ApprovalInfo, InboxItem } from '@shared/protocol'
 import { api } from '../../api/client'
 import { useApi } from '../../api/useApi'
 import { resolveApproval } from '../../lib/actions'
+import { toastErr } from '../../lib/feedback'
 import { C, toneColor } from '../../lib/colors'
 import { useYui } from '../../store/yui'
 import { Tabs } from '../../views/kit'
-import { Empty, useHeader } from '../../views/ui'
+import { Empty, ErrorNote, Skeleton, useHeader } from '../../views/ui'
 import { openInboxView } from '../../workflow/inputs'
 import { relTime } from './common'
 
@@ -40,7 +41,7 @@ async function dismiss(ib: InboxItem) {
   try {
     await api.post(`/api/inbox/${encodeURIComponent(ib.id)}/dismiss`)
   } catch (e) {
-    useYui.getState().say(`Não consegui dispensar: ${(e as Error).message}.`)
+    toastErr(e, 'Não consegui dispensar')
   }
 }
 
@@ -54,9 +55,16 @@ export function InboxPage() {
   const others = inbox.filter((i) => i.action.type !== 'approval')
   const phone = useYui((s) => s.device === 'phone')
 
+  const [deciding, setDeciding] = useState<string | null>(null) // id da aprovação sendo decidida (bloqueia clique duplo)
   const decide = async (id: string, ok: boolean) => {
-    await resolveApproval(id, ok)
-    approvals.reload()
+    if (deciding) return
+    setDeciding(id)
+    try {
+      await resolveApproval(id, ok)
+      approvals.reload()
+    } finally {
+      setDeciding(null)
+    }
   }
   const tabs = (
     <div className={phone ? 'h-scroll' : undefined} style={{ minWidth: 0 }}>
@@ -73,9 +81,16 @@ export function InboxPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 920 }}>
       {tabs}
-      {list.length === 0 && others.length === 0 && <Empty text="Nada precisa de você agora." hint="Aprovações de deploy, envio e publicação aparecem aqui." />}
+      {!approvals.data && approvals.error ? (
+        <ErrorNote text="Não consegui carregar as aprovações." retry={approvals.reload} />
+      ) : !approvals.data && others.length === 0 ? (
+        <Skeleton rows={3} kpis={0} />
+      ) : (
+        list.length === 0 && others.length === 0 && <Empty text="Nada precisa de você agora." hint="Aprovações de deploy, envio e publicação aparecem aqui." />
+      )}
       {list.map((a) => {
         const danger = a.kind === 'destructive'
+        const busy = deciding === a.id
         return (
         <section key={a.id} style={{ minWidth: 0, padding: phone ? '16px 14px' : '18px 20px', borderRadius: 18, background: 'linear-gradient(180deg,rgba(26,22,52,.6),rgba(14,16,34,.6))', border: `1px solid ${danger ? 'rgba(240,98,114,.45)' : 'rgba(245,181,74,.3)'}`, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, ...(phone ? { flexWrap: 'wrap', rowGap: 4 } : null) }}>
@@ -95,9 +110,14 @@ export function InboxPage() {
           <div style={phone ? { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 10 } : { display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button className="app-btn" style={phone ? { gridColumn: '1 / -1', height: 44 } : undefined} onClick={() => review(a.runId)}>Revisar</button>
             {!phone && <span style={{ flex: 1 }} />}
-            <button className={danger ? 'app-btn' : 'app-btn danger'} style={phone ? { height: 50, justifyContent: 'center' } : { minWidth: 120, height: 42 }} onClick={() => void decide(a.id, false)}>{danger ? 'Cancelar' : 'Rejeitar'}</button>
-            <button style={{ ...(phone ? { height: 50, padding: '0 8px', lineHeight: 1.2 } : { minWidth: 140, height: 42 }), borderRadius: 12, border: 'none', background: danger ? '#e2566a' : 'linear-gradient(135deg,#4fe0b0,#67d8f2)', color: danger ? '#fff' : '#06221c', fontSize: 14, fontWeight: 700, cursor: 'pointer' }} onClick={() => void decide(a.id, true)}>
-              {danger ? 'Excluir definitivamente' : 'Aprovar'}
+            <button className={danger ? 'app-btn' : 'app-btn danger'} disabled={!!deciding} style={phone ? { height: 50, justifyContent: 'center' } : { minWidth: 120, height: 42 }} onClick={() => void decide(a.id, false)}>{danger ? 'Cancelar' : 'Rejeitar'}</button>
+            <button
+              className={danger ? 'app-btn solid-danger' : 'app-btn'}
+              disabled={!!deciding}
+              style={{ ...(phone ? { height: 50, padding: '0 8px', lineHeight: 1.2 } : { minWidth: 140, height: 42 }), borderRadius: 12, fontSize: 14, ...(danger ? null : { border: 'none', background: `linear-gradient(135deg,${C.ok},${C.cyan})`, color: '#06221c', fontWeight: 700 }) }}
+              onClick={() => void decide(a.id, true)}
+            >
+              {busy ? 'Registrando…' : danger ? 'Excluir definitivamente' : 'Aprovar'}
             </button>
           </div>
         </section>
@@ -125,10 +145,12 @@ export function InboxPage() {
 }
 
 function ApprovalHistory() {
-  const { data, loading, error } = useApi<ApprovalHistoryItem[]>('/api/approvals/history?limit=50', [], 30000)
+  const hist = useApi<ApprovalHistoryItem[]>('/api/approvals/history?limit=50', [], 30000)
+  const { data, loading, error } = hist
   const phone = useYui((s) => s.device === 'phone')
-  if (loading && !data) return <Empty text="Carregando…" />
-  if (error || !data) return <Empty text="Não consegui ler o histórico de aprovações." />
+  const { reload } = hist
+  if (loading && !data) return <Skeleton rows={4} kpis={0} />
+  if (error || !data) return <ErrorNote text="Não consegui ler o histórico de aprovações." retry={reload} />
   if (!data.length) return <Empty text="Nenhuma aprovação resolvida ainda." hint="Aprovações aprovadas, rejeitadas ou expiradas aparecem aqui." />
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>

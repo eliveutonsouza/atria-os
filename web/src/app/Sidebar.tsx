@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { AppPage } from '@shared/protocol'
 import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
@@ -56,6 +56,22 @@ export function Sidebar() {
 
   const groups = useNavGroups(visible)
 
+  // gaveta (celular/tablet/toque): foco entra ao abrir e volta para onde estava ao fechar
+  const navRef = useRef<HTMLElement>(null)
+  const overlay = open && !docked && (!desktop || coarse)
+  useEffect(() => {
+    if (!overlay) return
+    const prev = document.activeElement as HTMLElement | null
+    const t = setTimeout(() => {
+      const nav = navRef.current
+      ;(nav?.querySelector<HTMLElement>('button[aria-current="page"]') ?? nav?.querySelector<HTMLElement>('button'))?.focus()
+    }, 50)
+    return () => {
+      clearTimeout(t)
+      if (prev && document.contains(prev)) prev.focus()
+    }
+  }, [overlay])
+
   const togglePin = () => {
     const next = !pinned
     try {
@@ -66,13 +82,13 @@ export function Sidebar() {
     set({ sidebarPinned: next, sidebarOpen: next })
   }
 
-  const overlay = open && !docked && (!desktop || coarse)
   return (
     <>
       {/* zona quente na borda esquerda (desktop) */}
       {desktop && !coarse && !visible && <div aria-hidden onMouseEnter={show} onMouseMove={show} style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 10, zIndex: 37 }} />}
-      {overlay && <div onClick={() => set({ sidebarOpen: false })} style={{ position: 'absolute', inset: 0, zIndex: 37, background: 'rgba(4,5,12,.5)', backdropFilter: 'blur(2px)' }} />}
+      {overlay && <div aria-hidden onClick={() => set({ sidebarOpen: false })} style={{ position: 'absolute', inset: 0, zIndex: 37, background: 'rgba(4,5,12,.5)', backdropFilter: 'blur(2px)' }} />}
       <nav
+        ref={navRef}
         aria-label="Navegação"
         aria-hidden={!visible}
         onMouseEnter={show}
@@ -153,7 +169,7 @@ export function Sidebar() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 }}>
             <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userName || 'Você'}</span>
             <span style={{ fontSize: 11, color: C.t3 }}>
-              Claude {status.claude ? 'ok' : 'off'} · OpenAI {status.openai ? 'ok' : 'off'}
+              Claude {status.claude ? 'conectado' : 'desconectado'} · OpenAI {status.openai ? 'conectado' : 'desconectado'}
             </span>
           </div>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: status.claude && status.openai ? C.ok : C.warn, boxShadow: `0 0 8px ${status.claude && status.openai ? C.ok : C.warn}` }} />

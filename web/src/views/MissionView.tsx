@@ -7,6 +7,7 @@ import { dropMission } from '../lib/actions'
 import { useYui } from '../store/yui'
 import { MissionEditor } from './MissionEditor'
 import { ConfirmDeleteModal, Empty, ErrorNote, Eyebrow, Skeleton, useHeader } from './ui'
+import { act as runAct, confirmAction } from '../lib/feedback'
 
 // Missão: plano de execução multi-agente (PRD §94/§36) — grafo de etapas + lista com estado ao vivo.
 
@@ -78,25 +79,29 @@ export function MissionView() {
 }
 
 function MissionDetail({ id, m, loading, error, reload, onEdit }: { id?: string; m?: MissionInfo | null; loading: boolean; error: unknown; reload: () => void; onEdit?: () => void }) {
-  const act = (a: 'pause' | 'resume' | 'cancel' | 'retry') => () => {
-    if (!id) return
-    api.post<MissionInfo>(`/api/missions/${id}/${a}`).then((r) => {
-      if (r) useYui.getState().set({ missions: { ...useYui.getState().missions, [r.id]: r } })
-      reload()
-    }).catch(() => {})
+  const [acting, setActing] = useState(false)
+  const ERR = { pause: 'Não consegui pausar', resume: 'Não consegui retomar', cancel: 'Não consegui cancelar', retry: 'Não consegui tentar de novo' } as const
+  const act = (a: 'pause' | 'resume' | 'cancel' | 'retry') => async () => {
+    if (!id || acting) return
+    if (a === 'cancel' && !(await confirmAction({ title: 'Cancelar esta missão?', text: 'As etapas que ainda não rodaram não vão acontecer. O que já foi feito continua no histórico.', confirmLabel: 'Cancelar missão', cancelLabel: 'Voltar', danger: true }))) return
+    setActing(true)
+    const r = await runAct(api.post<MissionInfo>(`/api/missions/${id}/${a}`), { error: ERR[a] })
+    setActing(false)
+    if (r) useYui.getState().set({ missions: { ...useYui.getState().missions, [r.id]: r } })
+    reload()
   }
   const actions = !m
     ? []
     : m.status === 'running'
-      ? [{ label: 'Pausar', fn: act('pause'), primary: true }, { label: 'Cancelar', fn: act('cancel') }]
+      ? [{ label: 'Pausar', fn: act('pause'), primary: true, disabled: acting }, { label: 'Cancelar', fn: act('cancel'), disabled: acting }]
       : m.status === 'paused'
-        ? [{ label: 'Retomar', fn: act('resume'), primary: true }, { label: 'Cancelar', fn: act('cancel') }]
+        ? [{ label: 'Retomar', fn: act('resume'), primary: true, disabled: acting }, { label: 'Cancelar', fn: act('cancel'), disabled: acting }]
         : m.status === 'blocked' || m.status === 'failed'
-          ? [{ label: 'Tentar de novo', fn: act('retry'), primary: true }, ...(m.status === 'blocked' ? [{ label: 'Cancelar', fn: act('cancel') }] : [])]
+          ? [{ label: 'Tentar de novo', fn: act('retry'), primary: true, disabled: acting }, ...(m.status === 'blocked' ? [{ label: 'Cancelar', fn: act('cancel'), disabled: acting }] : [])]
           : []
   const [delOpen, setDelOpen] = useState(false)
   const edit = onEdit ? [{ label: 'Editar etapas', fn: onEdit }] : []
-  useHeader('Mission', m?.title ?? 'Missão', m ? [...actions, ...edit, { label: 'Excluir missão', fn: () => setDelOpen(true), danger: true }] : actions, [m?.status, m?.id, !!onEdit])
+  useHeader('Missão', m?.title ?? 'Missão', m ? [...actions, ...edit, { label: 'Excluir missão', fn: () => setDelOpen(true), danger: true }] : actions, [m?.status, m?.id, !!onEdit, acting])
   if (!id) return <Empty text="Nenhuma missão aberta." hint="Peça algo grande: “Yui, cria uma landing page para uma clínica.”" />
   if (loading && !m) return <Skeleton kpis={0} rows={5} />
   if (error || !m) return <ErrorNote text="Não encontrei essa missão." />
@@ -104,6 +109,7 @@ function MissionDetail({ id, m, loading, error, reload, onEdit }: { id?: string;
   const done = m.steps.filter((s) => s.status === 'done').length
   const pct = Math.round((done / Math.max(1, m.steps.length)) * 100)
   const ms = MST[m.status]
+  const nums = new Map(m.steps.map((s, i) => [s.id, i + 1]))
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 1100 }}>
       {delOpen && <DeleteMissionModal mission={m} onClose={() => setDelOpen(false)} />}
@@ -115,7 +121,7 @@ function MissionDetail({ id, m, loading, error, reload, onEdit }: { id?: string;
           </span>
           <span style={{ fontSize: 13, color: C.t3 }}>{done}/{m.steps.length} etapas{m.project ? ` · ${m.project}` : ''}</span>
         </div>
-        <div style={{ fontSize: 15, color: '#c9cde0', lineHeight: 1.6, maxWidth: 820, textWrap: 'pretty' }}>{m.goal}</div>
+        <div style={{ fontSize: 15, color: C.soft, lineHeight: 1.6, maxWidth: 820, textWrap: 'pretty' }}>{m.goal}</div>
         <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,.07)', overflow: 'hidden', maxWidth: 820 }}>
           <div style={{ height: '100%', width: `${pct}%`, background: m.status === 'failed' ? C.crit : `linear-gradient(90deg, ${C.cyan}, ${C.violet})`, transition: 'width .4s' }} />
         </div>
@@ -131,7 +137,7 @@ function MissionDetail({ id, m, loading, error, reload, onEdit }: { id?: string;
       <Graph steps={m.steps} />
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <Eyebrow style={{ marginBottom: 6 }}>Etapas</Eyebrow>
-        {m.steps.map((s, i) => <StepRow key={s.id} step={s} n={i + 1} />)}
+        {m.steps.map((s, i) => <StepRow key={s.id} step={s} n={i + 1} nums={nums} />)}
       </div>
     </div>
   )
@@ -202,7 +208,7 @@ function Graph({ steps }: { steps: MissionStep[] }) {
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 
-function StepRow({ step, n }: { step: MissionStep; n: number }) {
+function StepRow({ step, n, nums }: { step: MissionStep; n: number; nums: Map<string, number> }) {
   const phone = useYui((s) => s.device === 'phone')
   const [open, setOpen] = useState(step.status === 'failed')
   const st = ST[step.status]
@@ -217,7 +223,7 @@ function StepRow({ step, n }: { step: MissionStep; n: number }) {
         <span style={{ color: st.c, textAlign: 'center' }}>{st.icon}</span>
         <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
           <span style={{ fontSize: 15, fontWeight: 600, overflowWrap: 'anywhere' }}>{step.title}{step.risky && <span style={{ marginLeft: 8, fontSize: 11, color: C.warn, fontWeight: 500 }}>precisa de OK</span>}</span>
-          <span style={{ fontSize: 13, color: C.t2 }}>{step.agent}{step.dependsOn.length ? ` · depois de ${step.dependsOn.join(', ')}` : ''}</span>
+          <span style={{ fontSize: 13, color: C.t2 }}>{step.agent}{step.dependsOn.length ? ` · depois da etapa ${step.dependsOn.map((d) => nums.get(d) ?? d).join(', ')}` : ''}</span>
           {/* celular: estado vai para baixo do agente (sem coluna fixa à direita) */}
           {phone && <span style={{ fontSize: 12, color: st.c }}>{st.label}</span>}
         </span>
@@ -227,12 +233,13 @@ function StepRow({ step, n }: { step: MissionStep; n: number }) {
         <div style={{ padding: phone ? '0 0 16px 30px' : '0 0 16px 60px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ fontSize: 13, color: '#b4b9cf', lineHeight: 1.6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{step.instruction}</div>
           {step.result && (
-            <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(0,0,0,.3)', border: '1px solid rgba(255,255,255,.06)', fontSize: 13, color: '#d6d9e8', lineHeight: 1.6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{step.result}</div>
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(0,0,0,.3)', border: '1px solid rgba(255,255,255,.06)', fontSize: 13, color: C.dim, lineHeight: 1.6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{step.result}</div>
           )}
           {step.runId && (
             <button
               onClick={() => useYui.getState().show('runs', { runId: step.runId! })}
-              style={{ alignSelf: 'flex-start', height: phone ? 44 : 30, padding: '0 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.03)', color: '#dfe3f3', fontSize: 12, cursor: 'pointer' }}
+              className="app-btn small"
+              style={{ alignSelf: 'flex-start', height: phone ? 44 : 30, padding: '0 12px', borderRadius: 9, fontSize: 12 }}
             >
               Ver execução
             </button>

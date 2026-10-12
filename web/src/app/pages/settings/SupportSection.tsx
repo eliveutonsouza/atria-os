@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { api } from '../../../api/client'
 import { onSupportUpdated } from '../../../api/events'
 import { C } from '../../../lib/colors'
+import { toastErr, toastOk } from '../../../lib/feedback'
 import { dayTime, hhmm } from '../../../lib/format'
 import { SmallBtn } from '../../../views/kit'
 import type { AuthStatus } from '../../../shell/SupportBanners'
-import { panel, SaveMsg, useSettings } from './sections'
+import { panel, SaveMsg, SettingsLoadError, useSettings } from './sections'
 
 // Configurações › Suporte e atualizações (ClientSettings.dc.html): o cliente decide se a equipe Atria
 // pode entrar para ajudar e se aceita atualizações mandadas pelo Atria Central; vê cada acesso e a versão.
@@ -45,23 +46,22 @@ const minutes = (a: string, b: string) => {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`
 }
 
-const eyebrow = { fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: C.t3, fontWeight: 600 } as const
-
-function Toggle({ on, title, hint, onChange }: { on: boolean; title: string; hint: string; onChange: (v: boolean) => void }) {
+function Toggle({ on, title, hint, disabled, onChange }: { on: boolean; title: string; hint: string; disabled?: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
+      disabled={disabled}
       onClick={() => onChange(!on)}
-      style={{ display: 'flex', alignItems: 'center', gap: 14, minHeight: 44, padding: 0, border: 'none', background: 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
+      style={{ display: 'flex', alignItems: 'center', gap: 14, minHeight: 44, padding: 0, border: 'none', background: 'transparent', color: C.text, textAlign: 'left', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.45 : 1, fontFamily: 'inherit', width: '100%' }}
     >
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: 'block', fontWeight: 600, fontSize: 14 }}>{title}</span>
         <span style={{ display: 'block', fontSize: 13, color: C.t2, lineHeight: 1.45 }}>{hint}</span>
       </span>
       <span aria-hidden style={{ flex: '0 0 auto', width: 44, height: 24, borderRadius: 12, position: 'relative', background: on ? C.ok : 'rgba(255,255,255,.14)', transition: 'background .15s' }}>
-        <span style={{ position: 'absolute', top: 3, left: on ? 23 : 3, width: 18, height: 18, borderRadius: '50%', background: on ? '#0a0c1d' : '#c9cde0', transition: 'left .15s' }} />
+        <span style={{ position: 'absolute', top: 3, left: on ? 23 : 3, width: 18, height: 18, borderRadius: '50%', background: on ? '#0a0c1d' : C.soft, transition: 'left .15s' }} />
       </span>
     </button>
   )
@@ -70,7 +70,7 @@ function Toggle({ on, title, hint, onChange }: { on: boolean; title: string; hin
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section style={{ ...panel, padding: 20, display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
-      <div style={eyebrow}>{title}</div>
+      <div className="eyebrow">{title}</div>
       {children}
     </section>
   )
@@ -89,9 +89,11 @@ function UpdateNote({ u, now }: { u: LocalUpdate; now: number }) {
 }
 
 export function SupportSection() {
-  const { data, save, msg } = useSettings()
+  const settings = useSettings()
+  const { data, save, msg, saving } = settings
   const [auth, setAuth] = useState<AuthStatus | null>(null)
   const [history, setHistory] = useState<Access[] | null>(null)
+  const [histErr, setHistErr] = useState(false)
   const [upd, setUpd] = useState<UpdatesStatus | null>(null)
   const [ending, setEnding] = useState(false)
   const [now, setNow] = useState(() => Date.now()) // relógio da última leitura (duração do acesso ativo)
@@ -102,9 +104,10 @@ export function SupportSection() {
       .get<Access[]>('/api/support/sessions')
       .then((h) => {
         setHistory(h)
+        setHistErr(false)
         setNow(Date.now())
       })
-      .catch(() => {})
+      .catch(() => setHistErr(true))
     api.get<UpdatesStatus>('/api/updates/status').then(setUpd).catch(() => {})
   }, [])
   const running = !!upd?.current && !upd.current.finishedAt
@@ -118,23 +121,31 @@ export function SupportSection() {
     }
   }, [load, running])
 
-  const remote = data ? data.values['support.remoteAccess'] !== false : true
-  const allowUpdates = data ? data.values['update.allowRemote'] !== false : true
+  // até carregar, os interruptores ficam desligados e bloqueados (não mostram um estado que não é o real)
+  const remote = data ? data.values['support.remoteAccess'] !== false : false
+  const allowUpdates = data ? data.values['update.allowRemote'] !== false : false
   const support = auth?.support?.active ? auth.support : null
   const asSupport = auth?.session === 'support'
   const endAccess = async () => {
     setEnding(true)
-    await api.del('/api/support/sessions').catch(() => {})
-    setEnding(false)
-    load()
+    try {
+      await api.del('/api/support/sessions')
+      toastOk(asSupport ? 'Você saiu do suporte.' : 'Acesso do suporte encerrado.')
+      load()
+    } catch (e) {
+      toastErr(e, 'Não consegui encerrar o acesso')
+    } finally {
+      setEnding(false)
+    }
   }
   const [uLabel, uColor] = UPDATER[upd?.updater.status ?? 'missing']
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <SettingsLoadError s={settings} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: 16, alignItems: 'start' }}>
         <Card title="Suporte remoto">
-          <Toggle on={remote} title="Permitir que a equipe Atria acesse para ajudar" hint="Cada acesso aparece numa faixa no topo e fica registrado. Dura no máximo 2 h." onChange={(v) => void save({ 'support.remoteAccess': v })} />
+          <Toggle on={remote} title="Permitir que a equipe Atria acesse para ajudar" hint="Cada acesso aparece numa faixa no topo e fica registrado. Dura no máximo 2 h." disabled={!data || saving} onChange={(v) => void save({ 'support.remoteAccess': v })} />
           {support && (
             <div role="status" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'rgba(103,216,242,.08)', border: '1px solid rgba(103,216,242,.25)', fontSize: 14 }}>
               <span style={{ flex: '1 1 200px' }}>
@@ -143,9 +154,16 @@ export function SupportSection() {
               <SmallBtn disabled={ending} onClick={() => void endAccess()}>{asSupport ? 'Sair do suporte' : 'Encerrar acesso'}</SmallBtn>
             </div>
           )}
-          <div style={{ ...eyebrow, fontSize: 12, letterSpacing: '.1em' }}>Acessos recentes</div>
+          <div className="eyebrow" style={{ fontSize: 12, letterSpacing: '.1em' }}>Acessos recentes</div>
           <div>
-            {history === null && <div style={{ fontSize: 13, color: C.t3 }}>Carregando…</div>}
+            {history === null && (histErr ? (
+              <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 13, color: C.t2 }}>
+                Não consegui carregar os acessos.
+                <SmallBtn onClick={load}>Tentar de novo</SmallBtn>
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: C.t3 }}>Carregando…</div>
+            ))}
             {history?.length === 0 && <div style={{ fontSize: 13, color: C.t2 }}>Nenhum acesso do suporte até agora.</div>}
             {history?.slice(0, 8).map((a, i, list) => (
               <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', fontSize: 14, padding: '8px 0', borderBottom: i < list.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none' }}>
@@ -164,7 +182,7 @@ export function SupportSection() {
             <span className="mono" style={{ fontSize: 18, overflowWrap: 'anywhere' }}>{upd?.version ?? auth?.version ?? '—'}</span>
           </div>
           {upd?.current && <UpdateNote u={upd.current} now={now} />}
-          <Toggle on={allowUpdates} title="Aceitar atualizações da equipe Atria" hint="Desligado, as atualizações ficam pausadas até você ligar de novo. Quando a equipe agenda uma, um aviso aparece no topo um dia antes." onChange={(v) => void save({ 'update.allowRemote': v })} />
+          <Toggle on={allowUpdates} title="Aceitar atualizações da equipe Atria" hint="Desligado, as atualizações ficam pausadas até você ligar de novo. Quando a equipe agenda uma, um aviso aparece no topo um dia antes." disabled={!data || saving} onChange={(v) => void save({ 'update.allowRemote': v })} />
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13, color: C.t2 }}>
             <span>Atualizador</span>
             <span style={{ color: uColor }}>
@@ -173,7 +191,7 @@ export function SupportSection() {
             </span>
           </div>
           {upd?.updater.status === 'missing' && (
-            <div style={{ fontSize: 12.5, color: C.t3, lineHeight: 1.45 }}>Esta instalação se atualiza pela VPS (./install.sh --update). A atualização pela equipe Atria vale para instalações feitas pelo comando do Atria Central.</div>
+            <div style={{ fontSize: 12.5, color: C.t3, lineHeight: 1.45 }}>Esta instalação é atualizada direto no servidor (por um técnico, com ./install.sh --update). A atualização pela equipe Atria vale para instalações feitas pelo comando do Atria Central.</div>
           )}
         </Card>
       </div>

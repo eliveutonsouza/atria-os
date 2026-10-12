@@ -13,7 +13,7 @@ import './app.css'
 // Dashboard (modo app): entra com fade + slide enquanto o orb da Yui voa para o canto.
 
 export const PAGE_TITLES: Record<AppPage, [string, string]> = {
-  overview: ['Visão geral · ao vivo', 'Visão geral'],
+  overview: ['Início · ao vivo', 'Início'],
   ops: ['Operações · metodologia de execução', 'Quem está fazendo o quê'],
   agents: ['Agentes', 'Sua equipe'],
   runs: ['Execuções', 'Histórico de execuções'],

@@ -6,7 +6,7 @@ import { Empty, ErrorNote, Eyebrow, Skeleton, useHeader } from './ui'
 
 export function BriefView() {
   const { data, loading, error } = useApi<Brief>('/api/brief')
-  useHeader('Overnight', 'Enquanto você esteve fora', [{ label: 'Visão geral', fn: () => useYui.getState().show('dashboard') }])
+  useHeader('Resumo da noite', 'Enquanto você esteve fora', [{ label: 'Visão geral', fn: () => useYui.getState().show('dashboard') }])
   const phone = useYui((s) => s.device === 'phone')
   if (loading && !data) return <Skeleton rows={6} />
   if (error || !data) return <ErrorNote />

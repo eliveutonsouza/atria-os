@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { VaultBacklink, VaultFile, VaultGraphPayload, VaultSuggestion } from '@shared/protocol'
 import { api } from '../api/client'
+import { C } from '../lib/colors'
+import { toastErr } from '../lib/feedback'
 import { useYui } from '../store/yui'
 import { askYui, excerpt, nodeColors, openConstellation, openInEditor } from './data'
 import { Star } from './ui'
-import { Icon, eyebrow, ghostBtn, glass, mono, primaryBtn } from './styles'
+import { Icon, eyebrow, glass, mono } from './styles'
 
 // Painel da estrela selecionada: caminho, trecho, links, backlinks, sugestões da Yui e ações.
 export function NotePanel({
@@ -71,6 +73,8 @@ export function NotePanel({
         onSuggestions(next.map((x) => x.id))
         return next
       })
+    } catch (e) {
+      toastErr(e, 'Não consegui ligar as notas')
     } finally {
       setBusy(null)
     }
@@ -125,8 +129,8 @@ export function NotePanel({
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
           {[
-            [outs.length, 'links', '#67d8f2'],
-            [ins.length, 'backlinks', '#a68cf7'],
+            [outs.length, 'cita', '#67d8f2'],
+            [ins.length, 'citada por', '#a68cf7'],
             [sugs.length, 'sugestões', '#f5c97a'],
           ].map(([v, l, c]) => (
             <div key={l as string} style={{ padding: '9px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -149,11 +153,11 @@ export function NotePanel({
                   className="hov-item"
                   onClick={() => onPick(c.id)}
                   title={snip}
-                  style={{ display: 'flex', alignItems: 'center', gap: 9, minHeight: 32, padding: '0 8px', borderRadius: 8, border: 'none', background: 'transparent', color: '#c9cde0', fontSize: 12.5, textAlign: 'left', cursor: 'pointer' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 9, minHeight: coarse ? 44 : 32, padding: '0 8px', borderRadius: 8, border: 'none', background: 'transparent', color: '#c9cde0', fontSize: 12.5, textAlign: 'left', cursor: 'pointer' }}
                 >
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: cc, boxShadow: `0 0 6px ${cc}`, flex: 'none' }} />
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title(c.id)}</span>
-                  <span style={{ ...mono, fontSize: 10, color: c.dir === 'link' ? '#67d8f2' : '#a68cf7' }}>{c.dir}</span>
+                  <span style={{ ...mono, fontSize: 10, color: c.dir === 'link' ? '#67d8f2' : '#a68cf7' }}>{c.dir === 'link' ? 'cita' : 'citada por'}</span>
                 </button>
               )
             })}
@@ -164,16 +168,16 @@ export function NotePanel({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={{ ...eyebrow, color: '#f5b54a' }}>Yui sugere ligar</span>
             {sugs.map((s) => (
-              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 34, padding: '0 8px', borderRadius: 8, border: '1px dashed rgba(245,181,74,0.35)', fontSize: 12, color: '#dfe3f3' }}>
+              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: coarse ? 48 : 34, padding: '0 8px', borderRadius: 8, border: '1px dashed rgba(245,181,74,0.35)', fontSize: 12, color: '#dfe3f3' }}>
                 <button onClick={() => onPick(s.id)} title={s.reason} style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', color: 'inherit', textAlign: 'left', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>
                   {s.title}
                 </button>
                 <button
                   onClick={() => link(s.id)}
                   disabled={busy === s.id}
-                  style={{ height: 26, padding: '0 9px', borderRadius: 6, border: 'none', background: 'rgba(245,181,74,0.16)', color: '#f5c97a', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                  style={{ height: coarse ? 44 : 26, padding: '0 9px', borderRadius: 6, border: 'none', background: 'rgba(245,181,74,0.16)', color: '#f5c97a', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                 >
-                  {busy === s.id ? '…' : 'ligar'}
+                  {busy === s.id ? '…' : 'Ligar'}
                 </button>
               </div>
             ))}
@@ -183,11 +187,12 @@ export function NotePanel({
 
       {!ghost && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, flex: 'none' }}>
-          <button style={{ ...primaryBtn, height: sheet ? 46 : 40 }} onClick={() => openInEditor(path)}>Abrir no editor</button>
-          <button style={{ ...ghostBtn, height: sheet ? 46 : 40 }} onClick={() => openConstellation(path)}>Constelação</button>
+          <button className="app-btn primary" style={{ height: sheet ? 46 : 40 }} onClick={() => openInEditor(path)}>Abrir no editor</button>
+          <button className="app-btn" style={{ height: sheet ? 46 : 40 }} onClick={() => openConstellation(path)}>Constelação</button>
           <button
-            style={{ ...ghostBtn, gridColumn: 'span 2', height: 34, fontSize: 12.5, borderColor: 'rgba(103,216,242,0.2)', color: asked ? '#4fe0b0' : '#a9e9f8' }}
-            onClick={() => askYui(node.title).then(() => setAsked(true)).catch(() => {})}
+            className="app-btn"
+            style={{ gridColumn: 'span 2', height: coarse ? 44 : 34, fontSize: 12.5, borderColor: 'rgba(103,216,242,0.2)', color: asked ? C.ok : C.cyanSoft }}
+            onClick={() => askYui(node.title).then(() => setAsked(true)).catch((e: unknown) => toastErr(e, 'Não consegui perguntar à Yui'))}
           >
             {asked ? 'A Yui está respondendo…' : 'Perguntar à Yui sobre esta nota'}
           </button>

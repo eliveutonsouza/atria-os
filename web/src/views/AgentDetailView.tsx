@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type { AgentConfig, AgentInfo, AgentUsageRef, ClaudeInitInfo, ModelsCatalog, RunInfo } from '@shared/protocol'
 import { api, ApiError } from '../api/client'
 import { useApi } from '../api/useApi'
@@ -7,10 +6,10 @@ import { startRun } from '../lib/actions'
 import { C } from '../lib/colors'
 import { ago } from '../lib/format'
 import { useYui } from '../store/yui'
-import { card, Empty, ErrorNote, Skeleton, useHeader } from './ui'
+import { card, Empty, ErrorNote, Modal, ModalButtons, Skeleton, useHeader } from './ui'
+import { confirmAction, toastErr, useAction, useUnsavedGuard } from '../lib/feedback'
 import { Chip, Field, input, mcpStatusMeta, SearchBox, SmallBtn, StatusPill } from './kit'
 import { ModelSelect } from './ModelSelect'
-import { BottomSheet } from './Sheet'
 import { AgentSkills } from './AgentSkills'
 
 // Ficha do agente: prompt, skills, conectores MCP (allowlist), plugins, modelo e turnos — salvos no
@@ -42,47 +41,75 @@ export function AgentDetailView({ onGone }: { onGone?: () => void } = {}) {
     return keys.some((k) => JSON.stringify(data[k]) !== JSON.stringify(draft[k]))
   }, [data, draft])
 
-  const save = async () => {
-    if (!draft || !id) return
+  const confirmLeave = useUnsavedGuard(dirty, 'as mudanças do agente')
+
+  const save = async (): Promise<boolean> => {
+    if (!draft || !id || saving) return false
     setSaving(true)
     try {
       await api.put(`/api/agents/${encodeURIComponent(id)}`, draft)
       reload()
       useYui.getState().say(`${draft.name} atualizado.`, { state: 'success' })
-    } catch {
-      useYui.getState().say('Não consegui salvar o agente.', { state: 'warning' })
+      return true
+    } catch (e) {
+      toastErr(e, 'Não consegui salvar o agente')
+      return false
     } finally {
       setSaving(false)
     }
   }
-  const duplicate = async () => {
+  const test = async () => {
     if (!id) return
-    const a = await api.post<AgentConfig>(`/api/agents/${encodeURIComponent(id)}/duplicate`).catch(() => null)
-    if (a) useYui.getState().show('agent', { agentId: a.id })
-  }
-  const archive = async () => {
-    if (!id || !draft) return
-    if (draft.archived) {
-      await api.put(`/api/agents/${encodeURIComponent(id)}`, { archived: false }).catch(() => null)
-      reload()
-      return
+    if (dirty) {
+      const ok = await confirmAction({ title: 'Salvar antes de testar?', text: 'O teste usa a versão salva do agente. Salve agora para testar com as suas mudanças.', confirmLabel: 'Salvar e testar' })
+      if (!ok || !(await save())) return
     }
-    await api.del(`/api/agents/${encodeURIComponent(id)}`).catch(() => null)
-    gone()
+    void startRun(id, null, 'Apresente-se em 2 frases: quem você é, o que faz e quais ferramentas/conectores você tem disponíveis agora. Não altere nada.')
+  }
+  const duplicateAct = useAction(
+    async () => {
+      if (!id || !(await confirmLeave())) return
+      const a = await api.post<AgentConfig>(`/api/agents/${encodeURIComponent(id)}/duplicate`)
+      useYui.getState().show('agent', { agentId: a.id })
+    },
+    { error: 'Não consegui duplicar o agente' },
+  )
+  const archiveAct = useAction(
+    async () => {
+      if (!id || !draft) return
+      if (draft.archived) {
+        await api.put(`/api/agents/${encodeURIComponent(id)}`, { archived: false })
+        reload()
+        return
+      }
+      await api.del(`/api/agents/${encodeURIComponent(id)}`)
+      gone()
+    },
+    {
+      error: 'Não consegui mudar o agente',
+      confirm: () =>
+        draft && !draft.archived
+          ? { title: `Arquivar ${draft.name}?`, text: 'Ele para de receber tarefas. Dá para reativar depois.', confirmLabel: 'Arquivar', danger: true, undoable: true }
+          : null,
+    },
+  )
+  const openTerminal = async () => {
+    if (!(await confirmLeave())) return
+    useYui.getState().show('terminal', { kind: 'shell', cmd: `claude --agent ${JSON.stringify(draft?.name ?? id)}` })
   }
 
   useHeader(
     draft?.group ? `Agente · ${draft.group}` : 'Agente',
     draft?.name ?? id ?? 'Agente',
     [
-      { label: saving ? 'Salvando…' : dirty ? 'Salvar' : 'Salvo', fn: () => void save(), primary: dirty },
-      { label: 'Testar', primary: !dirty, fn: () => id && void startRun(id, null, 'Apresente-se em 2 frases: quem você é, o que faz e quais ferramentas/conectores você tem disponíveis agora. Não altere nada.') },
-      { label: 'Abrir no terminal', fn: () => useYui.getState().show('terminal', { kind: 'shell', cmd: `claude --agent ${JSON.stringify(draft?.name ?? id)}` }) },
-      { label: 'Duplicar', fn: () => void duplicate() },
-      { label: draft?.archived ? 'Reativar' : 'Arquivar', fn: () => void archive() },
+      { label: saving ? 'Salvando…' : dirty ? 'Salvar' : 'Salvo', fn: () => void save(), primary: dirty, disabled: saving },
+      { label: 'Testar', primary: !dirty, fn: () => void test(), disabled: saving },
+      { label: 'Abrir no terminal', fn: () => void openTerminal() },
+      { label: duplicateAct.busy ? 'Duplicando…' : 'Duplicar', fn: () => void duplicateAct.run(), disabled: duplicateAct.busy },
+      { label: draft?.archived ? 'Reativar' : 'Arquivar', fn: () => void archiveAct.run(), disabled: archiveAct.busy },
       { label: 'Demitir', fn: () => setFiring(true), danger: true },
     ],
-    [saving, dirty, draft?.name, draft?.archived, draft?.group],
+    [saving, dirty, draft?.name, draft?.archived, draft?.group, duplicateAct.busy, archiveAct.busy],
   )
 
   if (!id) return <Empty text="Qual agente? Diga: “Abre o agente Designer.”" />
@@ -324,13 +351,6 @@ export function FireAgentModal({ agent, onCancel, onDone }: { agent: { id: strin
   const needsRep = refs.length > 0
   const ready = !!usage.data && (!needsRep || !!rep)
 
-  useEffect(() => {
-    if (phone) return // a folha inferior cuida do ESC
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onCancel() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [busy, onCancel, phone])
-
   const confirm = async () => {
     if (!ready) return
     setBusy(true)
@@ -347,11 +367,11 @@ export function FireAgentModal({ agent, onCancel, onDone }: { agent: { id: strin
     }
   }
 
-  const body = (
-    <>
+  return (
+    <Modal label={`Demitir ${agent.name}`} labelledBy="fam-title" role="alertdialog" busy={busy} tone="rgba(240,98,114,.35)" width={520} onClose={onCancel}>
       <div style={{ fontSize: 11, letterSpacing: '.2em', color: C.crit, fontWeight: 700 }}>AÇÃO DESTRUTIVA · NÃO DÁ PARA DESFAZER</div>
       <div id="fam-title" style={{ fontSize: 18, fontWeight: 700, overflowWrap: 'anywhere' }}>Demitir o agente {agent.name}?</div>
-      <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: '#c9cde0' }}>
+      <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-soft)' }}>
         O arquivo do agente é apagado e ele não volta quando o Atria OS reinicia. As execuções antigas continuam no histórico.
       </p>
       {!usage.data ? (
@@ -385,32 +405,14 @@ export function FireAgentModal({ agent, onCancel, onDone }: { agent: { id: strin
           </select>
         </label>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: phone ? 'repeat(2, minmax(0, 1fr))' : 'auto auto', justifyContent: phone ? undefined : 'end', gap: 8 }}>
-        <button autoFocus disabled={busy} onClick={onCancel} style={{ height: phone ? 50 : 42, padding: '0 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.03)', color: '#dfe3f3', fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit' }}>
+      <ModalButtons>
+        <button autoFocus disabled={busy} onClick={onCancel} className="app-btn" style={{ height: phone ? 50 : 44, padding: '0 16px', fontSize: 13.5 }}>
           Cancelar
         </button>
-        <button
-          disabled={busy || !ready}
-          onClick={() => void confirm()}
-          style={{ height: phone ? 50 : 42, padding: '0 16px', borderRadius: 10, border: 'none', background: '#e2566a', color: '#fff', fontSize: 13.5, fontWeight: 700, cursor: ready ? 'pointer' : 'not-allowed', fontFamily: 'inherit', opacity: busy || !ready ? 0.6 : 1 }}
-        >
+        <button disabled={busy || !ready} onClick={() => void confirm()} className="app-btn solid-danger" style={{ height: phone ? 50 : 44, padding: '0 16px', fontSize: 13.5 }}>
           {busy ? 'Demitindo…' : needsRep ? 'Reatribuir e demitir' : 'Demitir'}
         </button>
-      </div>
-    </>
-  )
-  if (phone)
-    return (
-      <BottomSheet label={`Demitir ${agent.name}`} role="alertdialog" tone="rgba(240,98,114,.5)" onClose={busy ? () => {} : onCancel}>
-        {body}
-      </BottomSheet>
-    )
-  return createPortal(
-    <div onClick={busy ? undefined : onCancel} style={{ position: 'fixed', inset: 0, background: 'rgba(4,5,10,.66)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: 16 }}>
-      <div role="alertdialog" aria-modal="true" aria-labelledby="fam-title" onClick={(e) => e.stopPropagation()} style={{ width: 520, maxWidth: '100%', maxHeight: 'calc(var(--vvh) - 32px)', overflowY: 'auto', boxSizing: 'border-box', padding: 22, borderRadius: 18, background: '#10132a', border: '1px solid rgba(240,98,114,.35)', boxShadow: '0 30px 80px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {body}
-      </div>
-    </div>,
-    document.body,
+      </ModalButtons>
+    </Modal>
   )
 }

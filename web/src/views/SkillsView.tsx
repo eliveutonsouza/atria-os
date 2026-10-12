@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type { AgentInfo, HubSkill, InstalledSkill } from '@shared/protocol'
 import { api } from '../api/client'
 import { useApi } from '../api/useApi'
 import { C } from '../lib/colors'
 import { ago } from '../lib/format'
 import { useYui } from '../store/yui'
-import { card, Empty, ErrorNote, Skeleton, useHeader } from './ui'
+import { card, Empty, ErrorNote, Modal, ModalButtons, Skeleton, useHeader } from './ui'
+import { plural, toast, toastErr } from '../lib/feedback'
 import { input, SearchBox, Tabs } from './kit'
 import { fmtInstalls, scopeLabel, SkillDrawer } from './SkillDrawer'
 
@@ -73,8 +73,15 @@ export function SkillsView({ tab: initialTab }: { tab?: string }) {
   const findInstalled = (s: { source: string; skillId: string }) => installed.find((i) => i.source === s.source && i.skillId === s.skillId) ?? null
 
   const checkUpdates = async () => {
+    if (checking) return
     setChecking(true)
-    await api.post('/api/skills/check-updates').catch(() => null)
+    try {
+      const r = await api.post<Installed>('/api/skills/check-updates')
+      const n = (r?.skills ?? []).filter((x) => x.updateAvailable).length
+      toast(n ? `${plural(n, 'skill tem', 'skills têm')} atualização disponível.` : 'Todas as skills estão em dia.', n ? 'info' : 'ok')
+    } catch (e) {
+      toastErr(e, 'Não consegui verificar as atualizações')
+    }
     inst.reload()
     setChecking(false)
   }
@@ -84,7 +91,7 @@ export function SkillsView({ tab: initialTab }: { tab?: string }) {
     'Skills',
     [
       { label: 'Instalar por link', fn: () => setLinkOpen(true) },
-      { label: checking ? 'Verificando…' : 'Verificar atualizações', fn: () => void checkUpdates(), primary: true },
+      { label: checking ? 'Verificando…' : 'Verificar atualizações', fn: () => void checkUpdates(), primary: true, disabled: checking },
     ],
     [checking],
   )
@@ -236,44 +243,43 @@ const installedPill = { fontSize: 12, padding: '6px 10px', borderRadius: 999, ba
 function LinkModal({ onClose, onPick }: { onClose: () => void; onPick: (p: Pick) => void }) {
   const [text, setText] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
   const go = async () => {
+    if (busy || !text.trim()) return
     setErr(null)
+    setBusy(true)
     try {
       onPick(await api.post<Pick>('/api/skills/resolve', { text }))
     } catch (e) {
       setErr((e as Error).message)
+      setBusy(false)
     }
   }
-  return createPortal(
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(4,5,10,.66)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+  return (
+    <Modal label="Instalar por link" labelledBy="skill-link-title" onClose={onClose} busy={busy} width={520}>
       <form
-        role="dialog"
-        aria-modal="true"
-        aria-label="Instalar por link"
-        onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault()
           void go()
         }}
-        style={{ width: 'min(520px,100%)', padding: 22, borderRadius: 18, background: 'linear-gradient(180deg,#14173a,#0e1022)', border: '1px solid rgba(255,255,255,.1)', display: 'flex', flexDirection: 'column', gap: 12, color: C.text }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 12, color: C.text }}
       >
-        <div style={{ fontSize: 18, fontWeight: 600 }}>Instalar por link</div>
+        <div id="skill-link-title" style={{ fontSize: 18, fontWeight: 600 }}>Instalar por link</div>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={{ fontSize: 13, color: C.t2 }}>Cole a URL do skills.sh ou o comando de instalação</span>
-          <input autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder="https://skills.sh/mattpocock/skills/tdd" style={input} />
+          <input autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder="https://skills.sh/mattpocock/skills/tdd" style={input} disabled={busy} />
         </label>
         <span style={{ fontSize: 12, color: C.t3 }}>Também aceita “npx skills add https://github.com/dono/repo --skill nome”.</span>
-        {err && <div role="alert" style={{ fontSize: 13, color: '#f39aa4' }}>{err}</div>}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button type="button" onClick={onClose} style={{ height: 42, padding: '0 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', background: 'transparent', color: C.text, cursor: 'pointer', fontFamily: 'inherit' }}>
+        {err && <div role="alert" style={{ fontSize: 13, color: C.critSoft }}>{err}</div>}
+        <ModalButtons>
+          <button type="button" className="app-btn" onClick={onClose} disabled={busy} style={{ height: 44, padding: '0 16px' }}>
             Cancelar
           </button>
-          <button type="submit" disabled={!text.trim()} style={{ height: 42, padding: '0 16px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#67d8f2,#a68cf7)', color: '#06070d', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: text.trim() ? 1 : 0.5 }}>
-            Ver skill
+          <button type="submit" className="app-btn primary" disabled={!text.trim() || busy} style={{ height: 44, padding: '0 16px' }}>
+            {busy ? 'Procurando…' : 'Ver skill'}
           </button>
-        </div>
+        </ModalButtons>
       </form>
-    </div>,
-    document.body,
+    </Modal>
   )
 }

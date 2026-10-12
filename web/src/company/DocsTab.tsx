@@ -3,6 +3,7 @@ import { COMPANY_CATEGORIES, type CompanyCategory, type CompanyDoc, type Company
 import { api } from '../api/client'
 import { onCompanyEvent } from '../api/events'
 import { C } from '../lib/colors'
+import { useAction } from '../lib/feedback'
 import { useYui } from '../store/yui'
 import { ACCEPT, fmtDate, fmtNum, goTab, statusOf, uploadFiles, Icon } from './api'
 import { CategoryChip, DeleteModal, HealthDot, PipeBar, Svg, TypeBadge } from './ui'
@@ -44,6 +45,7 @@ export function DocsTab() {
   const narrow = useYui((s) => s.narrow)
   const { docs, setDocs, err, reload } = useCompanyDocs()
   const [stats, setStats] = useState<CompanyStats | null>(null)
+  const [statsErr, setStatsErr] = useState(false)
   const [q, setQ] = useState('')
   const [cat, setCat] = useState<'Todas' | CompanyCategory>('Todas')
   const [sel, setSel] = useState<Set<string>>(new Set())
@@ -56,7 +58,10 @@ export function DocsTab() {
   const camRef = useRef<HTMLInputElement>(null)
 
   const loadStats = useCallback(() => {
-    api.get<CompanyStats>('/api/company/stats').then(setStats).catch(() => {})
+    api.get<CompanyStats>('/api/company/stats').then((s) => {
+      setStats(s)
+      setStatsErr(false)
+    }).catch(() => setStatsErr(true))
   }, [])
   useEffect(() => {
     loadStats()
@@ -115,13 +120,14 @@ export function DocsTab() {
       reload()
     })
   }
-  const reprocess = (ids: string[]) => {
-    const p = ids.length === 1 ? api.post(`/api/company/documents/${ids[0]}/reprocess`) : api.post('/api/company/documents/bulk-reprocess', { ids })
-    p.then(() => {
+  const { run: reprocess, busy: reprocessing } = useAction(
+    async (ids: string[]) => {
+      await (ids.length === 1 ? api.post(`/api/company/documents/${ids[0]}/reprocess`) : api.post('/api/company/documents/bulk-reprocess', { ids }))
       setSel(new Set())
       reload()
-    }).catch((e: Error) => setNotes([{ text: e.message, tone: 'crit' }]))
-  }
+    },
+    { ok: 'Reprocessando — aviso quando terminar.', error: 'Não consegui reprocessar' },
+  )
   const confirmDelete = () => {
     if (!del) return
     const ids = del.map((d) => d.id)
@@ -228,8 +234,8 @@ export function DocsTab() {
       {sel.size > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: narrow ? '100%' : 'auto' }}>
           <span style={{ fontSize: 12.5, color: '#c9cde0', flex: narrow ? 1 : 'none' }}>{sel.size} selecionados</span>
-          <button className="app-btn" style={{ height: narrow ? 44 : 32 }} onClick={() => reprocess([...sel])}>
-            Reprocessar
+          <button className="app-btn" style={{ height: narrow ? 44 : 32 }} disabled={reprocessing} onClick={() => reprocess([...sel])}>
+            {reprocessing ? 'Reprocessando…' : 'Reprocessar'}
           </button>
           <button className="app-btn danger" style={{ height: narrow ? 44 : 32, fontWeight: 600 }} onClick={() => setDel(selDocs)}>
             Excluir
@@ -282,7 +288,7 @@ export function DocsTab() {
           </div>
         ))}
         {docs && !visible.length && <div style={{ padding: 24, textAlign: 'center', color: C.t2, fontSize: 13.5 }}>{empty}</div>}
-        {totals && <div style={{ fontSize: 12, color: C.t2 }}>{totals}</div>}
+        {(totals || statsErr) && <div style={{ fontSize: 12, color: C.t2 }}>{statsErr && !stats ? 'Status indisponível' : totals}</div>}
         {del && <DeleteModal docs={del} busy={deleting} onCancel={() => setDel(null)} onConfirm={confirmDelete} />}
       </div>
     )
@@ -347,7 +353,7 @@ export function DocsTab() {
                   <button aria-label={`Ver ${d.name}`} title="Ver" className="co-icon-btn" onClick={() => goTab(`doc:${d.id}`)}>
                     <Svg d={Icon.eye} />
                   </button>
-                  <button aria-label={`Reprocessar ${d.name}`} title="Reprocessar" className="co-icon-btn" disabled={d.state === 'processing' || d.state === 'queued'} onClick={() => reprocess([d.id])}>
+                  <button aria-label={`Reprocessar ${d.name}`} title="Reprocessar" className="co-icon-btn" disabled={reprocessing || d.state === 'processing' || d.state === 'queued'} onClick={() => reprocess([d.id])}>
                     <Svg d={Icon.redo} />
                   </button>
                   <button aria-label={`Excluir ${d.name}`} title="Excluir" className="co-icon-btn danger" onClick={() => setDel([d])}>
@@ -362,12 +368,17 @@ export function DocsTab() {
           {docs && !visible.length && <div style={{ padding: 40, textAlign: 'center', color: '#8c92ad', fontSize: 13.5 }}>{empty}</div>}
         </div>
         <div style={{ minHeight: 40, display: 'flex', alignItems: 'center', gap: 16, padding: '6px 14px', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 12, color: C.t2, flexWrap: 'wrap' }}>
-          <span>{totals}</span>
+          <span>{statsErr && !stats ? 'Status indisponível' : totals}</span>
           <span style={{ flex: 1 }} />
-          <HealthDot ok={stats?.services.docling} label="Docling" />
-          <HealthDot ok={stats?.services.postgres} label="PostgreSQL" />
-          <HealthDot ok={stats?.services.qdrant} label="Qdrant" />
-          <HealthDot ok={stats?.services.openai} label="OpenAI" />
+          <details>
+            <summary style={{ cursor: 'pointer' }}>Detalhes técnicos</summary>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', paddingTop: 6 }}>
+              <HealthDot ok={stats?.services.docling} label="Leitura (Docling)" />
+              <HealthDot ok={stats?.services.postgres} label="Banco (PostgreSQL)" />
+              <HealthDot ok={stats?.services.qdrant} label="Busca (Qdrant)" />
+              <HealthDot ok={stats?.services.openai} label="OpenAI" />
+            </div>
+          </details>
         </div>
       </div>
       {del && <DeleteModal docs={del} busy={deleting} onCancel={() => setDel(null)} onConfirm={confirmDelete} />}

@@ -52,13 +52,13 @@ export function StepPanel({ step, steps, agents, locked, touch, onChange, onDele
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {deps.length === 0 && <span style={{ fontSize: 12.5, color: C.t3 }}>nenhuma — começa logo</span>}
           {deps.map((d) => (
-            <span key={d.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '0 4px 0 10px', minHeight: touch ? 36 : 28, borderRadius: 8, background: 'rgba(103,216,242,.08)', border: '1px solid rgba(103,216,242,.18)', color: '#a9e9f8', maxWidth: '100%' }}>
+            <span key={d.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '0 4px 0 10px', minHeight: touch ? 36 : 28, borderRadius: 8, background: 'rgba(103,216,242,.08)', border: '1px solid rgba(103,216,242,.18)', color: 'var(--cyan-soft)', maxWidth: '100%' }}>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nums.get(d.id)} · {d.title}</span>
               {!locked && (
                 <button
                   aria-label={`Remover dependência de ${d.title}`}
                   onClick={() => onChange({ dependsOn: step.dependsOn.filter((x) => x !== d.id) })}
-                  style={{ width: touch ? 32 : 22, height: touch ? 32 : 22, border: 'none', background: 'transparent', color: '#a9e9f8', cursor: 'pointer', fontSize: 12, padding: 0 }}
+                  style={{ width: touch ? 32 : 22, height: touch ? 32 : 22, border: 'none', background: 'transparent', color: 'var(--cyan-soft)', cursor: 'pointer', fontSize: 12, padding: 0 }}
                 >
                   ✕
                 </button>
@@ -86,7 +86,7 @@ export function StepPanel({ step, steps, agents, locked, touch, onChange, onDele
         Pedir meu OK antes desta etapa
       </label>
       {!locked && (
-        <button className="wf-btn" onClick={onDelete} style={{ height: h, color: '#f39aa4', borderColor: 'rgba(240,98,114,.3)' }}>
+        <button className="wf-btn" onClick={onDelete} style={{ height: h, color: 'var(--crit-soft)', borderColor: 'rgba(240,98,114,.3)' }}>
           Excluir etapa
         </button>
       )}

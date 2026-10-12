@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } 
 import type { ApprovalRuleInfo, ModelOption, ModelsCatalog, SettingsPayload, SetupStatus } from '@shared/protocol'
 import { api, ApiError } from '../../../api/client'
 import { C } from '../../../lib/colors'
+import { confirmAction, toastErr, toastOk } from '../../../lib/feedback'
 import { ago } from '../../../lib/format'
 import { disablePush, enablePush, isIOS, isStandalone, promptInstall, pushSupported, testPush } from '../../../pwa/pwa'
 import { useYui } from '../../../store/yui'
 import { Chip, Field, input, SmallBtn, StatusPill } from '../../../views/kit'
 import { ModelSelect } from '../../../views/ModelSelect'
-import { ConfirmDeleteModal } from '../../../views/ui'
+import { ConfirmDeleteModal, ErrorNote, Skeleton } from '../../../views/ui'
 import { EmbeddedTerminal } from './EmbeddedTerminal'
 
 // ---------- dados compartilhados ----------
@@ -15,12 +16,25 @@ import { EmbeddedTerminal } from './EmbeddedTerminal'
 export function useSettings() {
   const [data, setData] = useState<SettingsPayload | null>(null)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  const load = useCallback(() => api.get<SettingsPayload>('/api/settings').then(setData).catch(() => {}), [])
+  const [error, setError] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const load = useCallback(
+    () =>
+      api
+        .get<SettingsPayload>('/api/settings')
+        .then((d) => {
+          setData(d)
+          setError(false)
+        })
+        .catch(() => setError(true)),
+    [],
+  )
   useEffect(() => {
     void load()
   }, [load])
   const save = async (patch: Record<string, unknown>) => {
     setMsg(null)
+    setSaving(true)
     try {
       setData(await api.put<SettingsPayload>('/api/settings', patch))
       setMsg({ ok: true, text: 'Salvo.' })
@@ -28,20 +42,38 @@ export function useSettings() {
     } catch (e) {
       setMsg({ ok: false, text: e instanceof ApiError ? e.message : 'Não consegui salvar.' })
       return false
+    } finally {
+      setSaving(false)
     }
   }
-  return { data, save, msg, reload: load }
+  return { data, save, msg, reload: load, error, saving }
+}
+
+/** Configurações não carregaram: aviso com "Tentar de novo" (sem isso, Salvar gravaria campos vazios). */
+export function SettingsLoadError({ s }: { s: { data: unknown; error: boolean; reload: () => unknown } }) {
+  return s.error && !s.data ? <ErrorNote text="Não consegui carregar as configurações. Nada foi alterado." retry={() => void s.reload()} /> : null
 }
 
 export function useSetupStatus() {
   const [st, setSt] = useState<SetupStatus | null>(null)
-  const load = useCallback(() => api.get<SetupStatus>('/api/setup/status').then(setSt).catch(() => {}), [])
+  const [error, setError] = useState(false)
+  const load = useCallback(
+    () =>
+      api
+        .get<SetupStatus>('/api/setup/status')
+        .then((r) => {
+          setSt(r)
+          setError(false)
+        })
+        .catch(() => setError(true)),
+    [],
+  )
   useEffect(() => {
     void load()
     const t = setInterval(load, 5000) // logins feitos no terminal aparecem sozinhos
     return () => clearInterval(t)
   }, [load])
-  return { st, reload: load }
+  return { st, error, reload: load }
 }
 
 // ---------- peças visuais (Settings.dc.html) ----------
@@ -64,7 +96,7 @@ export function Section({ title, hint, children }: { title: string; hint?: strin
 export function SaveMsg({ msg }: { msg: { ok: boolean; text: string } | null }) {
   if (!msg) return null
   return (
-    <span role="status" style={{ fontSize: 12.5, color: msg.ok ? C.ok : '#f39aa4' }}>
+    <span role="status" style={{ fontSize: 12.5, color: msg.ok ? C.ok : C.critSoft }}>
       {msg.text}
     </span>
   )
@@ -88,20 +120,23 @@ function ConnRow({ letter, color, name, ok, status, desc, action }: { letter: st
   )
 }
 
+/** Classe dos botões grandes: dá o visual de desabilitado (.app-btn:disabled) e o foco padrão. */
+export const bigCls = (primary = false) => (primary ? 'app-btn primary' : 'app-btn')
+
 export const bigBtn = (primary = false) =>
   ({
     // altura vem de --big-btn-h (44px no toque, ver Section/ConnRow)
     height: 'var(--big-btn-h, 36px)', padding: '0 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', justifyContent: 'center',
     border: primary ? 'none' : '1px solid rgba(255,255,255,.1)',
     background: primary ? 'linear-gradient(135deg,#67d8f2,#a68cf7)' : 'transparent',
-    color: primary ? '#0a0c1d' : '#dfe3f3',
+    color: primary ? '#0a0c1d' : 'var(--text-btn)',
   }) as const
 
 // ---------- Primeiros passos ----------
 
 export function SetupSteps({ onGo }: { onGo: (tab: 'connections' | 'notifications' | 'system') => void }) {
-  const { st } = useSetupStatus()
-  if (!st) return null
+  const { st, error, reload } = useSetupStatus()
+  if (!st) return error ? <Section title="Primeiros passos"><ErrorNote text="Não consegui ler o que já está configurado." retry={() => void reload()} /></Section> : null
   const steps = [
     { done: !st.needsPassword, t: 'Acesso criado', d: 'Senha do painel definida.' },
     { done: st.claude !== 'none', t: 'Conta Claude conectada', d: st.claude === 'claude.ai' ? 'Login claude.ai: agentes com conectores, skills e plugins.' : st.claude === 'token' ? 'Usando token — conecte o login claude.ai para ter conectores.' : 'Os agentes precisam da sua conta Claude para trabalhar.', go: 'connections' as const },
@@ -132,13 +167,15 @@ export function SetupSteps({ onGo }: { onGo: (tab: 'connections' | 'notification
 // ---------- Conta ----------
 
 export function AccountSection() {
-  const { data, save, msg } = useSettings()
+  const settings = useSettings()
+  const { data, save, msg, saving } = settings
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [city, setCity] = useState('')
   const [cur, setCur] = useState('')
   const [next, setNext] = useState('')
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [pwBusy, setPwBusy] = useState(false)
   useEffect(() => {
     if (data) {
       setName(String(data.values['user.name'] ?? ''))
@@ -147,7 +184,9 @@ export function AccountSection() {
     }
   }, [data])
   const changePw = async () => {
+    if (pwBusy) return
     setPwMsg(null)
+    setPwBusy(true)
     try {
       await api.post('/api/auth/password', { current: cur, next })
       setCur('')
@@ -155,18 +194,21 @@ export function AccountSection() {
       setPwMsg({ ok: true, text: 'Senha alterada. Outras sessões foram encerradas.' })
     } catch (e) {
       setPwMsg({ ok: false, text: e instanceof ApiError ? e.message : 'Não consegui trocar a senha.' })
+    } finally {
+      setPwBusy(false)
     }
   }
   return (
     <>
       <Section title="Você" hint="Como a Yui te chama e para onde vão os avisos.">
+        <SettingsLoadError s={settings} />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
           <Field label="Nome"><input value={name} onChange={(e) => setName(e.target.value)} style={input} autoComplete="name" /></Field>
           <Field label="E-mail" hint="Usado como remetente das notificações push."><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={input} autoComplete="email" /></Field>
           <Field label="Cidade" hint="Para a Yui saber o clima e os feriados. Ex.: Goiânia, GO."><input value={city} onChange={(e) => setCity(e.target.value)} style={input} autoComplete="address-level2" placeholder="Cidade, UF" /></Field>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button type="button" style={bigBtn(true)} onClick={() => save({ 'user.name': name, 'user.email': email, 'user.city': city })}>Salvar</button>
+          <button type="button" className={bigCls(true)} style={bigBtn(true)} disabled={!data || saving} onClick={() => save({ 'user.name': name, 'user.email': email, 'user.city': city })}>{saving ? 'Salvando…' : 'Salvar'}</button>
           <SaveMsg msg={msg} />
         </div>
       </Section>
@@ -177,7 +219,7 @@ export function AccountSection() {
           <Field label="Nova senha" hint="Mínimo de 8 caracteres."><input type="password" value={next} onChange={(e) => setNext(e.target.value)} style={input} autoComplete="new-password" /></Field>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button type="button" style={bigBtn()} disabled={!cur || next.length < 8} onClick={changePw}>Trocar senha</button>
+          <button type="button" className={bigCls()} style={bigBtn()} disabled={!cur || next.length < 8 || pwBusy} onClick={changePw}>{pwBusy ? 'Trocando…' : 'Trocar senha'}</button>
           <SaveMsg msg={pwMsg} />
         </div>
       </Section>
@@ -195,6 +237,16 @@ function UserMemory() {
   useEffect(() => {
     void load()
   }, [load])
+  const forget = async (m: MemoryItem) => {
+    const ok = await confirmAction({ title: 'Esquecer esta lembrança?', text: `A Yui deixa de saber: “${m.text}”.`, confirmLabel: 'Esquecer', danger: true })
+    if (!ok) return
+    try {
+      await api.del(`/api/memory/${m.id}`)
+      void load()
+    } catch (e) {
+      toastErr(e, 'Não consegui esquecer')
+    }
+  }
   const add = async () => {
     setErr(null)
     try {
@@ -217,16 +269,16 @@ function UserMemory() {
           <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
             <span style={{ flex: 1, fontSize: 13.5, overflowWrap: 'anywhere' }}>{m.text}</span>
             {m.source === 'proposta' && <span style={{ fontSize: 11, color: C.t3 }}>aprendida</span>}
-            <SmallBtn onClick={() => void api.del(`/api/memory/${m.id}`).then(load)}>Esquecer</SmallBtn>
+            <SmallBtn onClick={() => void forget(m)}>Esquecer</SmallBtn>
           </div>
         ))}
         {data && !data.items.length && <span style={{ fontSize: 13, color: C.t3 }}>Nada guardado ainda.</span>}
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <input value={text} maxLength={200} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && text.trim() && void add()} placeholder="Ex.: Prefere reuniões depois das 10h" aria-label="Nova lembrança" style={{ ...input, flex: '1 1 240px' }} />
-        <button type="button" style={bigBtn()} disabled={!text.trim()} onClick={() => void add()}>Guardar</button>
+        <button type="button" className={bigCls()} style={bigBtn()} disabled={!text.trim()} onClick={() => void add()}>Guardar</button>
       </div>
-      {err && <span role="alert" style={{ fontSize: 12.5, color: '#f39aa4' }}>{err}</span>}
+      {err && <span role="alert" style={{ fontSize: 12.5, color: C.critSoft }}>{err}</span>}
     </Section>
   )
 }
@@ -238,7 +290,7 @@ const CLAUDE_LOGIN = 'env -u CLAUDE_CODE_OAUTH_TOKEN claude'
 const GH_LOGIN = 'gh auth login --hostname github.com --git-protocol https --web'
 
 export function ConnectionsSection() {
-  const { st, reload } = useSetupStatus()
+  const { st, error: stError, reload } = useSetupStatus()
   const { data, save, msg } = useSettings()
   const [term, setTerm] = useState<null | 'claude' | 'github'>(null)
   const [key, setKey] = useState('')
@@ -254,7 +306,7 @@ export function ConnectionsSection() {
     const r = await api.post<{ ok: boolean; models?: string[]; error?: string }>('/api/settings/test-openai', { key: key || undefined }).catch(() => ({ ok: false, error: 'falhou' }) as { ok: boolean; models?: string[]; error?: string })
     setTest(r.ok ? `Chave válida · ${r.models?.join(' · ')}` : `Falhou: ${r.error}`)
   }
-  if (!st) return null
+  if (!st) return stError ? <ErrorNote text="Não consegui ler o estado das conexões." retry={() => void reload()} /> : <Skeleton rows={3} kpis={0} />
   return (
     <>
       <ConnRow
@@ -264,7 +316,7 @@ export function ConnectionsSection() {
         ok={st.claude === 'claude.ai'}
         status={st.claude === 'claude.ai' ? 'conectado' : st.claude === 'token' ? 'só token' : 'desconectado'}
         desc={st.claude === 'claude.ai' ? `Login claude.ai · ${connectors.filter((m) => m.status === 'connected').length} conectores MCP` : 'Entre com a sua conta Claude (Pro/Max) — os agentes usam ela para trabalhar.'}
-        action={<button type="button" style={bigBtn(st.claude !== 'claude.ai')} onClick={() => setTerm(term === 'claude' ? null : 'claude')}>{st.claude === 'claude.ai' ? 'Reconectar' : 'Conectar conta Claude'}</button>}
+        action={<button type="button" className={bigCls(st.claude !== 'claude.ai')} style={bigBtn(st.claude !== 'claude.ai')} onClick={() => setTerm(term === 'claude' ? null : 'claude')}>{st.claude === 'claude.ai' ? 'Reconectar' : 'Conectar conta Claude'}</button>}
       />
       {term === 'claude' && (
         <Section title="Conectar conta Claude" hint="No terminal abaixo digite /login, escolha a conta claude.ai, abra o link que aparecer, autorize e cole o código de volta. Depois digite /exit. Esta página detecta sozinha quando terminar.">
@@ -278,7 +330,7 @@ export function ConnectionsSection() {
         ok={st.github}
         status={st.github ? 'conectado' : 'opcional'}
         desc={st.github ? 'Repositórios no catálogo; os ativos são clonados sozinhos.' : 'Conecte para a Yui enxergar e clonar seus repositórios.'}
-        action={<button type="button" style={bigBtn(!st.github)} onClick={() => setTerm(term === 'github' ? null : 'github')}>{st.github ? 'Trocar conta' : 'Conectar GitHub'}</button>}
+        action={<button type="button" className={bigCls(!st.github)} style={bigBtn(!st.github)} onClick={() => setTerm(term === 'github' ? null : 'github')}>{st.github ? 'Trocar conta' : 'Conectar GitHub'}</button>}
       />
       {term === 'github' && (
         <Section title="Conectar GitHub" hint="Siga as perguntas no terminal: ele mostra um código de 8 letras e um link — abra o link, cole o código e autorize. Em até 5 minutos o catálogo aparece em Projetos.">
@@ -291,16 +343,16 @@ export function ConnectionsSection() {
         name="OpenAI"
         ok={st.openai}
         status={st.openai ? 'chave válida' : 'falta a chave'}
-        desc={`Voz ${data?.values['models.live'] ?? ''} · cérebro ${data?.values['models.brain'] ?? ''} · planner ${data?.values['models.planner'] ?? ''}`}
-        action={<button type="button" style={bigBtn()} onClick={testKey}>Testar chave</button>}
+        desc={`Voz ${data?.values['models.live'] ?? ''} · cérebro ${data?.values['models.brain'] ?? ''} · planejador ${data?.values['models.planner'] ?? ''}`}
+        action={<button type="button" className={bigCls()} style={bigBtn()} onClick={testKey}>Testar chave</button>}
       />
       <Section title="Chave da OpenAI" hint="Chave de API da plataforma OpenAI (platform.openai.com). O plano ChatGPT não serve. Fica guardada só no servidor.">
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={data?.secrets['openai.key'] ? '•••••••• (configurada — cole outra para trocar)' : 'sk-…'} aria-label="Chave da OpenAI" style={{ ...input, maxWidth: 460 }} autoComplete="off" />
-          <button type="button" style={bigBtn(true)} disabled={!key} onClick={async () => { if (await save({ 'openai.key': key })) { setKey(''); void reload() } }}>Salvar chave</button>
+          <button type="button" className={bigCls(true)} style={bigBtn(true)} disabled={!key} onClick={async () => { if (await save({ 'openai.key': key })) { setKey(''); void reload() } }}>Salvar chave</button>
           <SaveMsg msg={msg} />
         </div>
-        {test && <span style={{ fontSize: 12.5, color: test.startsWith('Chave válida') ? C.ok : test === 'Testando…' ? C.t2 : '#f39aa4' }}>{test}</span>}
+        {test && <span style={{ fontSize: 12.5, color: test.startsWith('Chave válida') ? C.ok : test === 'Testando…' ? C.t2 : C.critSoft }}>{test}</span>}
       </Section>
       {needAuth.length > 0 && (
         <ConnRow
@@ -310,7 +362,7 @@ export function ConnectionsSection() {
           ok={false}
           status="pede autorização"
           desc="Conectores da sua conta Claude que ainda precisam ser autorizados (ex.: publicar posts pelos workflows)."
-          action={<a href="https://claude.ai/settings/connectors" target="_blank" rel="noreferrer" style={{ ...bigBtn(true), display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>Autorizar no claude.ai</a>}
+          action={<a href="https://claude.ai/settings/connectors" target="_blank" rel="noreferrer" className={bigCls(true)} style={{ ...bigBtn(true), display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>Autorizar no claude.ai</a>}
         />
       )}
     </>
@@ -322,7 +374,8 @@ export function ConnectionsSection() {
 const VOICES = ['marin', 'cedar', 'alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'quartz', 'willow']
 
 export function VoiceSection() {
-  const { data, save, msg } = useSettings()
+  const settings = useSettings()
+  const { data, save, msg, saving } = settings
   const [v, setV] = useState<Record<string, string | number | boolean | null>>({})
   useEffect(() => {
     if (data) setV(data.values)
@@ -330,6 +383,7 @@ export function VoiceSection() {
   const set = (k: string, val: string | number | boolean) => setV((o) => ({ ...o, [k]: val }))
   return (
     <Section title="Yui & voz" hint="Mudanças valem na próxima conversa por voz.">
+      <SettingsLoadError s={settings} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
         <Field label="Voz">
           <select value={String(v['voice.name'] ?? 'marin')} onChange={(e) => set('voice.name', e.target.value)} style={input}>
@@ -356,7 +410,7 @@ export function VoiceSection() {
         Reduzir movimento (animações mais calmas)
       </label>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <button type="button" style={bigBtn(true)} onClick={() => save({ 'voice.name': v['voice.name'], 'voice.idleMin': v['voice.idleMin'], 'voice.pttKey': v['voice.pttKey'], 'ui.particleDensity': v['ui.particleDensity'], 'ui.reducedMotion': !!v['ui.reducedMotion'] })}>Salvar</button>
+        <button type="button" className={bigCls(true)} style={bigBtn(true)} disabled={!data || saving} onClick={() => save({ 'voice.name': v['voice.name'], 'voice.idleMin': v['voice.idleMin'], 'voice.pttKey': v['voice.pttKey'], 'ui.particleDensity': v['ui.particleDensity'], 'ui.reducedMotion': !!v['ui.reducedMotion'] })}>{saving ? 'Salvando…' : 'Salvar'}</button>
         <SaveMsg msg={msg} />
       </div>
     </Section>
@@ -406,7 +460,8 @@ function ModelRow({ title, desc, children }: { title: string; desc: string; chil
 }
 
 export function ModelsSection() {
-  const { data, save, msg, reload } = useSettings()
+  const settings = useSettings()
+  const { data, save, msg, reload, saving } = settings
   const [v, setV] = useState<Record<string, string | number | boolean | null>>({})
   const [cat, setCat] = useState<ModelsCatalog | null>(null)
   const [loading, setLoading] = useState(false)
@@ -442,7 +497,8 @@ export function ModelsSection() {
     return all.some((o) => o.value === m) ? { ok: true, text: `${m} está disponível na sua conta OpenAI.` } : { ok: false, text: `${m} não aparece na sua conta OpenAI (nome errado ou sem acesso).` }
   }
   const restore = async () => {
-    if (await save(Object.fromEntries(MODEL_KEYS.map((k) => [k, null])))) void loadCat()
+    const ok = await confirmAction({ title: 'Restaurar os modelos padrão?', text: 'Os modelos escolhidos aqui voltam para o padrão do Atria OS. Preços e limites não mudam.', confirmLabel: 'Restaurar padrões' })
+    if (ok && await save(Object.fromEntries(MODEL_KEYS.map((k) => [k, null])))) void loadCat()
   }
   const pErr = pricingError(pricing)
   const savePricing = async () => {
@@ -459,8 +515,9 @@ export function ModelsSection() {
   return (
     <>
       <Section title="Modelos" hint="Quem conversa, quem decide, quem planeja e com que modelo os agentes Claude trabalham.">
+        <SettingsLoadError s={settings} />
         {cat?.openai.error ? (
-          <span role="alert" style={{ fontSize: 12.5, color: '#f39aa4' }}>{cat.openai.error}</span>
+          <span role="alert" style={{ fontSize: 12.5, color: C.critSoft }}>{cat.openai.error}</span>
         ) : (
           <span style={{ fontSize: 12, color: C.t3 }}>{cat ? (cat.openai.at ? `Lista lida da sua conta OpenAI ${ago(cat.openai.at)}.` : 'Lista da OpenAI ainda não lida.') : 'Lendo a lista de modelos…'}</span>
         )}
@@ -483,9 +540,9 @@ export function ModelsSection() {
           </ModelRow>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button type="button" style={bigBtn(true)} onClick={() => save(Object.fromEntries(keys.map((k) => [k, v[k] ?? ''])))}>Salvar</button>
-          <button type="button" style={bigBtn()} disabled={loading} onClick={() => void loadCat(true)}>{loading ? 'Atualizando…' : 'Atualizar lista'}</button>
-          <button type="button" style={bigBtn()} onClick={restore}>Restaurar padrões</button>
+          <button type="button" className={bigCls(true)} style={bigBtn(true)} disabled={!data || saving} onClick={() => save(Object.fromEntries(keys.map((k) => [k, v[k] ?? ''])))}>{saving ? 'Salvando…' : 'Salvar'}</button>
+          <button type="button" className={bigCls()} style={bigBtn()} disabled={loading} onClick={() => void loadCat(true)}>{loading ? 'Atualizando…' : 'Atualizar lista'}</button>
+          <button type="button" className={bigCls()} style={bigBtn()} disabled={!data || saving} onClick={restore}>Restaurar padrões</button>
           <SaveMsg msg={msg} />
         </div>
       </Section>
@@ -505,9 +562,9 @@ export function ModelsSection() {
           rows={5}
           style={{ ...input, fontSize: 13, resize: 'vertical', minHeight: 110 }}
         />
-        {pErr && <span role="alert" style={{ fontSize: 12.5, color: '#f39aa4' }}>{pErr}</span>}
+        {pErr && <span role="alert" style={{ fontSize: 12.5, color: C.critSoft }}>{pErr}</span>}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button type="button" style={bigBtn(true)} disabled={!!pErr} onClick={savePricing}>Salvar preços</button>
+          <button type="button" className={bigCls(true)} style={bigBtn(true)} disabled={!!pErr} onClick={savePricing}>Salvar preços</button>
           <SaveMsg msg={priceMsg} />
         </div>
       </Section>
@@ -518,19 +575,21 @@ export function ModelsSection() {
 // ---------- Agentes & aprovações ----------
 
 export function AgentsApprovalsSection() {
-  const { data, save, msg } = useSettings()
+  const settings = useSettings()
+  const { data, save, msg, saving } = settings
   const on = data ? data.values['approvals.mcpSensitive'] === true : false
   return (
     <>
       <Section title="Aprovações" hint="Workflows, rotinas, missões e projetos rodam no automático. Só pedem sua permissão onde você pediu.">
-        <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: '#c9cde0' }}>
-          <li>Bloqueado sempre (negado, sem perguntar): apagar raiz/workspace/dados inteiros, formatar disco, DROP DATABASE, prune do Docker, mexer nos stacks de produção protegidos e force push na main.</li>
+        <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: C.soft }}>
+          <li>Bloqueado sempre (negado, sem perguntar): apagar o sistema, a pasta de trabalho ou todos os dados, formatar disco, apagar um banco de dados inteiro, faxina em massa do Docker, mexer nos sistemas de produção protegidos e sobrescrever o histórico do ramo principal do código (force push na main).</li>
           <li>Workflows: a Yui decide os passos de Aprovação com base nas suas decisões anteriores; marque “Sempre me perguntar” no passo para decidir você.</li>
           <li>Missões: só pedem OK nas etapas em que você pediu aprovação.</li>
-          <li>Por projeto: padrões em <span className="mono">atria.json → approvalPatterns</span> pedem aprovação.</li>
+          <li>Por projeto: cada projeto pode listar ações que sempre pedem aprovação (campo <span className="mono">approvalPatterns</span> do arquivo <span className="mono">atria.json</span>).</li>
         </ul>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}>
-          <input type="checkbox" checked={on} onChange={(e) => save({ 'approvals.mcpSensitive': e.target.checked })} />
+        <SettingsLoadError s={settings} />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, opacity: data ? 1 : 0.45 }}>
+          <input type="checkbox" checked={on} disabled={!data || saving} onChange={(e) => save({ 'approvals.mcpSensitive': e.target.checked })} />
           Pedir aprovação antes de enviar/publicar/pagar por conectores (desligado = automático)
         </label>
         <SaveMsg msg={msg} />
@@ -549,15 +608,46 @@ export function AgentsApprovalsSection() {
 // Regras "sempre permitir / sempre bloquear" salvas pelo card de aprovação (por agente e projeto).
 function SavedRules() {
   const [rules, setRules] = useState<ApprovalRuleInfo[] | null>(null)
-  const load = useCallback(() => api.get<ApprovalRuleInfo[]>('/api/approval-rules').then(setRules).catch(() => setRules([])), [])
+  const [error, setError] = useState(false)
+  const load = useCallback(
+    () =>
+      api
+        .get<ApprovalRuleInfo[]>('/api/approval-rules')
+        .then((r) => {
+          setRules(r)
+          setError(false)
+        })
+        .catch(() => setError(true)),
+    [],
+  )
   useEffect(() => {
     void load()
   }, [load])
-  const remove = (id: string) => api.del(`/api/approval-rules/${id}`).then(load).catch(() => {})
+  const remove = async (r: ApprovalRuleInfo) => {
+    const ok = await confirmAction({
+      title: 'Remover esta regra?',
+      text: 'Depois disso, essa ação volta a pedir sua aprovação.',
+      rows: [{ label: 'Regra', value: r.mode === 'allow' ? 'Sempre permitir' : 'Sempre bloquear' }, { label: 'Ação', value: r.key }, { label: 'Agente', value: `${r.agentId} · ${r.project ?? 'Geral'}` }],
+      confirmLabel: 'Remover regra',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await api.del(`/api/approval-rules/${r.id}`)
+      toastOk('Regra removida.')
+      void load()
+    } catch (e) {
+      toastErr(e, 'Não consegui remover a regra')
+    }
+  }
   return (
     <Section title="Regras salvas" hint="Criadas pelo “Lembrar esta decisão” no card de aprovação. Valem só para aquele agente naquele projeto.">
-      {!rules?.length ? (
-        <span style={{ fontSize: 13, color: C.t3 }}>{rules ? 'Nenhuma regra salva. Toda ação sensível pede sua aprovação.' : 'Carregando…'}</span>
+      {error && !rules ? (
+        <ErrorNote text="Não consegui carregar as regras salvas." retry={() => void load()} />
+      ) : !rules ? (
+        <Skeleton rows={2} kpis={0} />
+      ) : !rules.length ? (
+        <span style={{ fontSize: 13, color: C.t3 }}>Nenhuma regra salva. Toda ação sensível pede sua aprovação.</span>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {rules.map((r) => (
@@ -565,7 +655,7 @@ function SavedRules() {
               <StatusPill label={r.mode === 'allow' ? 'Sempre permitir' : 'Sempre bloquear'} color={r.mode === 'allow' ? C.ok : C.crit} />
               <span className="mono" style={{ fontSize: 12.5, overflowWrap: 'anywhere', flex: '1 1 160px' }}>{r.key}</span>
               <span style={{ fontSize: 12.5, color: C.t2 }}>{r.agentId} · {r.project ?? 'Geral'}</span>
-              <SmallBtn onClick={() => void remove(r.id)}>Remover</SmallBtn>
+              <SmallBtn onClick={() => void remove(r)}>Remover</SmallBtn>
             </div>
           ))}
         </div>
@@ -576,7 +666,8 @@ function SavedRules() {
 
 // Orçamento pelo % do plano Claude + teto da OpenAI + watchdog de execução calada.
 function LimitsSection() {
-  const { data, save, msg } = useSettings()
+  const settings = useSettings()
+  const { data, save, msg, saving } = settings
   const keys = ['budget.warnPct', 'budget.stopPct', 'budget.openaiDailyUsd', 'budget.runMaxUsd', 'runs.silenceMin'] as const
   const [v, setV] = useState<Record<string, number>>({})
   useEffect(() => {
@@ -590,6 +681,7 @@ function LimitsSection() {
   )
   return (
     <Section title="Limites e segurança" hint="Protege o plano Claude e o bolso: o que é automático espera quando o limite chega; o que você pede na hora sempre roda.">
+      <SettingsLoadError s={settings} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
         {row('budget.warnPct', 'Avisar em (%)', 'Uso da janela de 5 h ou da semana do Claude.', 10, 100)}
         {row('budget.stopPct', 'Pausar automáticas em (%)', 'Rotinas e workflows de rotina esperam a janela reiniciar.', 10, 100)}
@@ -598,7 +690,7 @@ function LimitsSection() {
         {row('runs.silenceMin', 'Execução calada (min)', 'Sem atividade por esse tempo: aviso. No dobro: a execução para. 0 = desligado.', 0, 240)}
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button type="button" style={bigBtn(true)} onClick={() => save(v)}>Salvar limites</button>
+        <button type="button" className={bigCls(true)} style={bigBtn(true)} disabled={!data || saving} onClick={() => save(v)}>{saving ? 'Salvando…' : 'Salvar limites'}</button>
         <SaveMsg msg={msg} />
       </div>
     </Section>
@@ -628,9 +720,9 @@ export function NotificationsSection() {
     <>
       <Section title="Este dispositivo" hint={pushSupported() ? 'Aprovações, falhas e entregas chegam mesmo com o app fechado.' : isIOS() ? 'No iPhone, instale o app na tela inicial para receber notificações.' : 'Este navegador não suporta notificações push.'}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {!isStandalone() && <button type="button" style={bigBtn()} onClick={install}>Instalar app</button>}
-          <button type="button" style={bigBtn(!pushOn)} onClick={() => run(pushOn ? disablePush() : enablePush())}>{pushOn ? 'Desativar notificações' : 'Ativar notificações'}</button>
-          <button type="button" style={bigBtn()} onClick={() => run(testPush())}>Enviar teste</button>
+          {!isStandalone() && <button type="button" className={bigCls()} style={bigBtn()} onClick={install}>Instalar app</button>}
+          <button type="button" className={bigCls(!pushOn)} style={bigBtn(!pushOn)} onClick={() => run(pushOn ? disablePush() : enablePush())}>{pushOn ? 'Desativar notificações' : 'Ativar notificações'}</button>
+          <button type="button" className={bigCls()} style={bigBtn()} onClick={() => run(testPush())}>Enviar teste</button>
           {note && <span style={{ fontSize: 12.5, color: C.t2 }}>{note}</span>}
         </div>
       </Section>
@@ -644,7 +736,7 @@ export function NotificationsSection() {
                 <span style={{ overflowWrap: 'anywhere' }}>{d.device || 'Dispositivo'}</span>
                 <span style={{ color: C.t3, fontSize: 12 }}>inscrito em {new Date(d.created_at).toLocaleDateString('pt-BR')}</span>
               </span>
-              <button type="button" style={{ ...bigBtn(), color: '#f39aa4' }} onClick={() => setDel(d)} aria-label={`Remover ${d.device || 'dispositivo'}`}>Remover</button>
+              <button type="button" className={bigCls()} style={{ ...bigBtn(), color: C.critSoft }} onClick={() => setDel(d)} aria-label={`Remover ${d.device || 'dispositivo'}`}>Remover</button>
             </div>
           ))
         )}
@@ -683,21 +775,34 @@ interface Health {
 
 export function SystemSection() {
   const [h, setH] = useState<Health | null>(null)
+  const [error, setError] = useState(false)
   const [busy, setBusy] = useState(false)
-  const load = useCallback(() => api.get<Health>('/api/health/full').then(setH).catch(() => {}), [])
+  const load = useCallback(
+    () =>
+      api
+        .get<Health>('/api/health/full')
+        .then((r) => {
+          setH(r)
+          setError(false)
+        })
+        .catch(() => setError(true)),
+    [],
+  )
   useEffect(() => {
     void load()
   }, [load])
   const row = (label: string, ok: boolean, text: string) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.05)', fontSize: 13 }}>
-      <span style={{ color: '#c9cde0' }}>{label}</span>
+      <span style={{ color: C.soft }}>{label}</span>
       <StatusPill label={text} color={ok ? C.ok : C.warn} />
     </div>
   )
   return (
     <>
       <Section title="Saúde" hint="Cada peça que o Atria OS usa.">
-        {!h ? (
+        {error && !h ? (
+          <ErrorNote text="Não consegui verificar a saúde do sistema." retry={() => void load()} />
+        ) : !h ? (
           <span style={{ fontSize: 13, color: C.t3 }}>Verificando…</span>
         ) : (
           <div>
@@ -716,7 +821,12 @@ export function SystemSection() {
             disabled={busy}
             onClick={async () => {
               setBusy(true)
-              await api.post('/api/capabilities/refresh').catch(() => {})
+              try {
+                await api.post('/api/capabilities/refresh')
+                toastOk('Capacidades do Claude atualizadas.')
+              } catch (e) {
+                toastErr(e, 'Não consegui atualizar as capacidades')
+              }
               setBusy(false)
               void load()
             }}
@@ -726,11 +836,15 @@ export function SystemSection() {
           {h?.capabilitiesAt && <span style={{ fontSize: 12, color: C.t3 }}>lidas em {new Date(h.capabilitiesAt).toLocaleString('pt-BR')}</span>}
         </div>
       </Section>
-      <Section title="Atualizar e backup" hint="Na VPS, na pasta do Atria OS:">
-        <div className="mono" style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(0,0,0,.4)', fontSize: 12.5, lineHeight: 1.8, color: '#c9cde0' }}>
-          <div>./install.sh --update        <span style={{ color: C.t3 }}># puxa a versão nova, espera execuções e reinicia</span></div>
-          <div>./install.sh --backup        <span style={{ color: C.t3 }}># copia banco, workspace e logins para ./backups</span></div>
-        </div>
+      <Section title="Atualizar e backup" hint="Atualizações e cópias de segurança são feitas no servidor onde o Atria OS está instalado.">
+        <details>
+          <summary style={{ cursor: 'pointer', fontSize: 13, color: C.t2 }}>Para técnicos: comandos no servidor</summary>
+          <div style={{ fontSize: 12.5, color: C.t3, margin: '8px 0 6px' }}>No servidor, na pasta do Atria OS:</div>
+          <div className="mono" style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(0,0,0,.4)', fontSize: 12.5, lineHeight: 1.8, color: C.soft, overflowX: 'auto' }}>
+            <div>./install.sh --update        <span style={{ color: C.t3 }}># puxa a versão nova, espera execuções e reinicia</span></div>
+            <div>./install.sh --backup        <span style={{ color: C.t3 }}># copia banco, workspace e logins para ./backups</span></div>
+          </div>
+        </details>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <Chip>sessões: 30 dias</Chip>
           <Chip>dados: volume data</Chip>

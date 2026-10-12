@@ -3,9 +3,10 @@ import type { VaultBacklink, VaultEditorState, VaultFile, VaultStatus, VaultSugg
 import { api } from '../../api/client'
 import { onVaultChanged } from '../../api/events'
 import { C } from '../../lib/colors'
+import { toastErr, useAction, useUnsavedGuard } from '../../lib/feedback'
 import { useYui } from '../../store/yui'
 import { ActionSheet, type SheetAction } from '../../views/Sheet'
-import { ConfirmDeleteModal, useHeader } from '../../views/ui'
+import { ConfirmDeleteModal, ErrorNote, useHeader } from '../../views/ui'
 import { outgoing, renderNote, splitFrontmatter } from '../../vault/markdown'
 import { ContextMenu, PathPrompt } from '../../vault/VaultDialogs'
 import '../../vault/vault.css'
@@ -51,15 +52,25 @@ const store = {
 
 function useTree() {
   const [tree, setTree] = useState<VaultTreeEntry[]>([])
+  const [state, setState] = useState<'loading' | 'ok' | 'err'>('loading')
   const load = useCallback(() => {
-    api.get<VaultTreeEntry[]>('/api/vault/tree').then(setTree).catch(() => {})
+    api.get<VaultTreeEntry[]>('/api/vault/tree').then((t) => {
+      setTree(t)
+      setState('ok')
+    }).catch(() => setState((s) => (s === 'ok' ? s : 'err'))) // falha num recarregamento mantém a árvore que já estava
   }, [])
   useEffect(() => {
     load()
     return onVaultChanged(() => load())
   }, [load])
-  return { tree, reload: load }
+  const retry = useCallback(() => {
+    setState('loading')
+    load()
+  }, [load])
+  return { tree, treeState: state, reload: load, retry }
 }
+
+const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
 // Resolve [[nome]] como o Obsidian: caminho exato → nome do arquivo (caminho mais curto ganha).
 function makeResolver(tree: VaultTreeEntry[]) {
@@ -82,8 +93,10 @@ const label: CSSProperties = { fontSize: 10.5, letterSpacing: '.16em', textTrans
 
 const within = (p: string, base: string) => p === base || p.startsWith(`${base}/`)
 
-function Explorer({ tree, selected, onPick, onCreate, onNewFolder, onMenu, narrow }: {
+function Explorer({ tree, treeState, onRetry, selected, onPick, onCreate, onNewFolder, onMenu, narrow }: {
   tree: VaultTreeEntry[]
+  treeState: 'loading' | 'ok' | 'err'
+  onRetry: () => void
   selected: string
   onPick: (p: string) => void
   onCreate: (folder: string) => void
@@ -208,7 +221,13 @@ function Explorer({ tree, selected, onPick, onCreate, onNewFolder, onMenu, narro
             </button>
           )
         })}
-        {!rows.length && <div style={{ padding: 12, fontSize: 12.5, color: C.t3 }}>{needle ? 'Nada encontrado.' : 'Vault vazio.'}</div>}
+        {treeState === 'err' && !tree.length ? (
+          <ErrorNote text="Não consegui carregar os arquivos do vault." retry={onRetry} />
+        ) : treeState === 'loading' && !tree.length ? (
+          <div style={{ padding: 12, fontSize: 12.5, color: C.t3 }}>Carregando…</div>
+        ) : (
+          !rows.length && <div style={{ padding: 12, fontSize: 12.5, color: C.t3 }}>{needle ? 'Nada encontrado.' : 'Vault vazio.'}</div>
+        )}
       </div>
       <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,.06)', fontSize: 11.5, color: C.t2 }}>
         {notes} notas{narrow ? ' · toque longo para mais ações' : ''}
@@ -285,6 +304,7 @@ function Reader({ file, resolve, onOpen }: { file: VaultFile | null; resolve: (t
 
 function MiniGraph({ center, links, backs }: { center: string; links: string[]; backs: string[] }) {
   const all = [...new Set([...links, ...backs])].slice(0, 12)
+  const still = reducedMotion()
   const W = 254, H = 150, cx = W / 2, cy = H / 2
   return (
     <div aria-hidden className="vault-mini">
@@ -304,9 +324,11 @@ function MiniGraph({ center, links, backs }: { center: string; links: string[]; 
           return (
             <g key={p}>
               <line x1={cx} y1={cy} x2={x} y2={y} stroke={back ? 'rgba(166,140,247,.6)' : 'rgba(103,216,242,.55)'} strokeWidth="1" />
-              <circle r="1.8" fill="#fff">
-                <animateMotion dur={`${2 + (i % 3) * 0.6}s`} repeatCount="indefinite" path={back ? `M${x},${y} L${cx},${cy}` : `M${cx},${cy} L${x},${y}`} />
-              </circle>
+              {!still && (
+                <circle r="1.8" fill="#fff">
+                  <animateMotion dur={`${2 + (i % 3) * 0.6}s`} repeatCount="indefinite" path={back ? `M${x},${y} L${cx},${cy}` : `M${cx},${cy} L${x},${y}`} />
+                </circle>
+              )}
               <circle cx={x} cy={y} r="4.5" fill={c} style={{ filter: `drop-shadow(0 0 5px ${c})` }} />
             </g>
           )
@@ -318,7 +340,7 @@ function MiniGraph({ center, links, backs }: { center: string; links: string[]; 
   )
 }
 
-function Connections({ path, text, resolve, onOpen, status, onCommit }: { path: string; text: string; resolve: (t: string) => string | null; onOpen: (p: string) => void; status: VaultStatus | null; onCommit: () => void }) {
+function Connections({ path, text, resolve, onOpen, status, onCommit, committing }: { path: string; text: string; resolve: (t: string) => string | null; onOpen: (p: string) => void; status: VaultStatus | null; onCommit: () => void; committing: boolean }) {
   const [backs, setBacks] = useState<VaultBacklink[]>([])
   const [sugs, setSugs] = useState<VaultSuggestion[]>([])
   const load = useCallback(() => {
@@ -332,16 +354,16 @@ function Connections({ path, text, resolve, onOpen, status, onCommit }: { path: 
   }, [load])
   const outs = outgoing(text).map((t) => ({ t, p: resolve(t) }))
   const tags = [...new Set([...text.matchAll(/(?:^|\s)#([A-Za-zÀ-ú][\wÀ-ú/-]*)/g)].map((m) => m[1]))].slice(0, 10)
-  const link = (to: string) => api.post('/api/vault/link', { from: path, to }).then(load).catch(() => {})
+  const link = (to: string) => api.post('/api/vault/link', { from: path, to }).then(load).catch((e: unknown) => toastErr(e, 'Não consegui ligar as notas'))
   return (
     <aside aria-label="Conexões da nota" className="vault-card app-scroll" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0, overflowY: 'auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 13, fontWeight: 600 }}>Conexões</span>
-        <button className="vault-link-btn" onClick={() => useYui.getState().set({ appPage: 'brain', appParams: { id: path } })}>Constelação →</button>
+        <button className="vault-link-btn" onClick={() => useYui.getState().set({ appPage: 'brain', appParams: { id: path } })}>Ver no Cérebro →</button>
       </div>
       <MiniGraph center={path} links={outs.map((o) => o.p).filter((p): p is string => !!p)} backs={backs.map((b) => b.path)} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <span style={{ ...label, color: C.violet }}>Backlinks · {backs.length}</span>
+        <span style={{ ...label, color: C.violet }}>Citada por · {backs.length}</span>
         {backs.map((b) => (
           <button key={b.path} className="vault-conn" onClick={() => onOpen(b.path)}>
             <span style={{ fontSize: 12.5, fontWeight: 600, color: '#dfe3f3' }}>{b.title}</span>
@@ -365,7 +387,7 @@ function Connections({ path, text, resolve, onOpen, status, onCommit }: { path: 
           {sugs.map((s) => (
             <div key={s.id} className="vault-sug" title={s.reason}>
               <button className="vault-sug-name" onClick={() => onOpen(s.id)}>{s.title}</button>
-              <button className="vault-sug-btn" onClick={() => link(s.id)}>ligar</button>
+              <button className="vault-sug-btn" onClick={() => link(s.id)}>Ligar</button>
             </div>
           ))}
         </div>
@@ -381,10 +403,10 @@ function Connections({ path, text, resolve, onOpen, status, onCommit }: { path: 
         <div style={{ marginTop: 'auto', paddingTop: 10, borderTop: '1px solid rgba(255,255,255,.06)', display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11.5, color: C.t2 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, minHeight: 28 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: status.pending ? C.warn : C.ok, flexShrink: 0 }} />
-            <span>{status.pending ? `git · ${status.pending} ${status.pending === 1 ? 'alteração' : 'alterações'} a salvar` : 'git · tudo salvo no histórico'}</span>
+            <span>{status.pending ? `Histórico de versões · ${status.pending} ${status.pending === 1 ? 'alteração' : 'alterações'} a salvar` : 'Histórico de versões · tudo salvo'}</span>
             {!!status.pending && (
-              <button className="app-btn small" style={{ marginLeft: 'auto' }} onClick={onCommit}>
-                Salvar versão
+              <button className="app-btn small" style={{ marginLeft: 'auto' }} disabled={committing} onClick={onCommit}>
+                {committing ? 'Salvando…' : 'Salvar versão'}
               </button>
             )}
           </div>
@@ -398,8 +420,10 @@ function Connections({ path, text, resolve, onOpen, status, onCommit }: { path: 
   )
 }
 
-function MobileEditor({ file, onSaved }: { file: VaultFile; onSaved: () => void }) {
+function MobileEditor({ file, onSaved, onDirty }: { file: VaultFile; onSaved: () => void; onDirty: (dirty: boolean) => void }) {
   const [text, setText] = useState(file.text)
+  const dirty = text !== file.text
+  useEffect(() => onDirty(dirty), [dirty, onDirty])
   const [err, setErr] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const save = () => {
@@ -438,20 +462,29 @@ export function VaultPage() {
   const [status, setStatus] = useState<VaultStatus | null>(null)
   const [mobileView, setMobileView] = useState<'list' | 'note'>(initial ? 'note' : 'list')
   const [mobileEdit, setMobileEdit] = useState(false)
+  const [mobileDirty, setMobileDirty] = useState(false)
+  const confirmLeave = useUnsavedGuard(mobileEdit && mobileDirty, 'as mudanças da nota')
+  const leaveEditor = async (go: () => void) => {
+    if (mobileEdit && !(await confirmLeave())) return
+    setMobileDirty(false)
+    go()
+  }
   const [creating, setCreating] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
+  const [createErr, setCreateErr] = useState<string | null>(null)
+  const [createBusy, setCreateBusy] = useState(false)
   const [menu, setMenu] = useState<{ t: VaultTreeEntry; x: number; y: number } | null>(null)
   const [prompt, setPrompt] = useState<{ kind: 'move' | 'folder'; path: string; dir: boolean } | null>(null)
   const [del, setDel] = useState<{ path: string; dir: boolean; count: number } | null>(null)
   const [busy, setBusy] = useState(false)
-  const { tree, reload } = useTree()
+  const { tree, treeState, reload, retry } = useTree()
   const resolve = useMemo(() => makeResolver(tree), [tree])
   const lastEditorAt = useRef(Date.now())
   const showEditor = !narrow && mode !== 'read'
 
   // ações da nota aberta (no celular, só quando a nota está na tela; vão para o ⋯)
   const noteActions = file && (!narrow || mobileView === 'note')
-  useHeader('Conhecimento · vault Obsidian', 'Vault', [
+  useHeader('Conhecimento · notas', 'Vault', [
     { label: 'Ver no Cérebro', fn: () => useYui.getState().set({ appPage: 'brain', appParams: {} }) },
     ...(noteActions
       ? [
@@ -540,7 +573,9 @@ export function VaultPage() {
 
   const create = () => {
     const name = newName.trim().replace(/[\\/:*?"<>|]+/g, ' ')
-    if (!name || !creating) return
+    if (!name || !creating || createBusy) return
+    setCreateBusy(true)
+    setCreateErr(null)
     api
       .post<{ path: string }>('/api/vault/file', { path: `${creating}/${name}`, text: `# ${name}\n\n` })
       .then((r) => {
@@ -549,10 +584,14 @@ export function VaultPage() {
         reload()
         pick(r.path)
       })
-      .catch((e: Error) => setFileErr(e.message === 'já existe' ? 'Já existe uma nota com esse nome.' : e.message))
+      .catch((e: Error) => setCreateErr(e.message === 'já existe' ? 'Já existe uma nota com esse nome.' : e.message))
+      .finally(() => setCreateBusy(false))
   }
 
-  const commit = () => api.post<VaultStatus>('/api/vault/commit').then(setStatus).catch(() => {})
+  const { run: commit, busy: committing } = useAction(
+    async () => setStatus(await api.post<VaultStatus>('/api/vault/commit')),
+    { ok: 'Versão salva no histórico.', error: 'Não consegui salvar a versão' },
+  )
   const folders = tree.filter((t) => t.dir && !t.path.startsWith('.'))
 
   // ---------- renomear/mover, pastas e exclusão ----------
@@ -649,6 +688,7 @@ export function VaultPage() {
             ...(del.dir ? [{ label: 'Notas dentro', value: String(del.count) }] : []),
           ]}
           busy={busy}
+          undoable
           onCancel={() => setDel(null)}
           onConfirm={remove}
         />
@@ -664,9 +704,32 @@ export function VaultPage() {
           <option key={t.path} value={t.path}>{t.path}</option>
         ))}
       </select>
-      <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && create()} placeholder="Título da nota" className="vault-input" style={{ flex: 1, minWidth: 160 }} aria-label="Título da nota" />
-      <button className="app-btn primary" onClick={create}>Criar</button>
-      <button className="app-btn" onClick={() => setCreating(null)}>Cancelar</button>
+      <input
+        autoFocus
+        value={newName}
+        onChange={(e) => {
+          setNewName(e.target.value)
+          setCreateErr(null)
+        }}
+        onKeyDown={(e) => e.key === 'Enter' && create()}
+        placeholder="Título da nota"
+        className="vault-input"
+        style={{ flex: 1, minWidth: 160 }}
+        aria-label="Título da nota"
+        aria-invalid={!!createErr}
+        aria-describedby={createErr ? 'vault-create-err' : undefined}
+      />
+      <button className="app-btn primary" disabled={!newName.trim() || createBusy} onClick={create}>{createBusy ? 'Criando…' : 'Criar'}</button>
+      <button
+        className="app-btn"
+        onClick={() => {
+          setCreating(null)
+          setCreateErr(null)
+        }}
+      >
+        Cancelar
+      </button>
+      {createErr && <div id="vault-create-err" role="alert" style={{ flexBasis: '100%', color: C.critSoft, fontSize: 12.5 }}>{createErr}</div>}
     </div>
   )
 
@@ -678,14 +741,17 @@ export function VaultPage() {
         {overlays}
         {mobileView === 'list' ? (
           <div style={{ height: 'calc(var(--vvh) - var(--tabbar) - 190px)', minHeight: 280, display: 'flex' }}>
-            <Explorer tree={tree} selected={selected} onPick={pick} onCreate={setCreating} onNewFolder={openNewFolder} onMenu={openMenu} narrow />
+            <Explorer tree={tree} treeState={treeState} onRetry={retry} selected={selected} onPick={pick} onCreate={setCreating} onNewFolder={openNewFolder} onMenu={openMenu} narrow />
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <button className="app-btn" style={{ height: 44 }} onClick={() => setMobileView('list')}>← Arquivos</button>
+              <button className="app-btn" style={{ height: 44 }} onClick={() => leaveEditor(() => {
+                setMobileEdit(false)
+                setMobileView('list')
+              })}>← Arquivos</button>
               <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.t2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected.split('/').slice(0, -1).join(' › ')}</span>
-              <button className="app-btn" style={{ height: 44 }} onClick={() => setMobileEdit((v) => !v)} disabled={!file}>{mobileEdit ? 'Ler' : 'Editar'}</button>
+              <button className="app-btn" style={{ height: 44 }} onClick={() => (mobileEdit ? leaveEditor(() => setMobileEdit(false)) : setMobileEdit(true))} disabled={!file}>{mobileEdit ? 'Ler' : 'Editar'}</button>
             </div>
             {fileErr && <div style={{ color: C.crit, fontSize: 13 }}>{fileErr}</div>}
             {file &&
@@ -693,7 +759,9 @@ export function VaultPage() {
                 <MobileEditor
                   key={file.mtime}
                   file={file}
+                  onDirty={setMobileDirty}
                   onSaved={() => {
+                    setMobileDirty(false)
                     setMobileEdit(false)
                     loadFile()
                   }}
@@ -703,14 +771,14 @@ export function VaultPage() {
                   <Reader file={file} resolve={resolve} onOpen={pick} />
                 </div>
               ))}
-            {file && <Connections path={selected} text={file.text} resolve={resolve} onOpen={pick} status={status} onCommit={commit} />}
+            {file && <Connections path={selected} text={file.text} resolve={resolve} onOpen={pick} status={status} onCommit={() => void commit()} committing={committing} />}
           </div>
         )}
       </div>
     )
   }
 
-  const connections = file ? <Connections path={selected} text={file.text} resolve={resolve} onOpen={pick} status={status} onCommit={commit} /> : <div className="vault-card" />
+  const connections = file ? <Connections path={selected} text={file.text} resolve={resolve} onOpen={pick} status={status} onCommit={() => void commit()} committing={committing} /> : <div className="vault-card" />
 
   // ---------- desktop (tablet: árvore estreita + conteúdo; conexões numa gaveta) ----------
   return (
@@ -723,7 +791,7 @@ export function VaultPage() {
         </div>
       )}
       <section className="vault-grid" style={tablet ? { height: 'calc(var(--vvh) - var(--sat) - 150px)', minHeight: 360 } : { height: 'calc(100dvh - 158px)', minHeight: 520 }}>
-        <Explorer tree={tree} selected={selected} onPick={pick} onCreate={setCreating} onNewFolder={openNewFolder} onMenu={openMenu} narrow={false} />
+        <Explorer tree={tree} treeState={treeState} onRetry={retry} selected={selected} onPick={pick} onCreate={setCreating} onNewFolder={openNewFolder} onMenu={openMenu} narrow={false} />
         <div className="vault-center">
           <div className="vault-bar">
             <div role="group" aria-label="Modo de visualização" className="vault-seg">
@@ -763,11 +831,12 @@ export function VaultPage() {
         <div onClick={() => setCtxOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(4,5,12,.5)' }}>
           <div
             role="dialog"
+            aria-modal="true"
             aria-label="Contexto da nota"
             onClick={(e) => e.stopPropagation()}
             style={{ position: 'absolute', top: 'calc(12px + var(--sat))', right: 'calc(12px + var(--sar))', bottom: 'calc(12px + var(--sab))', width: 320, display: 'flex', flexDirection: 'column', gap: 8, background: '#0e1022', borderRadius: 18, padding: 8, boxShadow: '0 24px 70px rgba(0,0,0,.6)', border: '1px solid rgba(255,255,255,.08)' }}
           >
-            <button className="app-btn small" style={{ alignSelf: 'flex-end' }} onClick={() => setCtxOpen(false)}>Fechar</button>
+            <button autoFocus className="app-btn small" style={{ alignSelf: 'flex-end' }} onClick={() => setCtxOpen(false)}>Fechar</button>
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>{connections}</div>
           </div>
         </div>

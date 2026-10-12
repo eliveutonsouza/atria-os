@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
 import type { AgentConfig, ClaudeInitInfo, ToolboxItem } from '@shared/protocol'
 import { api } from '../api/client'
 import { useApi } from '../api/useApi'
@@ -7,8 +6,8 @@ import { startRun, submitText } from '../lib/actions'
 import { C } from '../lib/colors'
 import { ago } from '../lib/format'
 import { useYui } from '../store/yui'
-import { BottomSheet } from './Sheet'
-import { card, ConfirmDeleteModal, Empty, ErrorNote, Skeleton, useHeader } from './ui'
+import { card, ConfirmDeleteModal, Empty, ErrorNote, Modal, Skeleton, useHeader } from './ui'
+import { toastErr, toastOk } from '../lib/feedback'
 import { Chip, Field, input, mcpStatusMeta, SearchBox, SmallBtn, STATUS_META, StatusPill, Tabs } from './kit'
 
 // Painel Ferramentas: o que a Yui e os agentes conseguem usar — conectores do dia a dia, MCP, skills,
@@ -45,12 +44,14 @@ export function ToolsView() {
   const [editing, setEditing] = useState<ToolboxItem | 'new' | null>(null)
 
   const refresh = async () => {
+    if (refreshing) return
     setRefreshing(true)
     try {
       await api.post('/api/capabilities/refresh')
       await api.get('/api/toolbox/status')
-    } catch {
-      /* mantém dados atuais */
+      toastOk('Capacidades atualizadas.')
+    } catch (e) {
+      toastErr(e, 'Não consegui atualizar as capacidades')
     }
     caps.reload()
     toolbox.reload()
@@ -62,7 +63,7 @@ export function ToolsView() {
     'Conectores, MCP, skills e plugins',
     [
       { label: '+ Nova ferramenta', fn: () => setEditing('new'), primary: true },
-      { label: refreshing ? 'Atualizando…' : 'Atualizar capacidades', fn: () => void refresh() },
+      { label: refreshing ? 'Atualizando…' : 'Atualizar capacidades', fn: () => void refresh(), disabled: refreshing },
       { label: 'Mapa do Claude Code', fn: () => useYui.getState().show('claude') },
     ],
     [refreshing],
@@ -82,7 +83,14 @@ export function ToolsView() {
   const labels: Record<Tab, string> = { connectors: 'Conectores', mcp: 'MCP', skills: 'Skills', plugins: 'Plugins', apps: 'Apps & stacks' }
 
   if ((toolbox.loading && !toolbox.data) || (caps.loading && !caps.data)) return <Skeleton kpis={4} rows={6} />
-  if (toolbox.error && caps.error) return <ErrorNote />
+  if (toolbox.error && caps.error && !toolbox.data && !caps.data) return <ErrorNote retry={() => { toolbox.reload(); caps.reload() }} />
+  // uma das duas fontes falhou: mostra o que veio e avisa o que faltou
+  const partialErr =
+    toolbox.error && !toolbox.data
+      ? 'Não consegui carregar os conectores e apps agora.'
+      : caps.error && !caps.data
+        ? 'Não consegui ler as capacidades do Claude Code (MCP, skills e plugins) agora.'
+        : null
 
   const kpis = [
     { l: 'Ferramentas', v: items.length, c: C.text },
@@ -93,6 +101,12 @@ export function ToolsView() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+      {partialErr && (
+        <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 12, background: 'rgba(245,181,74,.06)', border: '1px solid rgba(245,181,74,.25)', fontSize: 13, color: C.soft }}>
+          <span style={{ flex: '1 1 220px' }}>{partialErr}</span>
+          <button className="app-btn small" onClick={() => (toolbox.error ? toolbox.reload() : caps.reload())}>Tentar de novo</button>
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: phone ? 'repeat(4,minmax(0,1fr))' : 'repeat(auto-fit,minmax(150px,1fr))', gap: phone ? 8 : 14 }}>
         {kpis.map((k) => (
           <div key={k.l} style={phone ? { ...card, padding: '10px 8px', minWidth: 0 } : card}>
@@ -342,30 +356,12 @@ async function saveDefs(change: (list: ToolDef[]) => ToolDef[]) {
   await api.put('/api/toolbox', change(list))
 }
 
-function FormPanel({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
-  const phone = useYui((s) => s.device === 'phone')
-  useEffect(() => {
-    if (phone) return // a folha inferior cuida do ESC
-    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', k)
-    return () => window.removeEventListener('keydown', k)
-  }, [onClose, phone])
-  const head = <div style={{ fontSize: 17, fontWeight: 700 }}>{title}</div>
-  if (phone)
-    return (
-      <BottomSheet label={title} onClose={onClose}>
-        {head}
-        {children}
-      </BottomSheet>
-    )
-  return createPortal(
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(4,5,10,.66)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: 16 }}>
-      <div role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()} style={{ width: 560, maxWidth: '100%', maxHeight: 'calc(var(--vvh) - 32px)', overflowY: 'auto', boxSizing: 'border-box', padding: 22, borderRadius: 18, background: '#10132a', border: '1px solid rgba(160,170,255,.16)', boxShadow: '0 30px 80px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column', gap: 14, color: C.text }}>
-        {head}
-        {children}
-      </div>
-    </div>,
-    document.body,
+function FormPanel({ title, onClose, busy, children }: { title: string; onClose: () => void; busy?: boolean; children: ReactNode }) {
+  return (
+    <Modal label={title} onClose={onClose} busy={busy} width={560} tone="rgba(160,170,255,.16)">
+      <div style={{ fontSize: 17, fontWeight: 700 }}>{title}</div>
+      {children}
+    </Modal>
   )
 }
 
@@ -446,7 +442,7 @@ function ToolForm({ initial, defaultType, categories, agents, onClose, onSaved }
   const two = phone ? 'minmax(0,1fr)' : 'repeat(2,minmax(0,1fr))'
   const typeMeta = ACCESS_TYPES.find((a) => a.id === type)
   return (
-    <FormPanel title={initial ? `Editar ${initial.name}` : 'Nova ferramenta'} onClose={busy ? () => {} : onClose}>
+    <FormPanel title={initial ? `Editar ${initial.name}` : 'Nova ferramenta'} onClose={onClose} busy={busy || confirm}>
       <div style={{ display: 'grid', gridTemplateColumns: two, gap: 12 }}>
         <Field label="Nome">
           <input style={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Gmail" />

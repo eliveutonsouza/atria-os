@@ -8,6 +8,7 @@ import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
 import { TermKeys, useCtrlLatch } from './TermKeys'
 import { useHeader } from './ui'
+import { confirmAction, toastErr } from '../lib/feedback'
 
 // Terminal no container: aba Claude (Claude Code interativo no projeto) e aba Shell (bash).
 // Sessões ficam em tmux no servidor — fechar a view só desanexa.
@@ -51,7 +52,13 @@ export function TerminalView() {
       {
         label: 'Nova sessão',
         fn: async () => {
-          await api.del(`/api/terminal/sessions/${sessionName(kind, slug)}`).catch(() => {})
+          const ok = await confirmAction({ title: 'Começar uma sessão nova?', text: 'A sessão atual é encerrada no servidor: o que estiver rodando nela para e o histórico da tela some.', confirmLabel: 'Encerrar e começar nova', danger: true })
+          if (!ok) return
+          try {
+            await api.del(`/api/terminal/sessions/${sessionName(kind, slug)}`)
+          } catch (e) {
+            toastErr(e, 'Não consegui encerrar a sessão atual')
+          }
           setGen((g) => g + 1)
         },
       },
@@ -67,7 +74,8 @@ export function TerminalView() {
     const host = hostRef.current
     if (!host) return
     const term = new Terminal({
-      fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+      // xterm desenha em canvas: precisa do valor da fonte, não do var()
+      fontFamily: getComputedStyle(document.documentElement).getPropertyValue('--mono').trim() || 'ui-monospace, monospace',
       fontSize: useYui.getState().device === 'phone' ? 12 : 13,
       lineHeight: 1.25,
       cursorBlink: true,
@@ -134,9 +142,9 @@ export function TerminalView() {
       onClick={() => setKind(k)}
       aria-pressed={kind === k}
       style={{
-        height: coarse ? 40 : 30, padding: '0 14px', borderRadius: 9, cursor: 'pointer', fontSize: phone ? 12 : 13, flexShrink: 0, whiteSpace: 'nowrap',
+        height: coarse ? 44 : 30, padding: '0 14px', borderRadius: 9, cursor: 'pointer', fontSize: phone ? 12 : 13, flexShrink: 0, whiteSpace: 'nowrap',
         border: `1px solid ${kind === k ? 'rgba(103,216,242,.35)' : 'rgba(255,255,255,.08)'}`,
-        background: kind === k ? 'rgba(103,216,242,.1)' : 'transparent', color: kind === k ? '#a9e9f8' : C.t2,
+        background: kind === k ? 'rgba(103,216,242,.1)' : 'transparent', color: kind === k ? C.cyanSoft : C.t2,
       }}
     >
       {label}
@@ -150,10 +158,15 @@ export function TerminalView() {
           {tab('claude', `Claude · ${slug ?? 'workspace'}`)}
           {tab('shell', 'Shell')}
         </div>
-        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.t3, flexShrink: 0, whiteSpace: 'nowrap' }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: status === 'open' ? C.ok : status === 'connecting' ? C.warn : C.crit }} />
+        <span role="status" aria-live="polite" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.t3, flexShrink: 0, whiteSpace: 'nowrap' }}>
+          <span aria-hidden style={{ width: 6, height: 6, borderRadius: '50%', background: status === 'open' ? C.ok : status === 'connecting' ? C.warn : C.crit }} />
           {status === 'open' ? 'conectado' : status === 'connecting' ? 'conectando…' : 'desconectado'}
         </span>
+        {status === 'closed' && (
+          <button className="app-btn small" style={{ flexShrink: 0 }} onClick={() => setGen((g) => g + 1)}>
+            Reconectar
+          </button>
+        )}
       </div>
       <div
         className="atria-terminal"

@@ -40,7 +40,7 @@ const ARROWS = [
 
 const key: CSSProperties = {
   minWidth: 44, height: 40, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)',
-  color: '#dfe3f3', fontSize: 14, flexShrink: 0, fontFamily: 'var(--mono)', cursor: 'pointer', touchAction: 'manipulation',
+  color: 'var(--text-btn)', fontSize: 14, flexShrink: 0, fontFamily: 'var(--mono)', cursor: 'pointer', touchAction: 'manipulation',
 }
 
 export function TermKeys({ send, ctrl, appCursor }: { send: (d: string) => void; ctrl: ReturnType<typeof useCtrlLatch>; appCursor?: () => boolean }) {
@@ -68,7 +68,7 @@ export function TermKeys({ send, ctrl, appCursor }: { send: (d: string) => void;
     <div className="h-scroll" role="toolbar" aria-label="Teclas especiais" style={{ gap: 6, padding: '2px 0' }}>
       {btn('Esc', () => press('\x1b'))}
       {btn('Tab', () => press('\t'))}
-      {btn('Ctrl', () => ctrl.set(!ctrl.on), 'Ctrl (trava para a próxima tecla)', ctrl.on ? { background: 'rgba(103,216,242,.18)', borderColor: 'rgba(103,216,242,.45)', color: '#a9e9f8' } : { color: C.t2 }, ctrl.on)}
+      {btn('Ctrl', () => ctrl.set(!ctrl.on), 'Ctrl (trava para a próxima tecla)', ctrl.on ? { background: 'rgba(103,216,242,.18)', borderColor: 'rgba(103,216,242,.45)', color: 'var(--cyan-soft)' } : { color: C.t2 }, ctrl.on)}
       {ARROWS.map((a) => (
         <Fragment key={a.k}>{btn(a.label, () => arrow(a.k), a.aria)}</Fragment>
       ))}

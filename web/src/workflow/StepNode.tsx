@@ -82,7 +82,7 @@ export function StepNode({ data, selected }: NodeProps<FlowNode>) {
       </div>
       <div style={{ marginTop: 5, fontSize: 13, fontWeight: 600, color: C.text, lineHeight: 1.3 }}>{step.title}</div>
       {step.type === 'task' && (
-        <div style={{ marginTop: 5, fontSize: 11, color: agentName ? '#a9e9f8' : C.crit }}>{agentName ? `${agentName}` : 'sem agente'}</div>
+        <div style={{ marginTop: 5, fontSize: 11, color: agentName ? 'var(--cyan-soft)' : C.crit }}>{agentName ? `${agentName}` : 'sem agente'}</div>
       )}
       {step.type === 'input' && (
         <div style={{ marginTop: 5, fontSize: 11, color: status === 'waiting_input' ? meta.color : C.t3 }}>

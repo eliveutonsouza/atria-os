@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AgentInfo, ClaudeInitInfo, RepoInfo, RunInfo } from '@shared/protocol'
 import { api, ApiError } from '../../api/client'
 import { C } from '../../lib/colors'
+import { confirmAction, toastErr, toastOk } from '../../lib/feedback'
 import { useYui } from '../../store/yui'
 import { ClaudeGuideView } from '../../views/ClaudeGuideView'
 import { Chip, input, SearchBox, SmallBtn, Tabs } from '../../views/kit'
-import { useHeader } from '../../views/ui'
+import { ErrorNote, Skeleton, useHeader } from '../../views/ui'
 
 // Central de comandos (Claude.dc.html): as ferramentas do Claude Code viram botões.
 // Cada botão roda de verdade — como agente em segundo plano (resultado volta para a Yui/Execuções)
@@ -111,6 +112,7 @@ function CommandsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Ag
   const [mode, setMode] = useState<Mode>('bg')
   const [extra, setExtra] = useState('')
   const [sent, setSent] = useState<{ ok: boolean; text: string; runId?: string } | null>(null)
+  const [sending, setSending] = useState<string | null>(null) // comando sendo enviado (bloqueia clique duplo)
   const phone = useYui((s) => s.device === 'phone')
   useEffect(() => {
     api.get<RepoInfo[]>('/api/repos').then((r) => setRepos(r.filter((x) => x.cloned))).catch(() => {})
@@ -127,12 +129,16 @@ function CommandsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Ag
   const run = async (c: Cmd) => {
     if (c.kind === 'nav') return goPage(c.value as 'schedule')
     if (mode === 'tty') return openTerminal('claude', project || null, ttyCommand(c, extra))
+    if (sending) return
     setSent(null)
+    setSending(c.key)
     try {
       const r = await api.post<RunInfo>('/api/runs', { agentId: pickAgent(c), project: project || null, instruction: instructionFor(c, extra) })
       setSent({ ok: true, text: `${c.key} enviado para ${r.agent}${project ? ` no ${project}` : ''}. O resultado volta para a Yui e para Execuções.`, runId: r.id })
     } catch (e) {
       setSent({ ok: false, text: e instanceof ApiError ? e.message : 'Não consegui iniciar agora.' })
+    } finally {
+      setSending(null)
     }
   }
 
@@ -165,7 +171,7 @@ function CommandsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Ag
       </section>
       <input value={extra} onChange={(e) => setExtra(e.target.value)} placeholder="Detalhes opcionais (ex.: “só a pasta src/auth”, “tema: vendas de setembro”, URL do site…)" aria-label="Detalhes do pedido" style={input} />
       {sent && (
-        <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, fontSize: 13, background: sent.ok ? 'rgba(79,224,176,.08)' : 'rgba(240,98,114,.08)', border: `1px solid ${sent.ok ? 'rgba(79,224,176,.25)' : 'rgba(240,98,114,.3)'}`, color: sent.ok ? '#8af0cc' : '#f39aa4' }}>
+        <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, fontSize: 13, background: sent.ok ? 'rgba(79,224,176,.08)' : 'rgba(240,98,114,.08)', border: `1px solid ${sent.ok ? 'rgba(79,224,176,.25)' : 'rgba(240,98,114,.3)'}`, color: sent.ok ? '#8af0cc' : C.critSoft }}>
           <span style={{ flex: 1 }}>{sent.text}</span>
           {sent.runId && <SmallBtn onClick={() => useYui.getState().set({ shellMode: 'app', appPage: 'runs', appParams: { id: sent.runId! } })}>Acompanhar</SmallBtn>}
         </div>
@@ -185,14 +191,15 @@ function CommandsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Ag
                   <button
                     key={c.key}
                     type="button"
-                    disabled={!ok}
+                    disabled={!ok || !!sending}
+                    aria-busy={sending === c.key}
                     onClick={() => run(c)}
                     title={ok ? (c.kind === 'nav' ? `Abrir ${c.label}` : mode === 'bg' ? `Rodar ${c.key} como agente` : `Abrir ${c.key} no terminal`) : 'Não instalado nesta conta'}
                     className="hov-bg2"
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.03)', color: '#dfe3f3', fontSize: 12.5, cursor: ok ? 'pointer' : 'not-allowed', opacity: ok ? 1 : 0.45, fontFamily: 'inherit' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.03)', color: C.btn, fontSize: 12.5, cursor: ok && !sending ? 'pointer' : 'not-allowed', opacity: ok && (!sending || sending === c.key) ? 1 : 0.45, fontFamily: 'inherit' }}
                   >
                     <span className="mono" style={{ color: cat.color, fontSize: 11.5 }}>{c.key}</span>
-                    {c.label}
+                    {sending === c.key ? 'Enviando…' : c.label}
                   </button>
                 )
               })}
@@ -207,17 +214,23 @@ function CommandsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Ag
 function SkillsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: AgentInfo[] }) {
   const phone = useYui((s) => s.device === 'phone')
   const [q, setQ] = useState('')
-  const [note, setNote] = useState('')
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null)
+  const [using, setUsing] = useState<string | null>(null)
   const active = useYui((s) => s.activeProject)
   const skills = (caps?.skills ?? []).filter((s) => !q || s.toLowerCase().includes(q.toLowerCase()))
   const use = async (skill: string) => {
     const agent = /design|canvas|pptx|pdf|docx|xlsx|dataviz|artifacts/.test(skill) ? 'designer' : /research/.test(skill) ? 'research' : 'backend'
     const agentId = agents.some((a) => a.id === agent) ? agent : agents[0]?.id ?? 'backend'
+    if (using) return
+    setUsing(skill)
+    setNote(null)
     try {
       const r = await api.post<RunInfo>('/api/runs', { agentId, project: active ?? null, instruction: `Use a skill "${skill}" (ferramenta Skill) no projeto atual e resuma o resultado em português.` })
-      setNote(`${skill} enviado para ${r.agent}.`)
-    } catch {
-      setNote('Não consegui iniciar agora.')
+      setNote({ ok: true, text: `${skill} enviado para ${r.agent}.` })
+    } catch (e) {
+      setNote({ ok: false, text: e instanceof ApiError ? e.message : 'Não consegui iniciar agora.' })
+    } finally {
+      setUsing(null)
     }
   }
   return (
@@ -225,13 +238,13 @@ function SkillsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Agen
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <SearchBox value={q} onChange={setQ} placeholder="Buscar skill…" />
         <span style={{ fontSize: 12, color: C.t3 }}>{caps ? `${caps.skills.length} skills instaladas` : 'Capacidades ainda não lidas — Configurações › Sistema › Atualizar.'}</span>
-        {note && <span role="status" style={{ fontSize: 12.5, color: C.ok }}>{note}</span>}
+        {note && <span role={note.ok ? 'status' : 'alert'} style={{ fontSize: 12.5, color: note.ok ? C.ok : C.crit }}>{note.text}</span>}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: phone ? 'minmax(0,1fr)' : 'repeat(auto-fill,minmax(260px,1fr))', gap: 8 }}>
         {skills.map((s) => (
           <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
             <span className="mono" style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: '#cbbcff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s}>{s}</span>
-            <SmallBtn onClick={() => use(s)}>Usar</SmallBtn>
+            <SmallBtn disabled={!!using} onClick={() => void use(s)}>{using === s ? 'Enviando…' : 'Usar'}</SmallBtn>
             <SmallBtn onClick={() => openTerminal('claude', active, `/${s}`)}>Terminal</SmallBtn>
           </div>
         ))}
@@ -243,11 +256,33 @@ function SkillsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Agen
 function SessionsTab() {
   const phone = useYui((s) => s.device === 'phone')
   const [list, setList] = useState<{ name: string; created: string; attached: boolean }[] | null>(null)
-  const load = useCallback(() => api.get<{ name: string; created: string; attached: boolean }[]>('/api/terminal/sessions').then(setList).catch(() => setList([])), [])
+  const [error, setError] = useState(false)
+  const load = useCallback(
+    () =>
+      api
+        .get<{ name: string; created: string; attached: boolean }[]>('/api/terminal/sessions')
+        .then((l) => {
+          setList(l)
+          setError(false)
+        })
+        .catch(() => setError(true)),
+    [],
+  )
   useEffect(() => {
     void load()
   }, [load])
-  if (!list) return null
+  const end = async (name: string, label: string) => {
+    const ok = await confirmAction({ title: 'Encerrar esta sessão?', text: `O terminal “${label}” fecha e o que estiver rodando nele para.`, confirmLabel: 'Encerrar sessão', danger: true })
+    if (!ok) return
+    try {
+      await api.del(`/api/terminal/sessions/${encodeURIComponent(name)}`)
+      toastOk('Sessão encerrada.')
+      void load()
+    } catch (e) {
+      toastErr(e, 'Não consegui encerrar a sessão')
+    }
+  }
+  if (!list) return error ? <ErrorNote text="Não consegui listar as sessões de terminal." retry={() => void load()} /> : <Skeleton rows={3} kpis={0} />
   if (!list.length) return <span style={{ fontSize: 13, color: C.t3 }}>Nenhuma sessão de terminal aberta. Abra uma pela aba Comandos ou pela página Terminal.</span>
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -262,7 +297,7 @@ function SessionsTab() {
               <span style={{ fontSize: 12, color: C.t3 }}>aberta {new Date(s.created).toLocaleString('pt-BR')}{s.attached ? ' · em uso agora' : ''}</span>
             </span>
             <SmallBtn onClick={() => openTerminal(kind, slug)}>Reconectar</SmallBtn>
-            <SmallBtn onClick={() => api.del(`/api/terminal/sessions/${encodeURIComponent(s.name)}`).then(load).catch(() => {})}>Encerrar</SmallBtn>
+            <SmallBtn onClick={() => void end(s.name, `${kind === 'claude' ? 'Claude' : 'Shell'} · ${slug ?? 'workspace'}`)}>Encerrar</SmallBtn>
           </div>
         )
       })}

@@ -129,7 +129,7 @@ export function SkillDrawer({ source, skillId, installed, presetAgents, onClose,
             <h2 style={{ margin: '6px 0 0', fontSize: phone ? 22 : 26, fontWeight: 500, overflowWrap: 'anywhere' }}>{skillId}</h2>
           </div>
           {!phone && (
-            <button aria-label="Fechar" onClick={onClose} style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 12, border: '1px solid rgba(255,255,255,.08)', background: 'transparent', color: C.t2, fontSize: 20, cursor: 'pointer' }}>
+            <button aria-label="Fechar" onClick={onClose} style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 12, border: '1px solid rgba(255,255,255,.08)', background: 'transparent', color: C.t2, fontSize: 20, cursor: 'pointer' }}>
               ×
             </button>
           )}
@@ -138,7 +138,7 @@ export function SkillDrawer({ source, skillId, installed, presetAgents, onClose,
           <div className="skel" style={{ height: 40 }} />
         ) : (
           <>
-            {detail?.description && <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: '#c9cde0' }}>{detail.description}</p>}
+            {detail?.description && <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: C.soft }}>{detail.description}</p>}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 12, color: C.t2 }}>
               {detail && detail.files > 0 && <span style={pill}>{detail.files} arquivos · {Math.max(1, Math.round(detail.bytes / 1024))} KB</span>}
               {installed && <span style={{ ...pill, color: C.ok, background: 'rgba(79,224,176,.08)' }}>✓ instalada · {scopeLabel(installed, agents)}</span>}
@@ -201,7 +201,7 @@ export function SkillDrawer({ source, skillId, installed, presetAgents, onClose,
           <span style={{ fontSize: 13, color: C.t3 }}>Conteúdo indisponível.</span>
         )}
       </section>
-      {error && <div role="alert" style={{ fontSize: 13, color: '#f39aa4' }}>{error}</div>}
+      {error && <div role="alert" style={{ fontSize: 13, color: C.critSoft }}>{error}</div>}
     </>
   )
 
@@ -209,21 +209,22 @@ export function SkillDrawer({ source, skillId, installed, presetAgents, onClose,
     <div style={{ display: 'flex', gap: 8, flexWrap: phone ? 'wrap' : 'nowrap', justifyContent: 'flex-end', alignItems: 'center', flexDirection: phone ? 'column-reverse' : 'row' }}>
       {!phone && <span style={{ fontSize: 12, color: C.t3, marginRight: 'auto', flex: '1 1 160px', minWidth: 0 }}>Baixa do GitHub do autor e vale na próxima execução.</span>}
       {installed && (
-        <button onClick={() => setConfirmDel(true)} disabled={!!busy} style={{ ...btn, width: phone ? '100%' : undefined, color: '#f39aa4', borderColor: 'rgba(240,98,114,.35)' }}>
+        <button className="app-btn danger" onClick={() => setConfirmDel(true)} disabled={!!busy} style={{ ...btn, width: phone ? '100%' : undefined, color: C.critSoft, borderColor: 'rgba(240,98,114,.35)' }}>
           Remover
         </button>
       )}
       {installed?.updateAvailable && (
-        <button onClick={() => void update()} disabled={!!busy} style={{ ...btn, width: phone ? '100%' : undefined }}>
+        <button className="app-btn" onClick={() => void update()} disabled={!!busy} style={{ ...btn, width: phone ? '100%' : undefined }}>
           {busy === 'update' ? 'Atualizando…' : 'Atualizar'}
         </button>
       )}
       {!phone && (
-        <button onClick={onClose} style={btn}>
+        <button className="app-btn" onClick={onClose} style={btn}>
           {installed ? 'Fechar' : 'Cancelar'}
         </button>
       )}
       <button
+        className="app-btn primary"
         onClick={() => void (installed ? saveScope() : install())}
         disabled={primaryDisabled}
         style={{ ...btn, width: phone ? '100%' : undefined, height: phone ? 52 : 44, border: 'none', background: primaryDisabled ? 'rgba(255,255,255,.08)' : 'linear-gradient(135deg,#67d8f2,#a68cf7)', color: primaryDisabled ? C.t2 : '#06070d', fontWeight: 700 }}
@@ -264,8 +265,10 @@ export function SkillDrawer({ source, skillId, installed, presetAgents, onClose,
         aria-modal="true"
         aria-label={`Skill ${skillId}`}
         onClick={(e) => e.stopPropagation()}
-        style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(600px, 100%)', boxSizing: 'border-box', background: 'rgba(14,17,38,.98)', borderLeft: '1px solid rgba(255,255,255,.08)', display: 'flex', flexDirection: 'column', color: C.text, animation: 'atria-sheet-in .2s var(--ease)' }}
+        style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(600px, 100%)', boxSizing: 'border-box', background: 'rgba(14,17,38,.98)', borderLeft: '1px solid rgba(255,255,255,.08)', display: 'flex', flexDirection: 'column', color: C.text, animation: 'atria-drawer-in .2s var(--ease)' }}
       >
+        {/* gaveta lateral entra pela direita (o atria-sheet-in global sobe de baixo) */}
+        <style>{'@keyframes atria-drawer-in { from { transform: translateX(100%); } to { transform: none; } }'}</style>
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>{body}</div>
         <div style={{ padding: '16px 28px', borderTop: '1px solid rgba(255,255,255,.06)' }}>{footer}</div>
       </aside>
@@ -278,4 +281,4 @@ export function SkillDrawer({ source, skillId, installed, presetAgents, onClose,
 }
 
 const pill = { padding: '4px 10px', borderRadius: 999, background: 'rgba(255,255,255,.05)', color: C.t2, fontSize: 12 } as const
-const btn = { height: 44, padding: '0 18px', borderRadius: 12, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: C.text, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' } as const
+const btn = { height: 44, padding: '0 18px', borderRadius: 12, background: 'transparent', color: C.text, fontSize: 14 } as const

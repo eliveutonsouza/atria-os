@@ -6,7 +6,7 @@ import { greeting } from '../lib/format'
 import { useYui } from '../store/yui'
 import { OrbLayer } from './parts'
 
-const field = { flex: 1, minWidth: 0, height: 40, border: 'none', outline: 'none', background: 'transparent', color: C.text, fontSize: 15, fontFamily: 'var(--sans)' } as const
+const field = { flex: 1, minWidth: 0, height: 40, border: 'none', background: 'transparent', color: C.text, fontSize: 15, fontFamily: 'var(--sans)' } as const
 const box = (err: boolean) =>
   ({ width: 'min(420px,100%)', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 7px 7px 16px', background: 'rgba(16,20,42,.78)', border: `1px solid ${err ? 'rgba(240,98,114,.45)' : 'rgba(160,170,255,.14)'}`, borderRadius: 18, backdropFilter: 'blur(16px)' }) as const
 
@@ -27,6 +27,7 @@ function CreateAccess() {
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const nav = useNavigate()
+  const hit = useYui((s) => (s.coarse ? 44 : 40))
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (busy) return
@@ -41,7 +42,7 @@ function CreateAccess() {
       nav('/app/settings', { replace: true })
     } catch (e2) {
       useYui.getState().set({ yst: 'warning' })
-      setErr(e2 instanceof ApiError ? e2.message : 'Não consegui criar o acesso.')
+      setErr(e2 instanceof ApiError && e2.status < 500 ? e2.message : 'O Atria não respondeu. Tente de novo em instantes.')
     } finally {
       setBusy(false)
     }
@@ -56,19 +57,33 @@ function CreateAccess() {
       <label style={box(!!err)}><input aria-label="Senha" type="password" placeholder="Senha (mín. 8 caracteres)" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} style={field} /></label>
       <label style={box(!!err)}>
         <input aria-label="Confirme a senha" type="password" placeholder="Confirme a senha" autoComplete="new-password" value={pw2} onChange={(e) => setPw2(e.target.value)} style={field} />
-        <button type="submit" aria-label="Criar acesso" disabled={busy} style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#67d8f2,#a68cf7)', color: '#0a0c1d', fontSize: 17, fontWeight: 700, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>→</button>
+        <button type="submit" aria-label="Criar acesso" disabled={busy} style={{ width: hit, height: hit, flexShrink: 0, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#67d8f2,#a68cf7)', color: '#0a0c1d', fontSize: 17, fontWeight: 700, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>→</button>
       </label>
-      <div role="alert" style={{ minHeight: 20, fontSize: 13, color: '#f39aa4' }}>{err}</div>
+      <div role="alert" style={{ minHeight: 20, fontSize: 13, color: C.critSoft }}>{err}</div>
     </form>
   )
 }
 
 export function Login() {
-  const [needsPassword, setNeedsPassword] = useState<boolean | null>(null)
-  useEffect(() => {
-    api.get<{ needsPassword: boolean }>('/api/auth/setup').then((r) => setNeedsPassword(r.needsPassword)).catch(() => setNeedsPassword(false))
-  }, [])
+  const [needsPassword, setNeedsPassword] = useState<boolean | 'error' | null>(null)
+  const check = () => {
+    api.get<{ needsPassword: boolean }>('/api/auth/setup').then((r) => setNeedsPassword(r.needsPassword)).catch(() => setNeedsPassword('error'))
+  }
+  useEffect(check, [])
   if (needsPassword === null) return <main style={{ position: 'fixed', inset: 0, background: '#06070d' }} />
+  if (needsPassword === 'error')
+    return (
+      <main style={{ ...mainBox, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <div role="alert" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center', maxWidth: 420 }}>
+          <div style={{ fontSize: 22, fontWeight: 300, lineHeight: 1.35 }}>O Atria não respondeu.</div>
+          <div style={{ fontSize: 14, color: C.t2 }}>Confira a conexão e tente de novo em instantes.</div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button className="app-btn primary" onClick={() => { setNeedsPassword(null); check() }}>Tentar de novo</button>
+            <button className="app-btn" onClick={() => setNeedsPassword(false)}>Entrar com senha</button>
+          </div>
+        </div>
+      </main>
+    )
   if (needsPassword)
     return (
       <main style={mainBox}>
@@ -85,6 +100,7 @@ function PasswordLogin() {
   const [busy, setBusy] = useState(false)
   const nav = useNavigate()
   const ref = useRef<HTMLInputElement>(null)
+  const hit = useYui((s) => (s.coarse ? 44 : 40))
   useEffect(() => {
     useYui.getState().set({ mode: 'center', yst: 'idle' })
     ref.current?.focus()
@@ -101,7 +117,8 @@ function PasswordLogin() {
       nav('/', { replace: true })
     } catch (e2) {
       useYui.getState().set({ yst: 'warning' })
-      setErr(e2 instanceof ApiError && e2.status === 429 ? 'Muitas tentativas. Espere um pouco.' : 'Senha incorreta.')
+      const status = e2 instanceof ApiError ? e2.status : 0
+      setErr(status === 429 ? 'Muitas tentativas. Espere um pouco.' : status === 401 || status === 403 ? 'Senha incorreta.' : 'O Atria não respondeu. Tente de novo em instantes.')
       setTimeout(() => useYui.getState().set({ yst: 'idle' }), 1400)
     } finally {
       setBusy(false)
@@ -128,11 +145,11 @@ function PasswordLogin() {
             placeholder="Senha"
             value={pw}
             onChange={(e) => setPw(e.target.value)}
-            style={{ flex: 1, minWidth: 0, height: 40, border: 'none', outline: 'none', background: 'transparent', color: C.text, fontSize: 15, fontFamily: 'var(--sans)' }}
+            style={{ ...field, height: hit }}
           />
-          <button type="submit" aria-label="Entrar" disabled={busy} style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#67d8f2,#a68cf7)', color: '#0a0c1d', fontSize: 17, fontWeight: 700, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>→</button>
+          <button type="submit" aria-label="Entrar" disabled={busy} style={{ width: hit, height: hit, flexShrink: 0, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#67d8f2,#a68cf7)', color: '#0a0c1d', fontSize: 17, fontWeight: 700, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>→</button>
         </div>
-        <div role="alert" style={{ minHeight: 20, fontSize: 13, color: '#f39aa4' }}>{err}</div>
+        <div role="alert" style={{ minHeight: 20, fontSize: 13, color: C.critSoft }}>{err}</div>
       </form>
     </main>
   )

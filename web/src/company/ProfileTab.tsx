@@ -3,8 +3,9 @@ import type { CompanyProfile, CompanyProfileInput, CompanyStats } from '@shared/
 import { api } from '../api/client'
 import { onCompanyEvent } from '../api/events'
 import { C } from '../lib/colors'
+import { useAction, useUnsavedGuard } from '../lib/feedback'
 import { useYui } from '../store/yui'
-import { fmtNum, goTab, initials, uploadLogo, Icon, useStacked } from './api'
+import { fmtNum, goTab, initials, setLeaveGuard, uploadLogo, Icon, useStacked } from './api'
 import { Svg } from './ui'
 
 // Perfil da empresa (Main.dc.html): o que entra no prompt de todo agente e da Yui.
@@ -27,7 +28,7 @@ function localPreview(f: CompanyProfileInput, stats: CompanyStats | null) {
   if (f.tone) lines.push(`Tom de voz: ${f.tone.toLowerCase()}`)
   const sv = f.services.filter((s) => s.name.trim())
   if (sv.length) lines.push(`Serviços: ${sv.map((s) => (s.price ? `${s.name} (${s.price})` : s.name)).join('; ')}`)
-  lines.push(`Base: empresa_consultar("pergunta") →\n  ${stats ? `${fmtNum(stats.ready)} documentos, ${fmtNum(stats.chunks)} trechos` : 'documentos da empresa'}`)
+  lines.push(`Base: consulta aos documentos da empresa →\n  ${stats ? `${fmtNum(stats.ready)} documentos, ${fmtNum(stats.chunks)} trechos` : 'documentos da empresa'}`)
   return lines.join('\n')
 }
 
@@ -37,6 +38,7 @@ export function ProfileTab() {
   const [profile, setProfile] = useState<CompanyProfile | null>(null)
   const [form, setForm] = useState<CompanyProfileInput>(EMPTY)
   const [stats, setStats] = useState<CompanyStats | null>(null)
+  const [statsErr, setStatsErr] = useState(false)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ text: string; err?: boolean } | null>(null)
   const [logoBusy, setLogoBusy] = useState(false)
@@ -47,7 +49,10 @@ export function ProfileTab() {
       setProfile(p)
       setForm(pick(p))
     }).catch((e: Error) => setMsg({ text: e.message, err: true }))
-    const loadStats = () => api.get<CompanyStats>('/api/company/stats').then(setStats).catch(() => {})
+    const loadStats = () => api.get<CompanyStats>('/api/company/stats').then((s) => {
+      setStats(s)
+      setStatsErr(false)
+    }).catch(() => setStatsErr(true))
     loadStats()
     return onCompanyEvent((ev) => {
       if (ev.type === 'company.profile.updated') setProfile(ev.profile)
@@ -56,6 +61,8 @@ export function ProfileTab() {
   }, [])
 
   const dirty = useMemo(() => !!profile && JSON.stringify(pick(profile)) !== JSON.stringify(form), [profile, form])
+  const confirmLeave = useUnsavedGuard(dirty, 'as mudanças do perfil')
+  useEffect(() => setLeaveGuard(confirmLeave), [confirmLeave])
   const set = <K extends keyof CompanyProfileInput>(k: K, v: CompanyProfileInput[K]) => setForm((f) => ({ ...f, [k]: v }))
 
   const save = () => {
@@ -81,9 +88,13 @@ export function ProfileTab() {
       .catch((e: Error) => setMsg({ text: e.message, err: true }))
       .finally(() => setLogoBusy(false))
   }
-  const removeLogo = () => {
-    api.del('/api/company/logo').then(() => api.get<CompanyProfile>('/api/company/profile')).then(setProfile).catch((e: Error) => setMsg({ text: e.message, err: true }))
-  }
+  const { run: removeLogo, busy: removingLogo } = useAction(
+    async () => {
+      await api.del('/api/company/logo')
+      setProfile(await api.get<CompanyProfile>('/api/company/profile'))
+    },
+    { ok: 'Logo removido.', error: 'Não consegui remover o logo', confirm: { title: 'Remover o logo?', text: 'Os agentes e o painel voltam a mostrar as iniciais da empresa. Você pode enviar outro logo depois.', confirmLabel: 'Remover logo', danger: true, undoable: true } },
+  )
 
   const ini = initials(form.name)
   const logo = (sz: number, radius: number, font: number) =>
@@ -120,10 +131,13 @@ export function ProfileTab() {
                 {logo(profile?.hasLogo ? 92 : 56, 14, 22)}
                 <span style={{ fontSize: 11 }}>{logoBusy ? 'Enviando…' : profile?.hasLogo ? 'Trocar logo' : 'Enviar logo'}</span>
               </button>
-              <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => onLogo(e.target.files?.[0])} />
+              <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => {
+                onLogo(e.target.files?.[0])
+                e.target.value = ''
+              }} />
               {profile?.hasLogo ? (
-                <button className="app-btn small danger" onClick={removeLogo}>
-                  Remover logo
+                <button className="app-btn small danger" disabled={removingLogo || logoBusy} onClick={() => removeLogo()}>
+                  {removingLogo ? 'Removendo…' : 'Remover logo'}
                 </button>
               ) : (
                 <span style={{ fontSize: 10.5, color: C.t3, textAlign: 'center' }}>PNG, JPG ou WEBP · até 2 MB</span>
@@ -235,6 +249,7 @@ export function ProfileTab() {
                 </div>
               ))}
             </div>
+            {statsErr && <span style={{ fontSize: 12, color: C.t2 }}>Status indisponível</span>}
             <button className="app-btn" style={{ height: 40 }} onClick={() => goTab('documentos')}>
               Gerenciar documentos →
             </button>

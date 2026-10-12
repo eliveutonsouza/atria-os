@@ -5,7 +5,7 @@ import { C } from '../../../lib/colors'
 import { ago } from '../../../lib/format'
 import { useYui } from '../../../store/yui'
 import { input, SmallBtn } from '../../../views/kit'
-import { SaveMsg, Section, useSettings } from './sections'
+import { SaveMsg, Section, SettingsLoadError, useSettings } from './sections'
 
 // Configurações › Sistema › Monitoramento remoto (YuiMonitoramento.dc.html): pulso para o Atria Central
 // do administrador, URL de saúde protegida pela mesma chave e a prévia do que sai desta VPS.
@@ -47,7 +47,8 @@ export function Switch({ on, label, onChange }: { on: boolean; label: string; on
 }
 
 export function MonitorSection() {
-  const { data, save, msg } = useSettings()
+  const settings = useSettings()
+  const { data, save, msg, saving } = settings
   const [st, setSt] = useState<MonitorStatus | null>(null)
   const [url, setUrl] = useState('')
   const [key, setKey] = useState('')
@@ -112,6 +113,7 @@ export function MonitorSection() {
 
   return (
     <Section title="Monitoramento remoto" hint="Para quem administra várias instalações do Atria OS: um painel de fora acompanha a saúde desta instância.">
+      <SettingsLoadError s={settings} />
       <div>
         <Row label="Monitoramento remoto" hint="Envia um pulso a cada 30 s para o painel do administrador.">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', minHeight: 36 }}>
@@ -125,7 +127,7 @@ export function MonitorSection() {
         <Row label="Chave da instância" hint="Gerada no Atria Central ao cadastrar esta instalação.">
           <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={hasKey ? '•••••••• guardada (vazio = não mudar)' : 'atk_…'} autoComplete="off" aria-label="Chave da instância" style={{ ...input, maxWidth: 460 }} className="mono" />
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <SmallBtn primary onClick={() => void saveConn()}>Salvar</SmallBtn>
+            <SmallBtn primary disabled={!data || saving} onClick={() => void saveConn()}>{saving ? 'Salvando…' : 'Salvar'}</SmallBtn>
             <SmallBtn disabled={testing} onClick={() => void runTest()}>{testing ? 'Testando…' : 'Testar conexão'}</SmallBtn>
             <SaveMsg msg={test ?? msg} />
           </div>

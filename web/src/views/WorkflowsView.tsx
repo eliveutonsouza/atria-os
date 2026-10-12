@@ -27,7 +27,7 @@ export function WorkflowsView() {
   const say = useYui.getState().say
   const phone = useYui((s) => s.device === 'phone')
 
-  useHeader('Workflows', 'Rotinas de trabalho', [
+  useHeader('Automações', 'Workflows', [
     { label: '+ Novo workflow', fn: () => show('workflow'), primary: true },
     { label: 'Rotinas agendadas', fn: () => show('routines') },
   ])
@@ -47,7 +47,10 @@ export function WorkflowsView() {
     }
   }
 
+  const [starting, setStarting] = useState<string | null>(null)
   const run = async (w: Row) => {
+    if (starting) return
+    setStarting(w.slug)
     try {
       const r = await send<WorkflowRunInfo>('POST', `/api/workflows/${encodeURIComponent(w.slug)}/run`, {})
       useYui.getState().set({ workflowRuns: { ...useYui.getState().workflowRuns, [r.id]: r } })
@@ -55,6 +58,8 @@ export function WorkflowsView() {
     } catch (e) {
       say(`Não consegui rodar "${w.name}": ${(e as Error).message}.`)
       reload()
+    } finally {
+      setStarting(null)
     }
   }
 
@@ -111,7 +116,7 @@ export function WorkflowsView() {
                 {w.team.length > 0 && (
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {w.team.map((a) => (
-                      <span key={a} style={{ fontSize: 11.5, padding: '3px 9px', borderRadius: 8, background: 'rgba(103,216,242,.08)', border: '1px solid rgba(103,216,242,.18)', color: '#a9e9f8' }}>
+                      <span key={a} style={{ fontSize: 11.5, padding: '3px 9px', borderRadius: 8, background: 'rgba(103,216,242,.08)', border: '1px solid rgba(103,216,242,.18)', color: C.cyanSoft }}>
                         {a}
                       </span>
                     ))}
@@ -131,9 +136,9 @@ export function WorkflowsView() {
                   // celular: grade de alvos de 44px, lixeira como ícone
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr)) 44px', gap: 6, marginTop: 'auto' }}>
                     <button className="wf-btn" onClick={() => show('workflow', { workflowId: w.slug })}>Abrir</button>
-                    <button className="wf-btn" onClick={() => void run(w)}>Rodar</button>
+                    <button className="wf-btn" disabled={starting === w.slug} onClick={() => void run(w)}>{starting === w.slug ? 'Iniciando…' : 'Rodar'}</button>
                     <button className="wf-btn ghost" onClick={() => show('workflow', { workflowId: w.slug })}>Agendar</button>
-                    <button className="wf-btn ghost" onClick={() => setDel(w)} aria-label={`Remover workflow ${w.name}`} style={{ color: '#f39aa4', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <button className="wf-btn ghost" onClick={() => setDel(w)} aria-label={`Remover workflow ${w.name}`} style={{ color: C.critSoft, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                         <path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" />
                       </svg>
@@ -142,11 +147,11 @@ export function WorkflowsView() {
                 ) : (
                   <div style={{ display: 'flex', gap: 6, marginTop: 'auto' }}>
                     <button className="wf-btn" onClick={() => show('workflow', { workflowId: w.slug })}>Abrir</button>
-                    <button className="wf-btn" onClick={() => void run(w)}>Rodar</button>
+                    <button className="wf-btn" disabled={starting === w.slug} onClick={() => void run(w)}>{starting === w.slug ? 'Iniciando…' : 'Rodar'}</button>
                     <button className="wf-btn ghost" onClick={() => show('workflow', { workflowId: w.slug })} title="Abra e use Agendar">
                       Agendar
                     </button>
-                    <button className="wf-btn ghost" onClick={() => setDel(w)} aria-label={`Remover workflow ${w.name}`} style={{ color: '#f39aa4', marginLeft: 'auto' }}>
+                    <button className="wf-btn ghost" onClick={() => setDel(w)} aria-label={`Remover workflow ${w.name}`} style={{ color: C.critSoft, marginLeft: 'auto' }}>
                       Remover
                     </button>
                   </div>

@@ -22,7 +22,7 @@ export function NavRail() {
   const app = useYui((s) => s.shellMode === 'app')
   const page = useYui((s) => s.appPage)
   const tablet = useYui((s) => s.device === 'tablet')
-  const pending = useYui((s) => s.inbox.filter((i) => i.action.type === 'approval').length)
+  const pending = useYui((s) => s.inbox.length)
   if (!app || !tablet) return null
   const inRail = ITEMS.some((i) => i.id === page)
   const btn = (on: boolean) => ({
@@ -51,7 +51,7 @@ export function NavRail() {
             </span>
             {it.label}
             {it.id === 'inbox' && pending > 0 && (
-              <span style={{ position: 'absolute', top: 4, right: 10, minWidth: 18, height: 18, borderRadius: 9, padding: '0 5px', background: C.warn, color: '#1a1204', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{pending}</span>
+              <span aria-label={`${pending} pendentes`} style={{ position: 'absolute', top: 4, right: 10, minWidth: 18, height: 18, borderRadius: 9, padding: '0 5px', background: C.warn, color: '#1a1204', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{pending}</span>
             )}
           </button>
         )

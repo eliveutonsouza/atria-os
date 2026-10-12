@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api/client'
-import { useApi } from '../api/useApi'
 import { C } from '../lib/colors'
+import { useAction } from '../lib/feedback'
 import { useYui } from '../store/yui'
+import { ErrorNote } from './ui'
 
 // Entregas dos agentes com pré-visualização (canvas Atria — Entregas e comparação, pranchas 1 e 3):
 // lista com filtros à esquerda, arquivo aberto à direita; no celular, a entrega abre em tela cheia.
@@ -29,11 +30,11 @@ function dayLabel(iso: string) {
   const same = (a: Date, b: Date) => a.toDateString() === b.toDateString()
   return same(d, today) ? 'HOJE' : same(d, y) ? 'ONTEM' : d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).toUpperCase()
 }
-const BADGE: Record<string, [string, string]> = { pdf: ['#f39aa4', 'rgba(240,98,114,.15)'], md: ['#cbbcff', 'rgba(166,140,247,.15)'], csv: ['#4fe0b0', 'rgba(79,224,176,.15)'], xlsx: ['#4fe0b0', 'rgba(79,224,176,.15)'], json: ['#a9e9f8', 'rgba(103,216,242,.12)'], html: ['#a9e9f8', 'rgba(103,216,242,.12)'] }
+const BADGE: Record<string, [string, string]> = { pdf: [C.critSoft, 'rgba(240,98,114,.15)'], md: [C.lav, 'rgba(166,140,247,.15)'], csv: [C.ok, 'rgba(79,224,176,.15)'], xlsx: [C.ok, 'rgba(79,224,176,.15)'], json: [C.cyanSoft, 'rgba(103,216,242,.12)'], html: [C.cyanSoft, 'rgba(103,216,242,.12)'] }
 
 function Thumb({ e }: { e: Entrega }) {
   if (isImage(e)) return <img src={fileUrl(e)} alt="" loading="lazy" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: 'rgba(255,255,255,.05)' }} />
-  const [fg, bg] = BADGE[ext(e)] ?? ['#c9cde0', 'rgba(255,255,255,.06)']
+  const [fg, bg] = BADGE[ext(e)] ?? [C.soft, 'rgba(255,255,255,.06)']
   return <span aria-hidden style={{ width: 44, height: 44, borderRadius: 8, background: bg, color: fg, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, textTransform: 'uppercase' }}>{ext(e).slice(0, 4) || 'ARQ'}</span>
 }
 
@@ -77,7 +78,7 @@ function Preview({ e }: { e: Entrega }) {
       const rows = parseCsv(text)
       return (
         <div style={{ width: '100%', overflow: 'auto', alignSelf: 'stretch' }}>
-          <table style={{ borderCollapse: 'collapse', fontSize: 12.5, color: '#d6d9e8' }}>
+          <table style={{ borderCollapse: 'collapse', fontSize: 12.5, color: C.dim }}>
             <tbody>
               {rows.map((r, i) => (
                 <tr key={i} style={{ background: i === 0 ? 'rgba(255,255,255,.06)' : undefined, fontWeight: i === 0 ? 600 : 400 }}>
@@ -89,7 +90,7 @@ function Preview({ e }: { e: Entrega }) {
         </div>
       )
     }
-    return <pre style={{ margin: 0, alignSelf: 'stretch', width: '100%', boxSizing: 'border-box', padding: 18, borderRadius: 8, background: 'rgba(0,0,0,.35)', font: "13px/1.65 'JetBrains Mono', monospace", color: '#d6d9e8', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', overflow: 'auto' }}>{text}</pre>
+    return <pre style={{ margin: 0, alignSelf: 'stretch', width: '100%', boxSizing: 'border-box', padding: 18, borderRadius: 8, background: 'rgba(0,0,0,.35)', font: '13px/1.65 var(--mono)', color: C.dim, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', overflow: 'auto' }}>{text}</pre>
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: C.t2, fontSize: 13, textAlign: 'center' }}>
@@ -99,9 +100,9 @@ function Preview({ e }: { e: Entrega }) {
   )
 }
 
-export function Entregas() {
+// A lista vem de quem monta a tela (Artefatos busca uma vez só e usa a contagem para o "vazio").
+export function Entregas({ data, loading, error, reload }: { data: Entrega[] | null; loading: boolean; error: unknown; reload: () => void }) {
   const phone = useYui((s) => s.device === 'phone')
-  const { data, reload } = useApi<Entrega[]>('/api/entregas?limit=200')
   const [filter, setFilter] = useState<Filter>('all')
   const [project, setProject] = useState('')
   const [q, setQ] = useState('')
@@ -110,23 +111,39 @@ export function Entregas() {
   const projects = useMemo(() => [...new Set(list.map((e) => e.project ?? ''))].sort(), [list])
   const shown = list.filter((e) => (filter === 'all' || (filter === 'pinned' ? e.pinned : category(e) === filter)) && (!project || (e.project ?? '') === project) && (!q || `${e.title} ${e.agent ?? ''} ${e.task ?? ''}`.toLowerCase().includes(q.toLowerCase())))
   const current = list.find((e) => e.id === sel) ?? (phone ? null : shown[0] ?? null)
+  const sendAct = useAction(
+    async (e: Entrega) => {
+      await api.post(`/api/entregas/${e.id}/send`, { channels: ['telegram'] })
+      useYui.getState().say(`Mandei ${e.title} no Telegram.`)
+    },
+    { error: 'Não consegui mandar no Telegram' },
+  )
+  const pinAct = useAction(
+    async (e: Entrega) => {
+      await api.post(`/api/entregas/${e.id}/pin`, { pinned: !e.pinned })
+      reload()
+    },
+    { error: 'Não consegui fixar' },
+  )
+  if (loading && !data)
+    return (
+      <section aria-label="Entregas dos agentes" aria-busy="true" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {[0, 1, 2].map((i) => <div key={i} className="skel" style={{ height: 56, borderRadius: 12 }} />)}
+      </section>
+    )
+  if (error && !data) return <ErrorNote text="Não consegui carregar as entregas dos agentes." retry={reload} />
   if (!list.length) return null
 
-  const send = (e: Entrega) =>
-    api.post(`/api/entregas/${e.id}/send`, { channels: ['telegram'] })
-      .then(() => useYui.getState().say(`Mandei ${e.title} no Telegram.`))
-      .catch((err: Error) => useYui.getState().say(`Não consegui mandar: ${err.message}`))
-  const pin = (e: Entrega) => api.post(`/api/entregas/${e.id}/pin`, { pinned: !e.pinned }).then(reload).catch(() => {})
   const h = phone ? 48 : 38
-  const ghost = { height: h, padding: '0 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,.12)', background: 'transparent', color: '#dfe3f3', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' } as const
-  const primary = { ...ghost, border: 'none', background: C.cyan, color: '#06221c', fontWeight: 700 } as const
-  const chip = (on: boolean) => ({ height: 34, padding: '0 12px', borderRadius: 9, border: `1px solid ${on ? 'rgba(103,216,242,.4)' : 'rgba(255,255,255,.1)'}`, background: on ? 'rgba(103,216,242,.1)' : 'transparent', color: on ? '#a9e9f8' : '#c9cde0', fontSize: 13, fontWeight: on ? 600 : 500, cursor: 'pointer' }) as const
+  const ghost = { height: h, padding: '0 14px', borderRadius: 10, borderColor: 'rgba(255,255,255,.12)', background: 'transparent', fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' } as const
+  const primary = { height: h, padding: '0 14px', borderRadius: 10, background: C.cyan, color: '#06221c', fontSize: 13 } as const
+  const chip = (on: boolean) => ({ height: 34, padding: '0 12px', borderRadius: 9, border: `1px solid ${on ? 'rgba(103,216,242,.4)' : 'rgba(255,255,255,.1)'}`, background: on ? 'rgba(103,216,242,.1)' : 'transparent', color: on ? C.cyanSoft : C.soft, fontSize: 13, fontWeight: on ? 600 : 500, cursor: 'pointer' }) as const
   const actions = (e: Entrega) => [
     // leitor de PDF do navegador às vezes não abre dentro do painel (ou no celular): aba própria
-    ...(['pdf', 'html'].includes(ext(e)) ? [<a key="tab" style={ghost} href={fileUrl(e)} target="_blank" rel="noreferrer">Abrir em nova aba</a>] : []),
-    <button key="pin" style={ghost} aria-pressed={e.pinned} onClick={() => void pin(e)}>{e.pinned ? 'Soltar' : 'Fixar'}</button>,
-    ...(e.runId ? [<button key="run" style={ghost} onClick={() => useYui.getState().show('runs', { runId: e.runId! })}>Execução</button>] : []),
-    <a key="dl" style={ghost} href={fileUrl(e, true)}>Baixar</a>,
+    ...(['pdf', 'html'].includes(ext(e)) ? [<a key="tab" className="app-btn" style={ghost} href={fileUrl(e)} target="_blank" rel="noreferrer">Abrir em nova aba</a>] : []),
+    <button key="pin" className="app-btn" style={ghost} aria-pressed={e.pinned} disabled={pinAct.busy} onClick={() => void pinAct.run(e)}>{e.pinned ? 'Soltar' : 'Fixar'}</button>,
+    ...(e.runId ? [<button key="run" className="app-btn" style={ghost} onClick={() => useYui.getState().show('runs', { runId: e.runId! })}>Execução</button>] : []),
+    <a key="dl" className="app-btn" style={ghost} href={fileUrl(e, true)}>Baixar</a>,
   ]
 
   // celular: entrega aberta em tela cheia (prancha 3)
@@ -134,7 +151,7 @@ export function Entregas() {
     return (
       <section aria-label={current.title} style={{ display: 'flex', flexDirection: 'column', gap: 12, minHeight: '70dvh' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button aria-label="Voltar" onClick={() => setSel(null)} style={{ ...ghost, width: 44, padding: 0, fontSize: 18 }}>‹</button>
+          <button aria-label="Voltar" className="app-btn" onClick={() => setSel(null)} style={{ ...ghost, width: 44, padding: 0, fontSize: 18 }}>‹</button>
           <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
             <span style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{current.title}</span>
             <span style={{ fontSize: 12, color: C.t2 }}>{current.agent ?? 'Agente'} · {kb(current.size)} · {dayLabel(current.createdAt).toLowerCase()} {hhmm(current.createdAt)}</span>
@@ -143,8 +160,8 @@ export function Entregas() {
         <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 12, borderRadius: 12, background: 'rgba(0,0,0,.25)', minHeight: 360 }}>
           <Preview e={current} />
         </div>
-        <button style={{ ...primary, height: 52, fontSize: 15 }} onClick={() => void send(current)}>Mandar no Telegram</button>
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${actions(current).length},minmax(0,1fr))`, gap: 8 }}>{actions(current)}</div>
+        <button className="app-btn primary" style={{ ...primary, height: 52, fontSize: 15 }} disabled={sendAct.busy} onClick={() => void sendAct.run(current)}>{sendAct.busy ? 'Mandando…' : 'Mandar no Telegram'}</button>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8 }}>{actions(current)}</div>
       </section>
     )
 
@@ -196,7 +213,7 @@ export function Entregas() {
                 <span style={{ fontSize: 12, color: C.t2 }}>{current.agent ? `Gerado pelo ${current.agent}` : 'Arquivo'}{current.task ? ` na execução “${current.task}”` : ''} · {kb(current.size)}</span>
               </span>
               {actions(current)}
-              <button style={primary} onClick={() => void send(current)}>Mandar no Telegram</button>
+              <button className="app-btn primary" style={primary} disabled={sendAct.busy} onClick={() => void sendAct.run(current)}>{sendAct.busy ? 'Mandando…' : 'Mandar no Telegram'}</button>
             </div>
             <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 24, background: 'rgba(0,0,0,.25)', minHeight: 0, overflow: 'auto' }}>
               <Preview e={current} />

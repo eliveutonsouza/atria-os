@@ -3,6 +3,7 @@ import type { ScheduleOccurrence, WorkflowDef, WorkflowRunInfo } from '@shared/p
 import { api } from '../../api/client'
 import { useApi } from '../../api/useApi'
 import { C } from '../../lib/colors'
+import { toastErr, toastOk } from '../../lib/feedback'
 import { useYui } from '../../store/yui'
 import { RoutinesView } from '../../views/RoutinesView'
 import { useHeader } from '../../views/ui'
@@ -78,8 +79,8 @@ export function SchedulePage() {
   const run = (slug: string) =>
     api
       .post(`/api/workflows/${slug}/run`, {})
-      .then(() => useYui.getState().say(`Workflow ${slug} iniciado.`, { state: 'delegating' }))
-      .catch(() => useYui.getState().say('Não consegui iniciar o workflow.', { state: 'warning' }))
+      .then(() => toastOk(`Workflow ${slug} iniciado.`))
+      .catch((e) => toastErr(e, 'Não consegui iniciar o workflow'))
 
   return (
     <>

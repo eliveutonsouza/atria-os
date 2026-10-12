@@ -3,12 +3,13 @@ import type { RunEventLine, RunInfo, ViewName, ViewParams } from '@shared/protoc
 import { api } from '../../api/client'
 import { useApi } from '../../api/useApi'
 import { C } from '../../lib/colors'
+import { toastErr, useAction } from '../../lib/feedback'
 import { useYui } from '../../store/yui'
 import { input } from '../../views/kit'
-import { ConfirmDeleteModal, Empty, useHeader } from '../../views/ui'
+import { ConfirmDeleteModal, Empty, ErrorNote, Skeleton, useHeader } from '../../views/ui'
 import { Dot, elapsed, fmtCost, fmtDuration, fmtTokens, openApp, relTime, Tag } from './common'
 
-// Execuções: tabela filtrável (agente, projeto, estado, origem) + detalhe com timeline, eventos e resultado.
+// Execuções: tabela filtrável (agente, projeto, estado, origem) + detalhe com etapas, eventos e resultado.
 
 const STATE: Record<string, [string, string]> = {
   running: ['rodando', C.cyan],
@@ -36,7 +37,7 @@ export function RunsPage() {
   const tablet = device === 'tablet'
   const sel = useYui((s) => s.appParams.id)
   const live = useYui((s) => s.runs)
-  const { data, reload } = useApi<{ runs: RunInfo[] }>('/api/runs', [], 20000)
+  const { data, reload, error } = useApi<{ runs: RunInfo[] }>('/api/runs', [], 20000)
   // páginas antigas ("Carregar mais") e execuções apagadas nesta tela
   const [older, setOlder] = useState<RunInfo[]>([])
   const [cursor, setCursor] = useState<string | null>(null)
@@ -94,7 +95,7 @@ export function RunsPage() {
       useYui.getState().say(r.deleted ? `Apaguei ${r.deleted} execuç${r.deleted > 1 ? 'ões' : 'ão'} com mais de ${days} dias.` : `Nenhuma execução com mais de ${days} dias.`)
       setPurgeDays(null)
     } catch (e) {
-      useYui.getState().say(`Não consegui limpar: ${(e as Error).message}.`)
+      toastErr(e, 'Não consegui limpar')
     }
     setPurging(false)
   }
@@ -179,7 +180,7 @@ export function RunsPage() {
             <span>Estado</span>
             <span style={{ textAlign: 'right' }}>Quando</span>
           </div>
-          {shown.length === 0 && <Empty text="Nenhuma execução com esses filtros." />}
+          {shown.length === 0 && (!data && runs.length === 0 ? (error ? <ErrorNote text="Não consegui carregar as execuções." retry={reload} /> : <Skeleton rows={5} kpis={0} />) : <Empty text={runs.length ? 'Nenhuma execução com esses filtros.' : 'Nenhuma execução ainda.'} />)}
           {shown.map((r) => {
             const [l, c] = STATE[r.state] ?? [r.state, C.t2]
             const on = r.id === sel
@@ -267,7 +268,7 @@ function RunDetail({ run, full = false, onDeleted }: { run: RunInfo; full?: bool
       onDeleted(run.id)
       useYui.getState().say('Execução excluída.')
     } catch (e) {
-      useYui.getState().say(`Não consegui excluir: ${(e as Error).message}.`)
+      toastErr(e, 'Não consegui excluir')
     }
     setBusy(false)
   }
@@ -275,6 +276,11 @@ function RunDetail({ run, full = false, onDeleted }: { run: RunInfo; full?: bool
     setLines(null)
     api.get<RunEventLine[]>(`/api/runs/${run.id}/events`).then(setLines).catch(() => setLines([]))
   }, [run.id, run.state, run.progress])
+  const cancel = useAction(() => api.post(`/api/runs/${run.id}/cancel`), {
+    ok: 'Execução cancelada.',
+    error: 'Não consegui cancelar',
+    confirm: { title: 'Cancelar esta execução?', text: 'O agente para agora; o que já foi feito fica como está.', rows: [{ label: 'Tarefa', value: run.task }, { label: 'Agente', value: run.agent }], confirmLabel: 'Cancelar execução', cancelLabel: 'Voltar', danger: true },
+  })
   const [l, c] = STATE[run.state] ?? [run.state, C.t2]
   const active = run.state === 'running' || run.state === 'queued' || run.state === 'waiting_approval'
   const openResult = () =>
@@ -314,7 +320,7 @@ function RunDetail({ run, full = false, onDeleted }: { run: RunInfo; full?: bool
       )}
       {run.steps.length > 0 && (
         <div>
-          <div className="eyebrow" style={{ marginBottom: 6 }}>Timeline</div>
+          <div className="eyebrow" style={{ marginBottom: 6 }}>Etapas</div>
           {run.steps.map((st, i) => (
             <div key={i} style={{ display: 'flex', gap: 10, padding: '4px 0', fontSize: 13, color: st.status === 'pending' ? C.t3 : C.text }}>
               <span style={{ width: 16, textAlign: 'center', color: st.status === 'done' ? C.ok : st.status === 'active' ? C.cyan : C.t3 }}>{st.status === 'done' ? '✓' : st.status === 'active' ? '●' : '○'}</span>
@@ -339,8 +345,8 @@ function RunDetail({ run, full = false, onDeleted }: { run: RunInfo; full?: bool
         {run.missionId && <button className="app-btn small" onClick={() => openApp('missions', run.missionId!)}>Ver missão</button>}
         <button className="app-btn small" onClick={() => setTech(!tech)}>{tech ? 'Ocultar detalhes técnicos' : 'Detalhes técnicos'}</button>
         {active && (
-          <button className="app-btn small danger" onClick={() => void api.post(`/api/runs/${run.id}/cancel`).catch(() => {})}>
-            Cancelar
+          <button className="app-btn small danger" disabled={cancel.busy} onClick={() => void cancel.run()}>
+            {cancel.busy ? 'Cancelando…' : 'Cancelar'}
           </button>
         )}
         <button className="app-btn small danger" onClick={() => setConfirm(true)}>Excluir</button>
@@ -361,7 +367,7 @@ function RunDetail({ run, full = false, onDeleted }: { run: RunInfo; full?: bool
       )}
       {tech && (
         <div className="app-mono" style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(0,0,0,.35)', border: '1px solid rgba(255,255,255,.06)', fontSize: 11.5, lineHeight: 1.7, color: C.t2, maxHeight: 320, overflowY: 'auto', overflowWrap: 'anywhere' }}>
-          <div>session {run.sessionId ?? '—'}</div>
+          <div>sessão {run.sessionId ?? '—'}</div>
           {(lines ?? []).slice(-60).map((ln, i) => (
             <div key={i} style={{ color: ln.kind === 'error' ? '#f6b3ba' : ln.kind === 'tool' ? '#c9cde0' : C.t2 }}>
               {ln.kind === 'error' ? '! ' : ''}

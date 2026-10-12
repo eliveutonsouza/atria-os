@@ -13,6 +13,7 @@ import { useYui } from '../store/yui'
 import { depsText, missionNextId, missionNumbers, missionRemove } from '../workflow/graph'
 import { BottomSheet } from './Sheet'
 import { ConfirmDeleteModal, useHeader } from './ui'
+import { useAction, useUnsavedGuard } from '../lib/feedback'
 
 // Nova missão / rascunho: pedido à esquerda (objetivo, projeto, detalhes, "pedir meu OK"), plano à direita
 // (quadro de etapas + painel da etapa). Planeja com a Yui ou monta à mão; só executa ao "Iniciar missão".
@@ -73,6 +74,9 @@ function Editor({ mission, restricted = false, onClose }: { mission: MissionInfo
   const key = JSON.stringify(payload())
   const [savedKey, setSavedKey] = useState(() => (mission ? key : ''))
   const dirty = !mid || key !== savedKey
+  // rascunho novo ainda vazio não pede confirmação para sair
+  const unsaved = mid ? key !== savedKey : !!(goal.trim() || title.trim() || details.trim() || steps.length)
+  const confirmLeave = useUnsavedGuard(unsaved, 'as mudanças da missão')
 
   // adota a versão do servidor (depois de criar, salvar ou planejar)
   const adopt = (m: MissionInfo, resetLayout = false) => {
@@ -112,6 +116,7 @@ function Editor({ mission, restricted = false, onClose }: { mission: MissionInfo
   }
 
   const save = async (): Promise<string | null> => {
+    if (busy) return null
     if (!restricted && needGoal()) return null
     const bad = steps.find((s) => !s.title.trim() || !s.agentId)
     if (bad) {
@@ -220,25 +225,34 @@ function Editor({ mission, restricted = false, onClose }: { mission: MissionInfo
     }
   }
 
+  // clique duplo em "Iniciar" não cria duas execuções
+  const startAct = useAction(start)
+  const close = async () => {
+    if (await confirmLeave()) onClose?.()
+  }
+  const leave = async () => {
+    if (await confirmLeave()) openApp('missions')
+  }
+
   // ações do cabeçalho chamam sempre a versão atual (o useHeader guarda as funções)
-  const act = useRef({ save, start, saveSteps })
+  const act = useRef({ save, start: startAct.run, saveSteps, close, leave })
   useLayoutEffect(() => {
-    act.current = { save, start, saveSteps }
+    act.current = { save, start: startAct.run, saveSteps, close, leave }
   })
   useHeader(
     restricted ? 'Missão · editar etapas' : 'Missão · rascunho',
     title.trim() || 'Nova missão',
     restricted
       ? [
-          { label: busy === 'save' ? 'Salvando…' : 'Salvar etapas', fn: () => void act.current.saveSteps(), primary: true },
-          { label: 'Fechar sem salvar', fn: () => onClose?.() },
+          { label: busy === 'save' ? 'Salvando…' : 'Salvar etapas', fn: () => void act.current.saveSteps(), primary: true, disabled: !!busy },
+          { label: 'Fechar sem salvar', fn: () => void act.current.close() },
         ]
       : [
-          { label: 'Descartar', fn: () => (mid ? setDiscardOpen(true) : openApp('missions')), danger: true },
-          { label: busy === 'save' ? 'Salvando…' : dirty ? 'Salvar rascunho' : 'Rascunho salvo', fn: () => void act.current.save() },
-          { label: busy === 'start' ? 'Iniciando…' : phone ? 'Iniciar' : 'Iniciar missão', fn: () => void act.current.start(), primary: true },
+          { label: 'Descartar', fn: () => (mid ? setDiscardOpen(true) : void act.current.leave()), danger: true },
+          { label: busy === 'save' ? 'Salvando…' : dirty ? 'Salvar rascunho' : 'Rascunho salvo', fn: () => void act.current.save(), disabled: !!busy },
+          { label: busy === 'start' || startAct.busy ? 'Iniciando…' : phone ? 'Iniciar' : 'Iniciar missão', fn: () => void act.current.start(), primary: true, disabled: !!busy || startAct.busy },
         ],
-    [restricted, busy, dirty, mid, phone],
+    [restricted, busy, dirty, mid, phone, startAct.busy],
   )
 
   const sel = steps.find((s) => s.id === selected) ?? null

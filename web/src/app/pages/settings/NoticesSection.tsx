@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import type { NotifyChannel, NotifyStatus } from '@shared/protocol'
 import { api, ApiError } from '../../../api/client'
 import { C } from '../../../lib/colors'
+import { confirmAction } from '../../../lib/feedback'
 import { useYui } from '../../../store/yui'
 import { input, StatusPill } from '../../../views/kit'
-import { bigBtn, SaveMsg, Section, useSettings } from './sections'
+import { bigBtn, bigCls, SaveMsg, Section, useSettings } from './sections'
 
 // Configurações › Avisos (Settings.dc.html do canvas de workflows): Telegram, e-mail (Resend) e celular (push).
 // Usados pelos passos "Avisar" e "Pedir informação" dos workflows.
@@ -104,8 +105,10 @@ export function NoticesSection() {
         setTgMsg({ ok: false, text: e instanceof ApiError ? e.message : 'Não consegui gerar o código.' })
       }
     })
-  const unlink = () =>
-    act('unlink', async () => {
+  const unlink = async () => {
+    const ok = await confirmAction({ title: 'Desvincular o chat do Telegram?', text: 'A Yui para de mandar avisos e de aceitar respostas por esse chat. Para ligar de novo, gere um código novo.', confirmLabel: 'Desvincular', danger: true, undoable: true })
+    if (!ok) return
+    return act('unlink', async () => {
       try {
         await api.del('/api/notify/telegram/link')
         setTgMsg({ ok: true, text: 'Chat desvinculado. Gere um código novo para ligar outro.' })
@@ -114,6 +117,7 @@ export function NoticesSection() {
         setTgMsg({ ok: false, text: 'Não consegui desvincular agora.' })
       }
     })
+  }
   const saveMail = () =>
     act('mail', async () => {
       const patch: Record<string, unknown> = { 'notify.email.from': mail.from.trim(), 'notify.email.to': mail.to.trim() }
@@ -134,7 +138,7 @@ export function NoticesSection() {
     return (
       <Section title="Avisos" hint="Não consegui ler o estado dos avisos agora.">
         <div>
-          <button type="button" style={bigBtn()} onClick={() => void reload()}>Tentar de novo</button>
+          <button type="button" className={bigCls()} style={bigBtn()} onClick={() => void reload()}>Tentar de novo</button>
         </div>
       </Section>
     )
@@ -174,7 +178,7 @@ export function NoticesSection() {
             autoComplete="off"
             style={{ ...input, maxWidth: phone ? undefined : 460 }}
           />
-          <button type="button" style={bigBtn(true)} disabled={!token.trim() || busy === 'token'} onClick={() => void saveToken()}>{busy === 'token' ? 'Salvando…' : 'Salvar token'}</button>
+          <button type="button" className={bigCls(true)} style={bigBtn(true)} disabled={!token.trim() || busy === 'token'} onClick={() => void saveToken()}>{busy === 'token' ? 'Salvando…' : 'Salvar token'}</button>
         </div>
         {tg?.configured && !tg.linked && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', borderRadius: 12, background: 'rgba(103,216,242,.06)', border: '1px solid rgba(103,216,242,.25)' }}>
@@ -190,16 +194,16 @@ export function NoticesSection() {
             )}
             <div style={row}>
               {deepLink && (
-                <a href={deepLink} target="_blank" rel="noreferrer" style={{ ...bigBtn(true), display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
+                <a href={deepLink} target="_blank" rel="noreferrer" className={bigCls(true)} style={{ ...bigBtn(true), display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
                   Abrir o bot no Telegram
                 </a>
               )}
               {startCmd && (
-                <button type="button" style={bigBtn()} onClick={() => void navigator.clipboard?.writeText(startCmd).then(() => setTgMsg({ ok: true, text: 'Copiado.' }))}>
+                <button type="button" className={bigCls()} style={bigBtn()} onClick={() => void navigator.clipboard?.writeText(startCmd).then(() => setTgMsg({ ok: true, text: 'Copiado.' }))}>
                   Copiar comando
                 </button>
               )}
-              <button type="button" style={bigBtn()} disabled={busy === 'code'} onClick={() => void newCode()}>{startCmd ? 'Gerar outro código' : 'Gerar código'}</button>
+              <button type="button" className={bigCls()} style={bigBtn()} disabled={busy === 'code'} onClick={() => void newCode()}>{startCmd ? 'Gerar outro código' : 'Gerar código'}</button>
             </div>
           </div>
         )}
@@ -209,7 +213,7 @@ export function NoticesSection() {
               Chat ligado: <b>{tg.chatName ?? 'seu chat'}</b> <span style={{ color: C.t3 }}>· só este chat é aceito</span>
             </span>
             <span style={{ flex: 1 }} />
-            <button type="button" style={{ ...bigBtn(), color: '#f39aa4' }} disabled={busy === 'unlink'} onClick={() => void unlink()}>Desvincular</button>
+            <button type="button" className={bigCls()} style={{ ...bigBtn(), color: C.critSoft }} disabled={busy === 'unlink'} onClick={() => void unlink()}>Desvincular</button>
           </div>
         )}
         {tg?.linked && (
@@ -228,9 +232,9 @@ export function NoticesSection() {
             <span style={{ color: C.t3, fontSize: 12 }}>além do texto · cerca de US$ 0,015 por minuto de fala</span>
           </label>
         )}
-        {tg?.error && <span role="alert" style={{ fontSize: 12.5, color: '#f39aa4' }}>{tg.error}</span>}
+        {tg?.error && <span role="alert" style={{ fontSize: 12.5, color: C.critSoft }}>{tg.error}</span>}
         <div style={row}>
-          <button type="button" style={bigBtn()} disabled={!tg?.linked || busy === 'tg-test'} onClick={() => void act('tg-test', async () => setTgMsg(await sendTest('telegram')))}>
+          <button type="button" className={bigCls()} style={bigBtn()} disabled={!tg?.linked || busy === 'tg-test'} onClick={() => void act('tg-test', async () => setTgMsg(await sendTest('telegram')))}>
             {busy === 'tg-test' ? 'Enviando…' : 'Mandar teste'}
           </button>
           <SaveMsg msg={tgMsg} />
@@ -256,8 +260,8 @@ export function NoticesSection() {
           </label>
         </div>
         <div style={row}>
-          <button type="button" style={bigBtn(true)} disabled={busy === 'mail'} onClick={() => void saveMail()}>{busy === 'mail' ? 'Salvando…' : 'Salvar'}</button>
-          <button type="button" style={bigBtn()} disabled={!em?.configured || busy === 'mail-test'} onClick={() => void act('mail-test', async () => setMailMsg(await sendTest('email')))}>
+          <button type="button" className={bigCls(true)} style={bigBtn(true)} disabled={busy === 'mail'} onClick={() => void saveMail()}>{busy === 'mail' ? 'Salvando…' : 'Salvar'}</button>
+          <button type="button" className={bigCls()} style={bigBtn()} disabled={!em?.configured || busy === 'mail-test'} onClick={() => void act('mail-test', async () => setMailMsg(await sendTest('email')))}>
             {busy === 'mail-test' ? 'Enviando…' : 'Mandar teste'}
           </button>
           <SaveMsg msg={mailMsg} />
@@ -267,7 +271,7 @@ export function NoticesSection() {
       <Section title="Celular (push)" hint="Usa o app Atria OS instalado. Pedidos de informação sempre chegam, mesmo com o app aberto em outra aba.">
         <div style={{ ...row, justifyContent: 'space-between' }}>
           <StatusPill label={st ? `${st.push.devices} aparelho${st.push.devices === 1 ? '' : 's'}` : 'verificando…'} color={st?.push.devices ? C.ok : C.t3} />
-          <button type="button" style={bigBtn()} onClick={() => useYui.getState().set({ appParams: { id: 'notifications' } })}>Gerenciar aparelhos</button>
+          <button type="button" className={bigCls()} style={bigBtn()} onClick={() => useYui.getState().set({ appParams: { id: 'notifications' } })}>Gerenciar aparelhos</button>
         </div>
         <div style={row}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#c9cde0', flexWrap: 'wrap' }}>
@@ -275,7 +279,7 @@ export function NoticesSection() {
             <input type="number" min={1} max={720} value={hours} onChange={(e) => setHours(Number(e.target.value))} aria-label="Horas entre lembretes" style={{ ...input, width: 84, height: 40 }} />
             h
           </label>
-          <button type="button" style={bigBtn()} disabled={busy === 'hours' || hours === (Number(data?.values['notify.remindHours'] ?? 24) || 24)} onClick={() => void saveHours()}>
+          <button type="button" className={bigCls()} style={bigBtn()} disabled={busy === 'hours' || hours === (Number(data?.values['notify.remindHours'] ?? 24) || 24)} onClick={() => void saveHours()}>
             Salvar
           </button>
           <SaveMsg msg={hoursMsg} />

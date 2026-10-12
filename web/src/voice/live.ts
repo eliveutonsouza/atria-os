@@ -156,7 +156,7 @@ export function pttUp() {
       taps = []
       setSt({ voiceMode: 'continuous' })
       setMic(true)
-      s.say('Conversa contínua ligada. Toque espaço de novo para voltar ao modo segurar-para-falar.', { state: 'listening' })
+      s.say('Conversa contínua ligada. Aperte espaço de novo para voltar ao modo segurar-para-falar.', { state: 'listening' })
       return
     }
     if (s.voiceMode === 'continuous') {

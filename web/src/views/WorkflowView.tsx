@@ -29,6 +29,7 @@ import { DeleteWorkflowModal } from '../workflow/DeleteWorkflow'
 import { CRON_PRESETS, describeCron, send } from '../workflow/http'
 import { ActionSheet, BottomSheet } from './Sheet'
 import { ErrorNote, Skeleton, useHeader } from './ui'
+import { toast, useAction, useUnsavedGuard } from '../lib/feedback'
 
 // Editor de workflow: fluxograma (@xyflow/react) ⇄ markdown canônico, com execução ao vivo.
 
@@ -90,7 +91,12 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
   const md = useMemo(() => serializeWorkflow(draft), [draft])
   const dirty = md !== savedMd
   const errors = useMemo(() => validateWorkflow(draft), [draft])
+  const confirmLeave = useUnsavedGuard(dirty, 'as mudanças do workflow')
   const mdFocus = useRef(false)
+  const nodesRef = useRef(draft.nodes)
+  useEffect(() => {
+    nodesRef.current = draft.nodes
+  }, [draft.nodes])
   const goTab = (t: 'props' | 'md' | 'mmd' | 'runs') => {
     setTab(t)
     if (t === 'md' || t === 'runs') setPtab(t)
@@ -120,8 +126,22 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
   const update = useCallback((fn: (nodes: WorkflowNode[]) => WorkflowNode[]) => setDraft((d) => ({ ...d, nodes: fn(d.nodes) })), [])
   const patchStep = (id: string, p: Partial<WorkflowNode>) => update((ns) => ns.map((n) => (n.id === id ? clean({ ...n, ...p }) : n)))
 
+  // passo apagado (Delete/Backspace ou botão) pode voltar pelo aviso "Desfazer"
+  const removeWithUndo = useCallback(
+    (ids: string[]) => {
+      const before = nodesRef.current
+      const titles = ids.map((id) => before.find((n) => n.id === id)?.title).filter(Boolean)
+      update((ns) => ids.reduce((acc, id) => removeStep(acc, id), ns))
+      setSelected((s) => (s && ids.includes(s) ? null : s))
+      toast(titles.length === 1 ? `Passo "${titles[0]}" removido.` : `${ids.length} passos removidos.`, 'info', { label: 'Desfazer', fn: () => update(() => before) })
+    },
+    [update],
+  )
+
   const onNodesChange = useCallback(
     (changes: NodeChange<FlowNode>[]) => {
+      const removed = changes.filter((c) => c.type === 'remove').map((c) => c.id)
+      if (removed.length) removeWithUndo(removed)
       for (const c of changes) {
         if (c.type === 'position' && c.position && !c.dragging) {
           const pos = { x: Math.round(c.position.x), y: Math.round(c.position.y) }
@@ -129,13 +149,10 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
         } else if (c.type === 'position' && c.position) {
           const pos = { x: c.position.x, y: c.position.y }
           update((ns) => ns.map((n) => (n.id === c.id ? { ...n, position: pos } : n)))
-        } else if (c.type === 'remove') {
-          update((ns) => removeStep(ns, c.id))
-          setSelected((s) => (s === c.id ? null : s))
         } else if (c.type === 'select' && c.selected) setSelected(c.id)
       }
     },
-    [update],
+    [update, removeWithUndo],
   )
   const onEdgesChange = useCallback(
     (changes: EdgeChange<Edge>[]) => {
@@ -249,9 +266,16 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
     }
   }
 
-  const cancelRun = async () => {
-    if (!run) return
-    await api.post(`/api/workflow-runs/${run.id}/cancel`).catch(() => {})
+  const runAct = useAction(runNow)
+  const cancelAct = useAction(
+    async () => {
+      if (run) await api.post(`/api/workflow-runs/${run.id}/cancel`)
+    },
+    { error: 'Não consegui parar a execução', confirm: { title: 'Parar esta execução?', text: 'Os passos que ainda não rodaram não vão acontecer.', confirmLabel: 'Parar execução', danger: true, undoable: true } },
+  )
+  const leave = async () => {
+    if (!(await confirmLeave())) return
+    useYui.getState().show('workflows')
   }
 
   const running = run && isActive(run)
@@ -259,20 +283,21 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
     isNew ? 'Novo workflow' : `Workflow · ${describeCron(draft.trigger.type === 'cron' ? draft.trigger.cron : null)}`,
     draft.name,
     [
-      { label: busy ? 'Salvando…' : dirty || isNew ? 'Salvar' : 'Salvo', fn: () => void save() },
-      running ? { label: 'Parar execução', fn: () => void cancelRun(), primary: true } : { label: 'Rodar agora', fn: () => void runNow(), primary: true },
+      { label: busy ? 'Salvando…' : dirty || isNew ? 'Salvar' : 'Salvo', fn: () => void save(), disabled: busy },
+      running
+        ? { label: cancelAct.busy ? 'Parando…' : 'Parar execução', fn: () => void cancelAct.run(), primary: true, disabled: cancelAct.busy }
+        : { label: runAct.busy ? 'Iniciando…' : 'Rodar agora', fn: () => void runAct.run(), primary: true, disabled: runAct.busy || busy },
       { label: 'Agendar', fn: () => setSchedOpen((o) => !o) },
-      { label: 'Todos os workflows', fn: () => useYui.getState().show('workflows') },
+      { label: 'Todos os workflows', fn: () => void leave() },
       ...(isNew ? [] : [{ label: 'Excluir workflow', fn: () => setDelOpen(true), danger: true }]),
     ],
-    [busy, dirty, isNew, running, draft.name, draft.trigger.cron, errors.length],
+    [busy, dirty, isNew, running, draft.name, draft.trigger.cron, errors.length, runAct.busy, cancelAct.busy],
   )
 
   const sel = draft.nodes.find((n) => n.id === selected) ?? null
   const removeSel = () => {
     if (!sel) return
-    update((ns) => removeStep(ns, sel.id))
-    setSelected(null)
+    removeWithUndo([sel.id])
     setSheet(false)
   }
   const PALETTE: WorkflowNodeType[] = ['task', 'decision', 'approval', 'input', 'notify', 'parallel', 'end']
@@ -532,7 +557,7 @@ function Editor({ initial, runParam }: { initial: WorkflowDef | null; runParam: 
 // Zoom/encaixe com alvos de 44px para toque (os Controls do xyflow são pequenos demais).
 function TouchControls() {
   const rf = useReactFlow()
-  const btn: CSSProperties = { width: 44, height: 44, border: 'none', background: 'rgba(16,20,42,.92)', color: '#dfe3f3', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }
+  const btn: CSSProperties = { width: 44, height: 44, border: 'none', background: 'rgba(16,20,42,.92)', color: 'var(--text-btn)', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }
   return (
     <Panel position="bottom-left" style={{ display: 'flex', flexDirection: 'column', gap: 1, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.08)' }}>
       <button aria-label="Aproximar" style={btn} onClick={() => void rf.zoomIn()}>+</button>
@@ -655,7 +680,7 @@ function StepProps({ step, steps, agents, touch, onChange, onDelete }: { step: W
           ))}
         </select>
         <span style={{ flex: 1 }} />
-        <button className="wf-btn ghost" onClick={onDelete} style={{ color: '#f39aa4' }}>{touch ? 'Excluir passo' : 'Excluir'}</button>
+        <button className="wf-btn ghost" onClick={onDelete} style={{ color: 'var(--crit-soft)' }}>{touch ? 'Excluir passo' : 'Excluir'}</button>
       </div>
       <Field label="Título">
         <input className="wf-input" value={step.title} onChange={(e) => onChange({ title: e.target.value })} />
@@ -725,7 +750,7 @@ function StepProps({ step, steps, agents, touch, onChange, onDelete }: { step: W
                   <option key={s.id} value={s.id}>{s.id}. {s.title}</option>
                 ))}
               </select>
-              <button className="wf-btn ghost" aria-label="Remover ramo" onClick={() => onChange({ branches: (step.branches ?? []).filter((_, j) => j !== i) })} style={touch ? { minWidth: 44, color: '#f39aa4' } : undefined}>×</button>
+              <button className="wf-btn ghost" aria-label="Remover ramo" onClick={() => onChange({ branches: (step.branches ?? []).filter((_, j) => j !== i) })} style={touch ? { minWidth: 44, color: 'var(--crit-soft)' } : undefined}>×</button>
             </div>
           ))}
           <button
@@ -766,7 +791,7 @@ function StepProps({ step, steps, agents, touch, onChange, onDelete }: { step: W
               <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.t2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 → {id}. {steps.find((s) => s.id === id)?.title ?? '?'}
               </span>
-              <button className="wf-btn ghost" style={{ color: '#f39aa4' }} onClick={() => onChange({ next: (step.next ?? []).filter((x) => x !== id) })}>
+              <button className="wf-btn ghost" style={{ color: 'var(--crit-soft)' }} onClick={() => onChange({ next: (step.next ?? []).filter((x) => x !== id) })}>
                 Excluir ligação
               </button>
             </div>
@@ -800,7 +825,7 @@ function ChannelChips({ value, onChange, telegramHint }: { value: NotifyChannel[
             onClick={() => onChange(on ? value.filter((x) => x !== c) : [...value, c])}
             style={{
               minHeight: 32, padding: '4px 12px', borderRadius: 999, fontSize: 12.5, cursor: 'pointer', fontFamily: 'Manrope, sans-serif',
-              border: on ? '1px solid transparent' : '1px solid rgba(255,255,255,.1)', background: on ? 'rgba(103,216,242,.12)' : 'transparent', color: on ? '#a9e9f8' : C.t2,
+              border: on ? '1px solid transparent' : '1px solid rgba(255,255,255,.1)', background: on ? 'rgba(103,216,242,.12)' : 'transparent', color: on ? 'var(--cyan-soft)' : C.t2,
             }}
           >
             {on ? '✓ ' : ''}
@@ -864,7 +889,7 @@ function InputFieldsEditor({ fields, touch, onChange }: { fields: InputField[]; 
                 const kind = e.target.value as InputFieldKind
                 patch(i, { kind, options: kind === 'choice' ? (f.options?.length ? f.options : ['sim', 'não']) : undefined, default: kind === 'date' || kind === 'time' ? f.default : undefined })
               }}
-              style={{ flex: '0 0 104px', color: '#a9e9f8' }}
+              style={{ flex: '0 0 104px', color: 'var(--cyan-soft)' }}
             >
               {KINDS.map((k) => (
                 <option key={k} value={k}>{FIELD_KIND_LABEL[k]}</option>
@@ -896,7 +921,7 @@ function InputFieldsEditor({ fields, touch, onChange }: { fields: InputField[]; 
             {f.kind === 'audio' && <span style={{ color: C.t3 }}>· transcrito</span>}
             <button type="button" className="wf-btn ghost" aria-label="Subir campo" disabled={i === 0} onClick={() => move(i, -1)} style={{ ...tiny, marginLeft: 'auto' }}>↑</button>
             <button type="button" className="wf-btn ghost" aria-label="Descer campo" disabled={i === fields.length - 1} onClick={() => move(i, 1)} style={tiny}>↓</button>
-            <button type="button" className="wf-btn ghost" aria-label={`Remover campo ${f.label}`} onClick={() => onChange(fields.filter((_, j) => j !== i))} style={{ ...tiny, color: '#f39aa4' }}>×</button>
+            <button type="button" className="wf-btn ghost" aria-label={`Remover campo ${f.label}`} onClick={() => onChange(fields.filter((_, j) => j !== i))} style={{ ...tiny, color: 'var(--crit-soft)' }}>×</button>
           </div>
         </div>
       ))}
@@ -1031,7 +1056,7 @@ function RunsPanel({ runs, current, onPick, steps }: { runs: WorkflowRunInfo[]; 
                 <WaitingCard runId={r.id} />
                 {r.dir && (
                   <div style={{ fontSize: 11.5, color: C.t3, wordBreak: 'break-all' }}>
-                    Pasta desta execução: <span style={{ fontFamily: "'JetBrains Mono', monospace", color: C.t2 }}>{r.dir}</span>
+                    Pasta desta execução: <span style={{ fontFamily: 'var(--mono)', color: C.t2 }}>{r.dir}</span>
                   </div>
                 )}
                 {steps.map((s) => {
@@ -1104,12 +1129,12 @@ function WaitingCard({ runId }: { runId: string }) {
       <span style={{ fontSize: 13, fontWeight: 600 }}>{req.title}</span>
       {req.status === 'pending' ? (
         <>
-          <span style={{ fontSize: 12.5, color: '#c9cde0', lineHeight: 1.5 }}>
+          <span style={{ fontSize: 12.5, color: 'var(--text-soft)', lineHeight: 1.5 }}>
             {via ? `Avisado por ${via} ${when(sent)}.` : `Pedido aberto ${when(req.createdAt)}.`}
             {req.nextReminderAt ? ` Próximo lembrete ${when(req.nextReminderAt)}.` : ''}
             {req.notifiedVia.includes('telegram') ? ' Também dá para responder pelo Telegram mandando o áudio para o bot.' : ''}
           </span>
-          {req.error && <span role="alert" style={{ fontSize: 12.5, color: '#f39aa4' }}>O último envio falhou: {req.error}. Responda de novo.</span>}
+          {req.error && <span role="alert" style={{ fontSize: 12.5, color: 'var(--crit-soft)' }}>O último envio falhou: {req.error}. Responda de novo.</span>}
           <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="wf-btn primary" style={{ height: 36 }} onClick={() => openInputRequest(req.id)}>Responder agora</button>
             <button className="wf-btn" style={{ height: 36 }} disabled={busy} onClick={() => void remind()}>{busy ? 'Enviando…' : 'Lembrar de novo agora'}</button>
@@ -1152,7 +1177,7 @@ function YuiDecisionFeedback({ runId, nodeId, approved, feedback }: { runId: str
       {!feedback && !writing && (
         <span style={{ display: 'flex', gap: 6 }}>
           <button className="wf-btn ghost" disabled={busy} style={{ height: 26, fontSize: 11.5 }} onClick={() => void send_(true)}>Concordo</button>
-          <button className="wf-btn ghost" disabled={busy} style={{ height: 26, fontSize: 11.5, color: '#f39aa4' }} onClick={() => setWriting(true)}>Discordo</button>
+          <button className="wf-btn ghost" disabled={busy} style={{ height: 26, fontSize: 11.5, color: 'var(--crit-soft)' }} onClick={() => setWriting(true)}>Discordo</button>
         </span>
       )}
       {writing && (

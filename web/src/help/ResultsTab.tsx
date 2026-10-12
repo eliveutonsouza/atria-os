@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { HelpResults, HelpTaskType } from '@shared/protocol'
 import { api } from '../api/client'
 import { C } from '../lib/colors'
+import { toastErr, toastOk } from '../lib/feedback'
 import { useYui } from '../store/yui'
 import { fmtHours, TIPO_COLOR, TIPO_LABEL } from './api'
 import { Loading } from './ui'
@@ -15,6 +16,7 @@ const PERIODS: [Period, string][] = [
   ['90d', 'Últimos 90 dias'],
 ]
 
+const usd = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'USD' })
 const fmtDate = (s: string) => new Date(s).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
 
 export function ResultsTab() {
@@ -55,8 +57,11 @@ export function ResultsTab() {
       api
         .put<HelpResults>('/api/help/results/minutes', body)
         .then(() => api.get<HelpResults>(`/api/help/results?period=${period}`))
-        .then(setR)
-        .catch((e: Error) => setErr(e.message))
+        .then((x) => {
+          setR(x)
+          toastOk('Minutos salvos.')
+        })
+        .catch((e: unknown) => toastErr(e, 'Não consegui salvar os minutos'))
     }, 600)
   }
 
@@ -69,7 +74,7 @@ export function ResultsTab() {
     { l: 'Workflows rodados', v: String(k.workflowsDone), c: C.violet, d: 'concluídos no período' },
     { l: 'Aprovações suas', v: String(k.approvals), c: C.warn, d: k.approvalAvgMin != null ? `tempo médio ${Math.round(k.approvalAvgMin)} min` : '—' },
     { l: 'Respostas da base', v: String(k.queries), c: '#f78cc8', d: `${k.docsReady} documentos prontos` },
-    { l: 'Custo do período', v: `US$ ${k.costUsd.toFixed(2)}`, c: C.lav, d: 'agentes (tokens)' },
+    { l: 'Custo do período', v: usd.format(k.costUsd), c: C.lav, d: 'agentes (uso de IA)' },
   ]
 
   return (

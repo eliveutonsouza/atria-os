@@ -8,10 +8,10 @@ import { useYui } from '../../store/yui'
 import { Field, input } from '../../views/kit'
 import { ProjectView } from '../../views/ProjectView'
 import { BottomSheet } from '../../views/Sheet'
-import { Empty } from '../../views/ui'
+import { Empty, ErrorNote, Skeleton } from '../../views/ui'
 import { Dot, openApp, relTime, useViewParams } from './common'
 
-// Projetos: catálogo do GitHub (clonados ou não) com saúde; o escolhido abre com ações (terminal, Claude, logs, preview).
+// Projetos: catálogo do GitHub (clonados ou não) com saúde; o escolhido abre com ações (terminal, Claude, registros, prévia).
 
 export function ProjectsPage() {
   const id = useYui((s) => s.appParams.id)
@@ -68,9 +68,9 @@ export function ProjectsPage() {
     <div style={phone ? { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8 } : { display: 'flex', gap: 8, flexWrap: 'wrap' }}>
       <button className="app-btn small" onClick={() => show('terminal', { kind: 'claude', project: id })}>Claude no projeto</button>
       <button className="app-btn small" onClick={() => show('terminal', { kind: 'shell', project: id })}>Terminal</button>
-      <button className="app-btn small" onClick={() => openApp('infra', id)}>Logs</button>
+      <button className="app-btn small" onClick={() => openApp('infra', id)}>Registros</button>
       <button className="app-btn small" onClick={() => openApp('claude')}>Comandos do Claude</button>
-      <button className="app-btn small" onClick={() => show('website', { project: id })}>Preview</button>
+      <button className="app-btn small" onClick={() => show('website', { project: id })}>Prévia</button>
     </div>
   )
 
@@ -88,7 +88,12 @@ export function ProjectsPage() {
       {addSheet}
       <section style={{ width: id ? (device === 'tablet' ? 280 : 360) : '100%', maxWidth: '100%', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <input aria-label="Buscar projeto" placeholder={`Buscar entre ${repos.data?.length ?? '…'} repositórios…`} value={q} onChange={(e) => setQ(e.target.value)} style={{ ...input, height: phone ? 44 : 36 }} />
-        {list.length === 0 && <Empty text={repos.data?.length === 0 ? 'Conecte o GitHub em Configurações para ver seus repositórios.' : 'Nenhum projeto encontrado.'} />}
+        {list.length === 0 &&
+          (!repos.data && !ov.data ? (
+            repos.error && ov.error ? <ErrorNote text="Não consegui carregar os projetos." retry={() => { repos.reload(); ov.reload() }} /> : <Skeleton rows={4} kpis={0} />
+          ) : (
+            <Empty text={repos.data?.length === 0 ? 'Conecte o GitHub em Configurações para ver seus repositórios.' : 'Nenhum projeto encontrado.'} />
+          ))}
         <div style={{ display: id || phone ? 'flex' : 'grid', flexDirection: 'column', gridTemplateColumns: `repeat(auto-fill,minmax(${device === 'tablet' ? 260 : 300}px,1fr))`, gap: 8 }}>
           {list.map((r) => {
             const h = health.get(r.slug)
@@ -230,7 +235,7 @@ function AddProject({ repos, onClose, onAdded }: { repos: RepoInfo[]; onClose: (
           </Field>
         </>
       )}
-      {err && <div style={{ fontSize: 13, color: C.crit, overflowWrap: 'anywhere' }}>{err}</div>}
+      {err && <div role="alert" style={{ fontSize: 13, color: C.crit, overflowWrap: 'anywhere' }}>{err}</div>}
       <div style={{ display: 'grid', gridTemplateColumns: phone ? 'repeat(2,minmax(0,1fr))' : 'auto auto', justifyContent: phone ? undefined : 'end', gap: 8 }}>
         <button className="app-btn" style={phone ? { height: 50 } : undefined} disabled={busy} onClick={onClose}>Cancelar</button>
         <button className="app-btn primary" style={phone ? { height: 50 } : undefined} disabled={busy} onClick={() => void submit()}>{busy ? 'Clonando…' : 'Clonar e adicionar'}</button>

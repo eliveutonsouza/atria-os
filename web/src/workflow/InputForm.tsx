@@ -59,6 +59,7 @@ export function InputToast() {
   useEffect(() => onFreshRequest(() => setId(freshRequest())), [])
   const req = useYui((s) => (id ? s.workflowInputs[id] : undefined))
   const open = useYui((s) => s.inputOpen)
+  const h = useYui((s) => s.coarse) ? 44 : 34
   if (!id || !req || req.status !== 'pending' || open === id) return null
   return (
     <div
@@ -73,10 +74,10 @@ export function InputToast() {
         <span style={{ fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', color: C.cyan, fontWeight: 700 }}>Workflow pede algo</span>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{req.title} · {req.workflowName}</span>
       </span>
-      <button onClick={() => openInputRequest(req.id)} style={{ height: 34, padding: '0 14px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#67d8f2,#a68cf7)', color: '#0a0c1d', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+      <button onClick={() => openInputRequest(req.id)} style={{ height: h, padding: '0 14px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#67d8f2,#a68cf7)', color: '#0a0c1d', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
         Responder
       </button>
-      <button aria-label="Dispensar aviso" onClick={dismissFresh} style={{ width: 34, height: 34, borderRadius: 9, border: 'none', background: 'transparent', color: C.t2, cursor: 'pointer', fontSize: 16, flexShrink: 0 }}>×</button>
+      <button aria-label="Dispensar aviso" onClick={dismissFresh} style={{ width: h, height: h, borderRadius: 9, border: 'none', background: 'transparent', color: C.t2, cursor: 'pointer', fontSize: 16, flexShrink: 0 }}>×</button>
     </div>
   )
 }
@@ -176,7 +177,7 @@ function InputForm({ req, onClose }: { req: WorkflowInputRequest; onClose: () =>
           {phone ? 'Pedido do workflow' : `Workflow · ${req.workflowName} · passo ${req.nodeId}`}
         </div>
         <h2 id="input-form-title" style={{ margin: '6px 0 4px', fontSize: phone ? 20 : 22, fontWeight: 600, overflowWrap: 'anywhere' }}>{req.title}</h2>
-        {req.instruction && <p style={{ margin: 0, fontSize: 14, color: '#c9cde0', lineHeight: 1.5, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{req.instruction}</p>}
+        {req.instruction && <p style={{ margin: 0, fontSize: 14, color: 'var(--text-soft)', lineHeight: 1.5, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{req.instruction}</p>}
         {phone && <p style={{ margin: '6px 0 0', fontSize: 12.5, color: C.t3 }}>{req.workflowName} · passo {req.nodeId}</p>}
       </div>
 
@@ -202,11 +203,11 @@ function InputForm({ req, onClose }: { req: WorkflowInputRequest; onClose: () =>
       )}
 
       {failedBefore && !error && (
-        <div role="alert" style={{ fontSize: 13, color: '#f39aa4', padding: '10px 12px', borderRadius: 10, background: 'rgba(240,98,114,.08)', border: '1px solid rgba(240,98,114,.25)' }}>
+        <div role="alert" style={{ fontSize: 13, color: 'var(--crit-soft)', padding: '10px 12px', borderRadius: 10, background: 'rgba(240,98,114,.08)', border: '1px solid rgba(240,98,114,.25)' }}>
           Não consegui processar o último envio: {req.error}. Os arquivos já enviados ficaram guardados — envie de novo.
         </div>
       )}
-      {error && <div role="alert" style={{ fontSize: 13, color: '#f39aa4' }}>{error}</div>}
+      {error && <div role="alert" style={{ fontSize: 13, color: 'var(--crit-soft)' }}>{error}</div>}
       {sending && (
         <div role="progressbar" aria-label="Enviando" aria-valuenow={pct ?? 0} aria-valuemin={0} aria-valuemax={100} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span style={{ fontSize: 12.5, color: C.t2 }}>Enviando… {pct}%</span>
@@ -223,14 +224,14 @@ function InputForm({ req, onClose }: { req: WorkflowInputRequest; onClose: () =>
           <button type="submit" disabled={sending || recording} style={{ ...primaryBtn(52), opacity: sending || recording ? 0.6 : 1 }}>{sending ? 'Enviando…' : 'Enviar e continuar'}</button>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <button type="button" style={btn(44)} onClick={onClose}>Depois</button>
-            <button type="button" style={btn(44, { border: '1px solid rgba(240,98,114,.35)', color: '#f39aa4', padding: '0 8px' })} onClick={() => void cancelRun()}>
+            <button type="button" style={btn(44, { border: '1px solid rgba(240,98,114,.35)', color: 'var(--crit-soft)', padding: '0 8px' })} onClick={() => void cancelRun()}>
               {confirmCancel ? 'Confirmar' : 'Cancelar execução'}
             </button>
           </div>
         </div>
       ) : (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" style={btn(44, { border: '1px solid rgba(240,98,114,.35)', color: '#f39aa4' })} onClick={() => void cancelRun()}>
+          <button type="button" style={btn(44, { border: '1px solid rgba(240,98,114,.35)', color: 'var(--crit-soft)' })} onClick={() => void cancelRun()}>
             {confirmCancel ? 'Confirmar: cancelar a execução' : 'Cancelar execução'}
           </button>
           <span style={{ display: 'flex', gap: 8 }}>
@@ -382,7 +383,7 @@ function FieldInput(props: {
           <button
             type="button"
             onClick={() => onValue(f.kind === 'date' ? today() : nowTime())}
-            style={{ height: 44, padding: '0 16px', borderRadius: 10, border: '1px solid rgba(103,216,242,.4)', background: 'rgba(103,216,242,.1)', color: '#a9e9f8', fontFamily: 'inherit', fontSize: 14, cursor: 'pointer', flexShrink: 0 }}
+            style={{ height: 44, padding: '0 16px', borderRadius: 10, border: '1px solid rgba(103,216,242,.4)', background: 'rgba(103,216,242,.1)', color: 'var(--cyan-soft)', fontFamily: 'inherit', fontSize: 14, cursor: 'pointer', flexShrink: 0 }}
           >
             {f.kind === 'date' ? 'Hoje' : 'Agora'}
           </button>
@@ -526,7 +527,7 @@ function AudioField({ field: f, files, onFiles, received, invalid, phone, onReco
         </span>
         <span style={{ display: 'flex', gap: 8 }}>
           {rec ? (
-            <button type="button" style={small({ border: '1px solid rgba(240,98,114,.5)', color: '#f39aa4', flex: phone ? 1 : undefined })} onClick={stop}>■ Parar</button>
+            <button type="button" style={small({ border: '1px solid rgba(240,98,114,.5)', color: 'var(--crit-soft)', flex: phone ? 1 : undefined })} onClick={stop}>■ Parar</button>
           ) : (
             <>
               <button type="button" style={small({ flex: phone ? 1 : undefined })} onClick={() => pick.current?.click()}>{file || received.length ? 'Trocar' : 'Escolher arquivo'}</button>
@@ -548,17 +549,18 @@ function AudioField({ field: f, files, onFiles, received, invalid, phone, onReco
         />
       </div>
       {url && !rec && <audio controls src={url} style={{ width: '100%', height: 36 }} aria-label="Prévia da gravação" />}
-      {recErr && <span role="alert" style={{ fontSize: 12.5, color: '#f39aa4' }}>{recErr}</span>}
+      {recErr && <span role="alert" style={{ fontSize: 12.5, color: 'var(--crit-soft)' }}>{recErr}</span>}
     </div>
   )
 }
 
 function Thumb({ file, onRemove }: { file: File; onRemove: () => void }) {
   const url = useObjectUrl(file)
+  const x = useYui((s) => s.coarse) ? 44 : 24
   return (
     <span style={{ position: 'relative', width: 84, height: 64, borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,.08)', flexShrink: 0 }}>
       {url && <img src={url} alt={file.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-      <button type="button" aria-label={`Remover ${file.name}`} onClick={onRemove} style={{ position: 'absolute', top: 2, right: 2, width: 24, height: 24, borderRadius: 8, border: 'none', background: 'rgba(6,7,13,.75)', color: C.text, cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>×</button>
+      <button type="button" aria-label={`Remover ${file.name}`} onClick={onRemove} style={{ position: 'absolute', top: 2, right: 2, width: x, height: x, borderRadius: 8, border: 'none', background: 'rgba(6,7,13,.75)', color: C.text, cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>×</button>
     </span>
   )
 }
@@ -572,6 +574,7 @@ function FilesField({ field: f, files, onFiles, received, invalid, phone, label 
     onFiles([...files, ...extra])
   }
   const remove = (i: number) => onFiles(files.filter((_, j) => j !== i))
+  const x = useYui((s) => s.coarse) ? 44 : 32
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); add(e.dataTransfer.files) }}>
       <span style={labelText}>{label}</span>
@@ -595,7 +598,7 @@ function FilesField({ field: f, files, onFiles, received, invalid, phone, label 
             <span key={`${fl.name}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,0,0,.2)', fontSize: 13 }}>
               <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fl.name}</span>
               <span style={{ color: C.t3, fontSize: 12, flexShrink: 0 }}>{fmtSize(fl.size)}</span>
-              <button type="button" aria-label={`Remover ${fl.name}`} onClick={() => remove(i)} style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'transparent', color: '#f39aa4', cursor: 'pointer', fontSize: 16 }}>×</button>
+              <button type="button" aria-label={`Remover ${fl.name}`} onClick={() => remove(i)} style={{ width: x, height: x, borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--crit-soft)', cursor: 'pointer', fontSize: 16 }}>×</button>
             </span>
           ))}
           <button type="button" onClick={() => pick.current?.click()} style={{ height: 44, borderRadius: 10, border: `1px dashed ${invalid ? 'rgba(240,98,114,.6)' : 'rgba(255,255,255,.2)'}`, background: 'transparent', color: C.t2, fontSize: 13.5, fontFamily: 'inherit', cursor: 'pointer' }}>

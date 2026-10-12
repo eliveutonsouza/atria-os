@@ -62,7 +62,7 @@ export function WebsiteView() {
     return () => window.removeEventListener('message', onMsg)
   }, [])
 
-  useHeader('Live preview', target?.title ?? 'Preview', target
+  useHeader('Prévia ao vivo', target?.title ?? 'Prévia', target
     ? [
         { label: 'Recarregar', fn: () => setReload((n) => n + 1) },
         { label: 'Deploy', primary: true, fn: () => submitText('Faça o deploy deste site.') },

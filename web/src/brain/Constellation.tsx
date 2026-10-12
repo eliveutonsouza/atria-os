@@ -5,6 +5,7 @@ import { useYui } from '../store/yui'
 import { BrainEngine, type ELink, type ENode } from './brainEngine'
 import { excerpt, nodeColors, openConstellation, openInEditor } from './data'
 import { AMBER, rgba } from './palette'
+import { toastErr } from '../lib/feedback'
 import { IconBtn } from './ui'
 import { Icon, SPACE_BG, eyebrow, ghostBtn, glass, mono, primaryBtn } from './styles'
 
@@ -169,15 +170,23 @@ export function Constellation({ path, graph }: { path: string; graph: VaultGraph
   const linkAll = async () => {
     setLinking(true)
     try {
-      for (const s of sugs) await api.post('/api/vault/link', { from: path, to: s.id })
-      setSugs([])
+      for (const s of sugs) {
+        await api.post('/api/vault/link', { from: path, to: s.id })
+        setSugs((cur) => cur.filter((x) => x.id !== s.id))
+      }
+    } catch (e) {
+      toastErr(e, 'Não consegui ligar todas as notas')
     } finally {
       setLinking(false)
     }
   }
   const linkOne = async (id: string) => {
-    await api.post('/api/vault/link', { from: path, to: id }).catch(() => {})
-    setSugs((s) => s.filter((x) => x.id !== id))
+    try {
+      await api.post('/api/vault/link', { from: path, to: id })
+      setSugs((s) => s.filter((x) => x.id !== id))
+    } catch (e) {
+      toastErr(e, 'Não consegui ligar as notas')
+    }
   }
 
   const ring1 = rings?.filter((r) => r.ring === 1).length ?? 0
@@ -186,7 +195,7 @@ export function Constellation({ path, graph }: { path: string; graph: VaultGraph
   const col = center ? nodeColors(center) : nodeColors({ folder: '', ghost: false })
   if (engRef.current && center) {
     const c = engRef.current.node(path)
-    if (c) c.sub = `${col.name} · ${outs} links · ${ins} backlinks`
+    if (c) c.sub = `${col.name} · cita ${outs} · citada por ${ins}`
   }
   const titles = useMemo(() => graph.nodes.filter((n) => !n.ghost && n.id !== path).map((n) => n.title).sort((a, b) => a.localeCompare(b, 'pt-BR')), [graph, path])
 
@@ -215,7 +224,7 @@ export function Constellation({ path, graph }: { path: string; graph: VaultGraph
                 key={d}
                 aria-pressed={depth === d}
                 onClick={() => setDepth(d)}
-                style={{ width: narrow ? 44 : 40, height: narrow ? 38 : 30, borderRadius: 8, border: 'none', background: depth === d ? 'rgba(103,216,242,0.16)' : 'transparent', color: depth === d ? '#fff' : '#9aa0bb', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                style={{ width: narrow || coarse ? 44 : 40, height: coarse ? 44 : narrow ? 38 : 30, borderRadius: 8, border: 'none', background: depth === d ? 'rgba(103,216,242,0.16)' : 'transparent', color: depth === d ? '#fff' : '#9aa0bb', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
               >
                 {d}
               </button>
@@ -249,7 +258,7 @@ export function Constellation({ path, graph }: { path: string; graph: VaultGraph
               ))}
             </div>
           )}
-          <div style={{ ...mono, fontSize: 10.5, color: '#8c92ad' }}>{ring1} vizinhos diretos · {outs} links · {ins} backlinks</div>
+          <div style={{ ...mono, fontSize: 10.5, color: '#8c92ad' }}>{ring1} vizinhos diretos · cita {outs} · citada por {ins}</div>
           {narrow && <button style={{ ...primaryBtn, height: 44 }} onClick={() => openInEditor(path)}>Ler / editar nota</button>}
         </div>
 
@@ -265,7 +274,7 @@ export function Constellation({ path, graph }: { path: string; graph: VaultGraph
             {sugs.map((s) => (
               <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#dfe3f3' }}>
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.reason}>{s.title}</span>
-                <button onClick={() => linkOne(s.id)} style={{ height: 28, padding: '0 9px', borderRadius: 7, border: `1px solid ${rgba(AMBER, 0.45)}`, background: rgba(AMBER, 0.14), color: '#f5c97a', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>+ ligar</button>
+                <button onClick={() => linkOne(s.id)} style={{ height: coarse ? 44 : 28, padding: '0 9px', borderRadius: 7, border: `1px solid ${rgba(AMBER, 0.45)}`, background: rgba(AMBER, 0.14), color: '#f5c97a', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>+ Ligar</button>
               </div>
             ))}
             <button disabled={linking} onClick={linkAll} style={{ height: 38, borderRadius: 10, border: 'none', background: 'rgba(245,181,74,0.2)', color: '#f5c97a', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>
@@ -279,7 +288,7 @@ export function Constellation({ path, graph }: { path: string; graph: VaultGraph
             <span style={{ ...eyebrow, color: '#8c92ad', fontWeight: 600 }}>Legenda</span>
             {[
               ['link que sai desta nota', '#67d8f2'],
-              ['backlink (outra nota cita esta)', '#a68cf7'],
+              ['citada por (outra nota cita esta)', '#a68cf7'],
               ['link nos dois sentidos', 'linear-gradient(90deg, #67d8f2, #a68cf7)'],
               ['sugestão da Yui', `repeating-linear-gradient(90deg, ${AMBER} 0 6px, rgba(0,0,0,0) 6px 11px)`],
             ].map(([l, bg]) => (
@@ -312,12 +321,12 @@ export function Constellation({ path, graph }: { path: string; graph: VaultGraph
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
                 placeholder="outra nota…"
-                style={{ width: 190, height: 30, padding: '0 10px', borderRadius: 9, border: '1px solid rgba(160,170,255,0.18)', background: 'rgba(6,7,13,0.6)', color: '#e8eaf4', fontSize: 12.5, outline: 'none' }}
+                style={{ width: 190, height: coarse ? 44 : 30, padding: '0 10px', borderRadius: 9, border: '1px solid rgba(160,170,255,0.18)', background: 'rgba(6,7,13,0.6)', color: '#e8eaf4', fontSize: 12.5, outline: 'none' }}
               />
               <datalist id="brain-titles">
                 {titles.slice(0, 400).map((t) => <option key={t} value={t} />)}
               </datalist>
-              <button type="submit" style={{ height: 30, padding: '0 10px', borderRadius: 9, border: 'none', background: 'rgba(103,216,242,0.16)', color: '#a9e9f8', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Traçar</button>
+              <button type="submit" style={{ height: coarse ? 44 : 30, padding: '0 10px', borderRadius: 9, border: 'none', background: 'rgba(103,216,242,0.16)', color: '#a9e9f8', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Traçar</button>
             </form>
             {route &&
               route.map((id, i) => {
@@ -327,7 +336,7 @@ export function Constellation({ path, graph }: { path: string; graph: VaultGraph
                   <span key={id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <button
                       onClick={() => i > 0 && openConstellation(id)}
-                      style={{ height: 26, padding: '0 10px', borderRadius: 13, border: `1px solid ${rgba(c, 0.55)}`, background: 'transparent', color: '#e8eaf4', fontSize: 12, boxShadow: `0 0 12px ${rgba(c, 0.25)}`, cursor: i > 0 ? 'pointer' : 'default' }}
+                      style={{ height: coarse ? 44 : 26, padding: '0 10px', borderRadius: coarse ? 22 : 13, border: `1px solid ${rgba(c, 0.55)}`, background: 'transparent', color: '#e8eaf4', fontSize: 12, boxShadow: `0 0 12px ${rgba(c, 0.25)}`, cursor: i > 0 ? 'pointer' : 'default' }}
                     >
                       {title(id)}
                     </button>

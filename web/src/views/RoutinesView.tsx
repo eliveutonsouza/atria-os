@@ -4,12 +4,16 @@ import type { AgentInfo, NotifyChannel, RoutineInfo, WorkflowDef } from '@shared
 import { useApi } from '../api/useApi'
 import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
-import { CRON_PRESETS, dayLabel, describeCron, hhmm, send } from '../workflow/http'
+import { CRON_PRESETS, dayLabel, describeCron, friendlyCron, hhmm, send } from '../workflow/http'
+import { toastErr } from '../lib/feedback'
 import { ConfirmDeleteModal, Empty, ErrorNote, Skeleton, useHeader } from './ui'
 
 // Rotinas agendadas (cron): "Hoje" estilo PRD §85 + gestão (criar/editar/pausar/rodar agora/excluir).
 
 const LAST_C: Record<string, string> = { done: C.ok, failed: C.crit, cancelled: C.t3, running: C.cyan, waiting_approval: C.warn, queued: C.t2 }
+
+const LAST_PT: Record<string, string> = { done: 'concluída', failed: 'falhou', cancelled: 'cancelada', running: 'rodando…', waiting_approval: 'aguardando seu OK', queued: 'na fila' }
+const lastLabel = (s: string | null | undefined) => (s ? LAST_PT[s] ?? s : '')
 
 const isToday = (iso: string | null) => !!iso && new Date(iso).toDateString() === new Date().toDateString()
 
@@ -20,6 +24,7 @@ export function RoutinesView() {
   const [editing, setEditing] = useState<RoutineInfo | 'new' | null>(null)
   const [deleting, setDeleting] = useState<RoutineInfo | null>(null)
   const [busy, setBusy] = useState(false)
+  const [rowBusy, setRowBusy] = useState<string | null>(null)
   const say = useYui.getState().say
   const phone = useYui((s) => s.device === 'phone')
 
@@ -33,7 +38,7 @@ export function RoutinesView() {
     for (const r of data ?? []) {
       if (isToday(r.lastRun)) {
         const c = LAST_C[r.lastStatus ?? ''] ?? C.t2
-        items.push({ t: hhmm(r.lastRun), at: +new Date(r.lastRun!), mark: r.lastStatus === 'done' ? '✓' : r.lastStatus === 'failed' ? '!' : '●', color: c, r, label: r.lastStatus ?? '' })
+        items.push({ t: hhmm(r.lastRun), at: +new Date(r.lastRun!), mark: r.lastStatus === 'done' ? '✓' : r.lastStatus === 'failed' ? '!' : '●', color: c, r, label: lastLabel(r.lastStatus) })
       }
       if (r.enabled && isToday(r.nextRun)) items.push({ t: hhmm(r.nextRun), at: +new Date(r.nextRun!), mark: '○', color: C.t3, r, label: 'agendada' })
     }
@@ -45,9 +50,16 @@ export function RoutinesView() {
       await fn()
       if (ok) say(ok)
     } catch (e) {
-      say(`Não deu: ${(e as Error).message}.`)
+      toastErr(e, 'Não deu certo')
     }
     reload()
+  }
+  // uma ação por rotina de cada vez (sem clique duplo)
+  const rowAct = async (id: string, fn: () => Promise<unknown>, ok?: string) => {
+    if (rowBusy) return
+    setRowBusy(id)
+    await act(fn, ok)
+    setRowBusy(null)
   }
 
   const target = (r: RoutineInfo) =>
@@ -63,7 +75,7 @@ export function RoutinesView() {
           title={`Excluir a rotina "${deleting.name}"?`}
           text="Ela para de rodar no horário agendado. Execuções que ela já fez continuam no histórico."
           rows={[
-            { label: 'Quando', value: describeCron(deleting.cron) },
+            { label: 'Quando', value: friendlyCron(deleting.cron) },
             { label: 'Faz', value: target(deleting) },
           ]}
           busy={busy}
@@ -108,21 +120,21 @@ export function RoutinesView() {
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 600 }}>{r.name}</div>
                 <div style={{ fontSize: 12.5, color: C.t2, marginTop: 3 }}>
-                  {describeCron(r.cron)} <span className="mono" style={{ color: C.t4 }}>({r.cron})</span> · {target(r)}
+                  <span title={r.cron}>{friendlyCron(r.cron)}</span> · {target(r)}
                 </div>
                 <div style={{ fontSize: 12, color: C.t3, marginTop: 3 }}>
                   Próxima: {r.enabled ? dayLabel(r.nextRun) : 'pausada'} · Última:{' '}
-                  {r.lastRun ? <span style={{ color: LAST_C[r.lastStatus ?? ''] ?? C.t2 }}>{dayLabel(r.lastRun)} ({r.lastStatus})</span> : 'nunca'}
+                  {r.lastRun ? <span style={{ color: LAST_C[r.lastStatus ?? ''] ?? C.t2 }}>{dayLabel(r.lastRun)}{r.lastStatus ? ` (${lastLabel(r.lastStatus)})` : ''}</span> : 'nunca'}
                 </div>
               </div>
               {/* celular: ações abaixo do nome, grade 2×2 de 44px */}
               <div style={phone ? { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 6 } : { display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                <button className="wf-btn" onClick={() => void act(() => send('POST', `/api/routines/${r.id}/run`), `Rodando "${r.name}" agora.`)}>Rodar agora</button>
-                <button className="wf-btn" onClick={() => void act(() => send('PUT', `/api/routines/${r.id}`, { enabled: !r.enabled }), r.enabled ? 'Rotina pausada.' : 'Rotina reativada.')}>
+                <button className="wf-btn" disabled={rowBusy === r.id} onClick={() => void rowAct(r.id, () => send('POST', `/api/routines/${r.id}/run`), `Rodando "${r.name}" agora.`)}>{rowBusy === r.id ? 'Aguarde…' : 'Rodar agora'}</button>
+                <button className="wf-btn" disabled={rowBusy === r.id} onClick={() => void rowAct(r.id, () => send('PUT', `/api/routines/${r.id}`, { enabled: !r.enabled }), r.enabled ? 'Rotina pausada.' : 'Rotina reativada.')}>
                   {r.enabled ? 'Pausar' : 'Ativar'}
                 </button>
                 <button className="wf-btn ghost" onClick={() => setEditing(r)}>Editar</button>
-                <button className="wf-btn ghost" style={{ color: '#f39aa4' }} onClick={() => setDeleting(r)}>Excluir</button>
+                <button className="wf-btn ghost" style={{ color: C.critSoft }} onClick={() => setDeleting(r)}>Excluir</button>
               </div>
             </div>
           ))
@@ -145,19 +157,24 @@ function RoutineForm({ initial, workflows, agents, phone, onClose, onSaved }: { 
   const [overlap, setOverlap] = useState<'skip' | 'queue'>(initial?.overlap ?? 'skip')
   const [catchup, setCatchup] = useState(initial?.catchup ?? true)
   const [err, setErr] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   const save = async () => {
+    if (saving) return
     const extra = { deliver, deliverMode, overlap, catchup }
     const body =
       kind === 'workflow'
         ? { name: name || `Workflow · ${workflows.find((w) => w.slug === workflow)?.name ?? workflow}`, cron, workflowId: workflow, agentId: null, instruction: null, project: null, ...extra }
         : { name, cron, workflowId: null, agentId, instruction, project: project.trim() || null, ...extra }
+    setSaving(true)
     try {
       await send(initial ? 'PUT' : 'POST', initial ? `/api/routines/${initial.id}` : '/api/routines', body)
-      useYui.getState().say(initial ? 'Rotina atualizada.' : `Rotina criada: ${describeCron(cron)}.`)
+      useYui.getState().say(initial ? 'Rotina atualizada.' : `Rotina criada: ${friendlyCron(cron)}.`)
       onSaved()
     } catch (e) {
       setErr((e as Error).message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -210,7 +227,7 @@ function RoutineForm({ initial, workflows, agents, phone, onClose, onSaved }: { 
         <span className="wf-label">Quando</span>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           {CRON_PRESETS.filter((p) => p.cron).map((p) => (
-            <button key={p.label} className="wf-btn" aria-pressed={cron === p.cron} style={cron === p.cron ? { borderColor: 'rgba(103,216,242,.45)', color: '#a9e9f8' } : undefined} onClick={() => setCron(p.cron!)}>
+            <button key={p.label} className="wf-btn" aria-pressed={cron === p.cron} style={cron === p.cron ? { borderColor: 'rgba(103,216,242,.45)', color: C.cyanSoft } : undefined} onClick={() => setCron(p.cron!)}>
               {p.label}
             </button>
           ))}
@@ -222,7 +239,7 @@ function RoutineForm({ initial, workflows, agents, phone, onClose, onSaved }: { 
         <span className="wf-label">Entregar o resultado</span>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           {(['telegram', 'email', 'push'] as const).map((c) => (
-            <button key={c} className="wf-btn" aria-pressed={deliver.includes(c)} style={deliver.includes(c) ? { borderColor: 'rgba(103,216,242,.45)', color: '#a9e9f8' } : undefined} onClick={() => setDeliver(deliver.includes(c) ? deliver.filter((x) => x !== c) : [...deliver, c])}>
+            <button key={c} className="wf-btn" aria-pressed={deliver.includes(c)} style={deliver.includes(c) ? { borderColor: 'rgba(103,216,242,.45)', color: C.cyanSoft } : undefined} onClick={() => setDeliver(deliver.includes(c) ? deliver.filter((x) => x !== c) : [...deliver, c])}>
               {c === 'telegram' ? 'Telegram' : c === 'email' ? 'E-mail' : 'Push'}
             </button>
           ))}
@@ -244,9 +261,9 @@ function RoutineForm({ initial, workflows, agents, phone, onClose, onSaved }: { 
         <input type="checkbox" checked={catchup} onChange={(e) => setCatchup(e.target.checked)} />
         Se o Atria estava fora do ar no horário, rodar uma vez quando voltar (até 24 h)
       </label>
-      {err && <div style={{ fontSize: 12.5, color: C.crit }}>{err}</div>}
+      {err && <div role="alert" style={{ fontSize: 12.5, color: C.crit }}>{err}</div>}
       <div>
-        <button className="wf-btn primary" onClick={() => void save()} style={phone ? { width: '100%', height: 48 } : undefined}>Salvar rotina</button>
+        <button className="wf-btn primary" disabled={saving} onClick={() => void save()} style={phone ? { width: '100%', height: 48 } : undefined}>{saving ? 'Salvando…' : 'Salvar rotina'}</button>
       </div>
     </div>
   )

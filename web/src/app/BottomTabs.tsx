@@ -19,7 +19,7 @@ export function BottomTabs() {
   const page = useYui((s) => s.appPage)
   const phone = useYui((s) => s.device === 'phone')
   const kb = useYui((s) => s.keyboardOpen)
-  const pending = useYui((s) => s.inbox.filter((i) => i.action.type === 'approval').length)
+  const pending = useYui((s) => s.inbox.length)
   if (!app || !phone || kb) return null
   const inTabs = TABS.some((t) => (t.match ?? [t.id]).includes(page))
   return (

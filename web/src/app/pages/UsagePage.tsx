@@ -3,6 +3,7 @@ import type { UsageLimit, UsageReport } from '@shared/protocol'
 import { api } from '../../api/client'
 import { useApi } from '../../api/useApi'
 import { C } from '../../lib/colors'
+import { toastErr } from '../../lib/feedback'
 import { useYui } from '../../store/yui'
 import { input } from '../../views/kit'
 import { ErrorNote, Skeleton, useHeader } from '../../views/ui'
@@ -288,14 +289,14 @@ export function UsagePage() {
     try {
       await api.post('/api/usage/refresh')
       usage.reload()
-    } catch {
-      useYui.getState().say('Não consegui ler os limites do Claude agora. Tente de novo em instantes.')
+    } catch (e) {
+      toastErr(e, 'Não consegui ler os limites do Claude agora')
     } finally {
       setBusy(false)
     }
   }
 
-  useHeader(phone ? 'Sistema' : 'Sistema · consumo de inteligência artificial', 'Consumo de IA', [{ label: busy ? 'Atualizando…' : 'Atualizar limites', primary: true, fn: refresh }], [busy, phone, days])
+  useHeader(phone ? 'Sistema' : 'Sistema · consumo de inteligência artificial', 'Consumo de IA', [{ label: busy ? 'Atualizando…' : 'Atualizar limites', primary: true, fn: refresh, disabled: busy }], [busy, phone, days])
 
   const r = usage.data
   return (

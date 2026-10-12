@@ -46,7 +46,7 @@ export function useNavGroups(active = true): { name: string; items: NavItem[] }[
     {
       name: 'Acompanhar',
       items: [
-        { id: 'overview', label: 'Visão geral' },
+        { id: 'overview', label: 'Início' },
         { id: 'ops', label: 'Operações', count: p ? p.running + p.queued || undefined : undefined },
         { id: 'agents', label: 'Agentes', count: working || undefined },
         { id: 'runs', label: 'Execuções' },

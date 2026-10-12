@@ -19,7 +19,7 @@ function dayLabel(daysAgo: number): string {
 export function DashboardView() {
   const agentsWorking = useYui((s) => s.agentsWorking)
   const { data, loading, error } = useApi<Overview>('/api/overview', [], 30000)
-  useHeader('System overview · Live', 'Visão geral', [{ label: 'Execuções', fn: () => useYui.getState().show('runs') }])
+  useHeader('Resumo do sistema · ao vivo', 'Visão geral', [{ label: 'Execuções', fn: () => useYui.getState().show('runs') }])
   if (loading && !data) return <Skeleton rows={3} />
   if (error || !data) return <ErrorNote />
 

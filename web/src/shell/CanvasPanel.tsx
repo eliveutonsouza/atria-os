@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useState } from 'react'
 import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
 import { pickPrimary } from '../app/PageFrame'
@@ -49,7 +49,6 @@ function ViewBody() {
   }
 }
 
-const btn: CSSProperties = { height: 34, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: C.t2, fontSize: 13, cursor: 'pointer' }
 
 export function CanvasPanel() {
   const mode = useYui((s) => s.mode)
@@ -89,10 +88,10 @@ export function CanvasPanel() {
               {a.label}
             </button>
           ))}
-          <button onClick={() => useYui.getState().setFocus(!isF)} className="hov-txt" style={btn}>
+          <button onClick={() => useYui.getState().setFocus(!isF)} className="app-btn">
             {isF ? 'Sair da tela cheia' : 'Tela cheia'}
           </button>
-          <button onClick={() => useYui.getState().close()} title="Fechar (Esc)" className="hov-txt" style={{ ...btn, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={() => useYui.getState().close()} title="Fechar (Esc)" className="app-btn" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             Voltar <span className="mono" style={{ fontSize: 10, color: C.t3 }}>ESC</span>
           </button>
         </div>

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useYui } from '../store/yui'
 import { rgba } from './palette'
 import { mono } from './styles'
 
@@ -14,12 +15,13 @@ export function Star({ color, color2, size = 14 }: { color: string; color2: stri
 }
 
 export function Chip({ on, color, label, count, onClick }: { on: boolean; color: string; label: string; count?: number; onClick: () => void }) {
+  const coarse = useYui((s) => s.coarse)
   return (
     <button
       onClick={onClick}
       aria-pressed={on}
       style={{
-        height: 32, padding: '0 12px', borderRadius: 16, flex: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5,
+        height: coarse ? 44 : 32, padding: '0 12px', borderRadius: coarse ? 22 : 16, flex: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5,
         border: `1px solid ${on ? 'rgba(103,216,242,0.45)' : 'rgba(160,170,255,0.14)'}`, background: on ? 'rgba(103,216,242,0.12)' : 'rgba(10,12,29,0.6)', color: on ? '#fff' : '#c9cde0',
       }}
     >
@@ -32,12 +34,13 @@ export function Chip({ on, color, label, count, onClick }: { on: boolean; color:
 
 export function Toggle({ on, label, tone = 'cyan', onClick }: { on: boolean; label: string; tone?: 'cyan' | 'warn'; onClick: () => void }) {
   const c = tone === 'warn' ? '245,181,74' : '103,216,242'
+  const coarse = useYui((s) => s.coarse)
   return (
     <button
       onClick={onClick}
       aria-pressed={on}
       style={{
-        height: 30, padding: '0 10px', borderRadius: 9, cursor: 'pointer', fontSize: 12,
+        height: coarse ? 44 : 30, padding: '0 10px', borderRadius: 9, cursor: 'pointer', fontSize: 12,
         border: `1px solid ${on ? `rgba(${c},0.45)` : 'rgba(255,255,255,0.08)'}`, background: on ? `rgba(${c},0.12)` : 'transparent', color: on ? '#fff' : '#8c92ad',
       }}
     >
@@ -47,6 +50,8 @@ export function Toggle({ on, label, tone = 'cyan', onClick }: { on: boolean; lab
 }
 
 export function IconBtn({ label, onClick, children, size = 36 }: { label: string; onClick: () => void; children: ReactNode; size?: number }) {
+  const coarse = useYui((s) => s.coarse)
+  if (coarse) size = Math.max(size, 44)
   return (
     <button
       aria-label={label}

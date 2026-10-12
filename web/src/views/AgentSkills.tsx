@@ -9,6 +9,7 @@ import { card } from './ui'
 import { input } from './kit'
 import { fmtInstalls, SkillDrawer } from './SkillDrawer'
 import { useInstalledSkills } from './SkillsView'
+import { toastErr } from '../lib/feedback'
 
 // Ficha do agente › Skills do skills.sh (Agent.dc.html): as só dele, as da plataforma e a busca
 // para adicionar uma nova já com este agente marcado.
@@ -34,15 +35,20 @@ export function AgentSkills({ agentId, agentName, pluginSkills }: { agentId: str
   const results = (dq.length >= 2 ? search.data?.skills : top.data?.skills)?.filter((s) => !mine.some((m) => m.source === s.source && m.skillId === s.skillId)).slice(0, 6) ?? []
 
   const removeHere = async (name: string) => {
+    if (busy) return
     setBusy(name)
-    await api.del(`/api/skills/${encodeURIComponent(name)}?agent=${encodeURIComponent(agentId)}`).catch(() => null)
-    setBusy(null)
-    inst.reload()
-    useYui.getState().say(`${name} removida de ${agentName}.`, { state: 'success' })
+    try {
+      await api.del(`/api/skills/${encodeURIComponent(name)}?agent=${encodeURIComponent(agentId)}`)
+      useYui.getState().say(`${name} removida de ${agentName}.`, { state: 'success' })
+    } catch (e) {
+      toastErr(e, `Não consegui remover ${name}`)
+    } finally {
+      setBusy(null)
+      inst.reload()
+    }
   }
 
   const row = { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto auto', gap: 12, alignItems: 'center', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.05)' } as const
-  const smallBtn = { height: phone ? 44 : 34, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: C.t2, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' } as const
 
   return (
     <section aria-label="Skills do skills.sh" style={{ display: 'grid', gridTemplateColumns: phone ? 'minmax(0,1fr)' : 'repeat(auto-fit,minmax(min(360px,100%),1fr))', gap: 14 }}>
@@ -63,7 +69,7 @@ export function AgentSkills({ agentId, agentName, pluginSkills }: { agentId: str
                   </div>
                 </button>
                 <span style={{ fontSize: 12, padding: '4px 10px', borderRadius: 999, color: s.updateAvailable ? C.warn : C.ok, background: s.updateAvailable ? 'rgba(245,181,74,.10)' : 'rgba(79,224,176,.10)' }}>{s.updateAvailable ? 'atualização' : 'em dia'}</span>
-                <button onClick={() => void removeHere(s.name)} disabled={busy === s.name} style={smallBtn}>
+                <button onClick={() => void removeHere(s.name)} disabled={busy === s.name} className="app-btn small" style={{ height: phone ? 44 : 34, padding: '0 12px', color: C.t2, fontSize: 13 }}>
                   {busy === s.name ? 'Removendo…' : 'Remover'}
                 </button>
               </div>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { VaultGraphPayload, VaultSearchHit } from '@shared/protocol'
 import { api } from '../api/client'
+import { toast } from '../lib/feedback'
 import { useYui } from '../store/yui'
 import { BrainEngine, type ELink, type ENode } from './brainEngine'
 import { HUB_DEGREE, degrees, nodeColors, openConstellation } from './data'
@@ -197,6 +198,7 @@ export function Universe({ graph }: { graph: VaultGraphPayload }) {
     if (local) return pick(local.id)
     const hits = await api.get<VaultSearchHit[]>(`/api/vault/search?q=${encodeURIComponent(q.trim())}`).catch(() => [])
     if (hits[0]) pick(hits[0].path)
+    else toast(`Nenhuma estrela encontrada para "${q.trim()}".`)
   }
 
   const counts = useMemo(() => {

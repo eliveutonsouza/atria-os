@@ -22,7 +22,7 @@ export function ReportView() {
   const [del, setDel] = useState(false)
   const [busy, setBusy] = useState(false)
   const current = name ?? (data ? `${data.id}.json` : null)
-  useHeader('Report', data?.title ?? 'Relatório', data
+  useHeader('Relatório', data?.title ?? 'Relatório', data
     ? [
         { label: 'Resumir', primary: true, fn: () => submitText('Resuma este relatório em poucas frases.') },
         { label: 'Apresentar', fn: () => submitText('Transforme este relatório em slides.') },
@@ -90,7 +90,7 @@ export function ReportView() {
         <section key={sec.heading} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: toneColor(sec.tone, C.cyan), fontWeight: 600 }}>{sec.heading}</div>
           {sec.items.map((it, i) => (
-            <div key={i} style={{ fontSize: 15, lineHeight: 1.6, color: '#d6d9e8', paddingLeft: 16, borderLeft: '1px solid rgba(255,255,255,.1)' }}>{it}</div>
+            <div key={i} style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--text-dim)', paddingLeft: 16, borderLeft: '1px solid rgba(255,255,255,.1)' }}>{it}</div>
           ))}
         </section>
       ))}

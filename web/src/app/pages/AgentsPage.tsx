@@ -4,9 +4,10 @@ import { api } from '../../api/client'
 import { useApi } from '../../api/useApi'
 import { startRun } from '../../lib/actions'
 import { C } from '../../lib/colors'
+import { plural, toastErr, toastOk, useAction } from '../../lib/feedback'
 import { useYui } from '../../store/yui'
 import { AgentDetailView, FireAgentModal } from '../../views/AgentDetailView'
-import { Empty, useHeader } from '../../views/ui'
+import { Empty, ErrorNote, Skeleton, useHeader } from '../../views/ui'
 import { agentColor, Card, Dot, fmtCost, fmtDuration, fmtTokens, HBar, Kpi, openApp, relTime, useViewParams } from './common'
 
 // Agentes (Agents.dc.html): equipe à esquerda; à direita o agente escolhido com Estatísticas | Configuração | Execuções.
@@ -24,14 +25,10 @@ type Tab = 'stats' | 'config' | 'runs'
 type Filter = 'active' | 'archived'
 
 async function newAgent() {
-  try {
-    const a = await api.post<AgentConfig>('/api/agents', { name: 'Novo agente', description: 'Descreva a especialidade', group: 'Geral', prompt: 'Instruções de trabalho do agente.' })
-    if (a) {
-      openApp('agents', a.id)
-      setTimeout(() => window.dispatchEvent(new CustomEvent('atria-agent-tab', { detail: 'config' })), 50)
-    }
-  } catch {
-    useYui.getState().say('Não consegui criar o agente agora.', { state: 'warning' })
+  const a = await api.post<AgentConfig>('/api/agents', { name: 'Novo agente', description: 'Descreva a especialidade', group: 'Geral', prompt: 'Instruções de trabalho do agente.' })
+  if (a) {
+    openApp('agents', a.id)
+    setTimeout(() => window.dispatchEvent(new CustomEvent('atria-agent-tab', { detail: 'config' })), 50)
   }
 }
 
@@ -50,6 +47,7 @@ export function AgentsPage() {
   const all = useApi<AgentConfig[]>('/api/agents/all', [working, filter])
   const archived = (all.data ?? []).filter((a) => a.archived)
   const [firing, setFiring] = useState<AgentConfig | null>(null)
+  const { run: createAgent, busy: creating } = useAction(newAgent, { error: 'Não consegui criar o agente' })
   const refresh = () => {
     agents.reload()
     all.reload()
@@ -66,8 +64,8 @@ export function AgentsPage() {
 
   // celular, só a lista: "+ Novo agente" sobe para o cabeçalho
   useEffect(() => {
-    if (phone && !paramId) useYui.getState().setHeader({ eyebrow: 'Agentes', title: 'Equipe', actions: [{ label: '+ Novo agente', fn: () => void newAgent(), primary: true }] })
-  }, [phone, paramId])
+    if (phone && !paramId) useYui.getState().setHeader({ eyebrow: 'Agentes', title: 'Equipe', actions: [{ label: creating ? 'Criando…' : '+ Novo agente', fn: () => void createAgent(), primary: true, disabled: creating }] })
+  }, [phone, paramId, creating, createAgent])
 
   // "+ Novo agente" abre direto a configuração
   useEffect(() => {
@@ -103,7 +101,7 @@ export function AgentsPage() {
       {tabs}
       {tab === 'stats' && id && <AgentStatsTab id={id} info={list.find((a) => a.id === id)} onGone={gone} />}
       {tab === 'config' && <AgentDetailView onGone={gone} />}
-      {tab === 'runs' && id && <AgentRunsTab id={id} />}
+      {tab === 'runs' && id && <AgentRunsTab id={id} info={list.find((a) => a.id === id)} />}
     </>
   )
 
@@ -111,9 +109,9 @@ export function AgentsPage() {
     try {
       await api.put(`/api/agents/${encodeURIComponent(a.id)}`, { archived: false })
       refresh()
-      useYui.getState().say(`${a.name} reativado.`, { state: 'success' })
-    } catch {
-      useYui.getState().say(`Não consegui reativar ${a.name}.`, { state: 'warning' })
+      toastOk(`${a.name} reativado.`)
+    } catch (e) {
+      toastErr(e, `Não consegui reativar ${a.name}`)
     }
   }
 
@@ -135,11 +133,11 @@ export function AgentsPage() {
       <section style={{ width: phone ? '100%' : device === 'tablet' ? 280 : 380, maxWidth: '100%', display: 'flex', flexDirection: 'column', gap: 10, flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span className="app-muted">
-            {list.length} agentes · {list.filter((a) => a.status === 'running').length} trabalhando
+            {plural(list.length, 'agente', 'agentes')} · {list.filter((a) => a.status === 'running').length} trabalhando
           </span>
           {!phone && (
-            <button className="app-btn small" onClick={() => void newAgent()}>
-              + Novo agente
+            <button className="app-btn small" disabled={creating} onClick={() => void createAgent()}>
+              {creating ? 'Criando…' : '+ Novo agente'}
             </button>
           )}
         </div>
@@ -176,7 +174,7 @@ export function AgentsPage() {
                   <button className="app-btn small" style={{ minHeight: phone ? 44 : undefined }} onClick={() => void reactivate(a)}>
                     Reativar
                   </button>
-                  <button className="app-btn small" style={{ minHeight: phone ? 44 : undefined, color: '#f39aa4', borderColor: 'rgba(240,98,114,.35)' }} onClick={() => setFiring(a)}>
+                  <button className="app-btn small" style={{ minHeight: phone ? 44 : undefined, color: C.critSoft, borderColor: 'rgba(240,98,114,.35)' }} onClick={() => setFiring(a)}>
                     Demitir
                   </button>
                 </span>
@@ -297,11 +295,12 @@ function AccessRow({ label, items, all, color }: { label: string; items: string[
   )
 }
 
-function AgentRunsTab({ id }: { id: string }) {
+function AgentRunsTab({ id, info }: { id: string; info?: AgentInfo }) {
   const phone = useYui((s) => s.device === 'phone')
   const runs = useApi<{ runs: RunInfo[] }>('/api/runs', [id], 15000)
-  useHeader('Agente · execuções', id, [], [id])
+  useHeader('Agente · execuções', info?.name ?? 'Execuções do agente', [], [id, info?.name])
   const mine = (runs.data?.runs ?? []).filter((r) => r.agentId === id)
+  if (!runs.data) return runs.error ? <ErrorNote text="Não consegui carregar as execuções." retry={runs.reload} /> : <Skeleton rows={4} kpis={0} />
   if (!mine.length) return <Empty text="Esse agente ainda não rodou recentemente." hint="Use “Testar” ou peça uma tarefa para a Yui." />
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>

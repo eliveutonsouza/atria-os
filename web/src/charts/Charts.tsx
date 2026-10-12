@@ -3,7 +3,12 @@ import { C } from '../lib/colors'
 
 // Gráficos SVG no idioma visual do design (sem biblioteca): barras com gradiente, área lavanda, linhas e pizza.
 
-export const SERIES_COLORS = [C.cyan, C.lav, C.ok, C.violet, C.warn, '#f39aa4']
+export const SERIES_COLORS = [C.cyan, C.lav, C.ok, C.violet, C.warn, C.critSoft]
+const fmt = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 })
+
+function NoData({ height }: { height: number }) {
+  return <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: C.t3 }}>Sem dados no período</div>
+}
 
 export function KpiTile({ label, value, color = C.text, size = 40 }: { label: string; value: string; color?: string; size?: number }) {
   return (
@@ -17,8 +22,9 @@ export function KpiTile({ label, value, color = C.text, size = 40 }: { label: st
 /** Barras verticais (uma série) — usado na atividade 24h. */
 export function Bars({ values, tips, height = 140, highlightLast = true, label }: { values: number[]; tips?: string[]; height?: number; highlightLast?: boolean; label: string }) {
   const max = Math.max(1, ...values)
+  if (!values.some((v) => v > 0)) return <NoData height={height} />
   return (
-    <div role="img" aria-label={label} style={{ height, display: 'flex', alignItems: 'flex-end', gap: values.length > 40 ? 2 : 4 }}>
+    <div role="img" aria-label={`${label}: ${values.map((v, i) => tips?.[i] ?? fmt(v)).join(', ')}`} style={{ height, display: 'flex', alignItems: 'flex-end', gap: values.length > 40 ? 2 : 4 }}>
       {values.map((v, i) => (
         <div
           key={i}
@@ -36,10 +42,14 @@ export function Bars({ values, tips, height = 140, highlightLast = true, label }
 
 /** Barras agrupadas (várias séries) com rótulos. */
 export function GroupedBars({ labels, series, height = 180 }: { labels: string[]; series: { name: string; values: number[] }[]; height?: number }) {
-  const max = Math.max(1, ...series.flatMap((s) => s.values))
+  const all = series.flatMap((s) => s.values)
+  const max = Math.max(1, ...all)
+  if (!all.some((v) => v > 0)) return <NoData height={height} />
+  // com poucas barras, o valor aparece em cima de cada uma (não só no title)
+  const showVals = labels.length * series.length <= 24
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div role="img" aria-label="Gráfico de barras" style={{ height, display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+      <div role="img" aria-label={`Gráfico de barras: ${labels.map((l, i) => `${l} ${series.map((s) => `${s.name} ${fmt(s.values[i] ?? 0)}`).join(', ')}`).join('; ')}`} style={{ height, display: 'flex', alignItems: 'flex-end', gap: 10, paddingTop: showVals ? 16 : 0 }}>
         {labels.map((l, i) => (
           <div key={i} style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'flex-end', gap: 3, minWidth: 0 }}>
             {series.map((s, si) => {
@@ -47,9 +57,11 @@ export function GroupedBars({ labels, series, height = 180 }: { labels: string[]
               return (
                 <div
                   key={si}
-                  title={`${l} · ${s.name}: ${v}`}
-                  style={{ flex: 1, height: `${Math.max(1, (v / max) * 100)}%`, borderRadius: '3px 3px 1px 1px', background: series.length === 1 ? 'linear-gradient(180deg,#67d8f2,rgba(166,140,247,.35))' : SERIES_COLORS[si % SERIES_COLORS.length], opacity: series.length === 1 ? 0.9 : 0.8 }}
-                />
+                  title={`${l} · ${s.name}: ${fmt(v)}`}
+                  style={{ flex: 1, position: 'relative', height: `${Math.max(1, (v / max) * 100)}%`, borderRadius: '3px 3px 1px 1px', background: series.length === 1 ? 'linear-gradient(180deg,#67d8f2,rgba(166,140,247,.35))' : SERIES_COLORS[si % SERIES_COLORS.length], opacity: series.length === 1 ? 0.9 : 0.8 }}
+                >
+                  {showVals && <span className="mono" style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', paddingBottom: 2, fontSize: 10, color: C.t2, whiteSpace: 'nowrap' }}>{fmt(v)}</span>}
+                </div>
               )
             })}
           </div>
@@ -106,28 +118,31 @@ export function LineArea({ series, area = false, height = 140, label, min, max: 
 
 /** Pizza/rosca. */
 export function Pie({ labels, values, size = 180 }: { labels: string[]; values: number[]; size?: number }) {
-  const total = values.reduce((a, b) => a + Math.max(0, b), 0) || 1
+  const sum = values.reduce((a, b) => a + Math.max(0, b), 0)
+  if (!sum) return <NoData height={size} />
+  const total = sum
   let acc = 0
   const r = 40
   const circ = 2 * Math.PI * r
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
-      <svg viewBox="0 0 100 100" width={size} height={size} role="img" aria-label="Gráfico de pizza" style={{ transform: 'rotate(-90deg)' }}>
+      <svg viewBox="0 0 100 100" width={size} height={size} role="img" aria-label={`Gráfico de pizza: ${labels.map((l, i) => `${l} ${fmt(values[i] ?? 0)}`).join(', ')}`} style={{ transform: 'rotate(-90deg)' }}>
         <circle cx="50" cy="50" r={r} fill="none" stroke="rgba(255,255,255,.05)" strokeWidth="14" />
         {values.map((v, i) => {
           const frac = Math.max(0, v) / total
           const dash = `${frac * circ} ${circ}`
           const off = -acc * circ
           acc += frac
-          return <circle key={i} cx="50" cy="50" r={r} fill="none" stroke={SERIES_COLORS[i % SERIES_COLORS.length]} strokeWidth="14" strokeDasharray={dash} strokeDashoffset={off}><title>{`${labels[i]}: ${v}`}</title></circle>
+          return <circle key={i} cx="50" cy="50" r={r} fill="none" stroke={SERIES_COLORS[i % SERIES_COLORS.length]} strokeWidth="14" strokeDasharray={dash} strokeDashoffset={off}><title>{`${labels[i]}: ${fmt(v)}`}</title></circle>
         })}
       </svg>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
         {labels.map((l, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ width: 8, height: 8, borderRadius: 2, background: SERIES_COLORS[i % SERIES_COLORS.length] }} />
-            <span style={{ color: '#d6d9e8' }}>{l}</span>
-            <span style={{ color: C.t3 }}>{Math.round((Math.max(0, values[i]) / total) * 100)}%</span>
+            <span style={{ color: 'var(--text-dim)' }}>{l}</span>
+            <span style={{ color: C.t2 }}>{fmt(values[i] ?? 0)}</span>
+            <span style={{ color: C.t3 }}>{Math.round((Math.max(0, values[i] ?? 0) / total) * 100)}%</span>
           </div>
         ))}
       </div>

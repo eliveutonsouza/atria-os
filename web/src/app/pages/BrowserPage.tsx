@@ -3,6 +3,7 @@ import type { BrowserChallengeState, BrowserClientMsg, BrowserServerMsg, Browser
 import { api } from '../../api/client'
 import { onBrowserChallenge } from '../../api/events'
 import { C, glow } from '../../lib/colors'
+import { useAction } from '../../lib/feedback'
 import { useYui } from '../../store/yui'
 import { useHeader } from '../../views/ui'
 
@@ -182,9 +183,11 @@ export function BrowserPage() {
     for (const ch of v.replaceAll(KB_SENTINEL, '')) tapKey(ch)
   }
 
-  const stopRun = async (runId: string) => {
-    await api.post(`/api/runs/${runId}/cancel`).catch(() => {})
-  }
+  const stop = useAction((runId: string, _agent: string) => api.post(`/api/runs/${runId}/cancel`), {
+    ok: 'Agente parado.',
+    error: 'Não consegui parar o agente',
+    confirm: (_runId, agent) => ({ title: 'Parar o agente?', text: `${agent} para de usar o navegador agora; o que já foi feito fica como está.`, confirmLabel: 'Parar agente', cancelLabel: 'Voltar', danger: true }),
+  })
   const narrow = useYui((s) => s.narrow)
   const tablet = useYui((s) => s.device === 'tablet')
   const coarse = useYui((s) => s.coarse)
@@ -197,7 +200,7 @@ export function BrowserPage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 999, fontSize: 12, background: busy ? 'rgba(103,216,242,.08)' : 'rgba(255,255,255,.03)', border: `1px solid ${busy ? 'rgba(103,216,242,.25)' : 'rgba(255,255,255,.08)'}`, color: busy ? '#a9e9f8' : C.t2 }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: !connected ? C.crit : busy ? C.cyan : C.t3, boxShadow: busy ? glow(C.cyan, 8) : undefined }} />
-          {!connected ? 'Navegador desconectado' : busy ? `${last.agent} está usando · ${fps} fps` : `Ocioso · ${fps} fps`}
+          {!connected ? 'Navegador desconectado' : busy ? `${last.agent} está usando · ${fps} quadros/s` : `Ocioso · ${fps} quadros/s`}
         </span>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#c9cde0', cursor: 'pointer', position: 'relative' }}>
           <input
@@ -275,7 +278,7 @@ export function BrowserPage() {
               onBlur={() => setEditingUrl(false)}
               onChange={(e) => setUrl(e.target.value)}
               className="mono"
-              style={{ flex: 1, minWidth: 0, height: coarse ? 44 : narrow ? 36 : 28, borderRadius: 8, border: 'none', outline: 'none', background: 'rgba(255,255,255,.05)', padding: '0 12px', fontSize: 12, color: '#c9cde0', order: narrow ? 10 : undefined, flexBasis: narrow ? '100%' : undefined }}
+              style={{ flex: 1, minWidth: 0, height: coarse ? 44 : narrow ? 36 : 28, borderRadius: 8, border: 'none', background: 'rgba(255,255,255,.05)', padding: '0 12px', fontSize: 12, color: '#c9cde0', order: narrow ? 10 : undefined, flexBasis: narrow ? '100%' : undefined }}
             />
             <button type="submit" disabled={!controlling} title={controlling ? 'Abrir endereço' : 'Ligue "Assumir controle" para navegar'} style={{ ...btn, height: bh, opacity: controlling ? 1 : 0.45 }}>Abrir URL</button>
             {coarse && (
@@ -358,10 +361,10 @@ export function BrowserPage() {
             ))}
             {!activity.length && <span style={{ color: C.t3, fontFamily: 'var(--sans)', fontSize: 12 }}>As ações aparecem aqui enquanto um agente navega.</span>}
           </div>
-          {error && <div style={{ fontSize: 12, color: '#f6b3ba' }}>Não consegui executar: {error}</div>}
+          {error && <div role="alert" style={{ fontSize: 12, color: '#f6b3ba' }}>Não consegui executar: {error}</div>}
           {last && busy && (
-            <button onClick={() => stopRun(last.runId)} style={{ height: 40, borderRadius: 12, border: '1px solid rgba(240,98,114,.35)', background: 'transparent', color: '#f39aa4', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-              Parar agente
+            <button disabled={stop.busy} onClick={() => void stop.run(last.runId, last.agent)} className="app-btn danger" style={{ height: coarse ? 44 : 40, borderRadius: 12, fontWeight: 600 }}>
+              {stop.busy ? 'Parando…' : 'Parar agente'}
             </button>
           )}
         </aside>

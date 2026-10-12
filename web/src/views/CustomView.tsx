@@ -94,7 +94,7 @@ export function BlockView({ block }: { block: Block }) {
                     {block.columns.map((_, ci) => {
                       const v = r[ci]
                       return (
-                        <td key={ci} style={{ padding: '11px 14px', borderBottom: '1px solid rgba(255,255,255,.04)', color: typeof v === 'number' ? C.text : '#d6d9e8', textAlign: typeof v === 'number' ? 'right' : 'left', fontVariantNumeric: 'tabular-nums' }}>
+                        <td key={ci} style={{ padding: '11px 14px', borderBottom: '1px solid rgba(255,255,255,.04)', color: typeof v === 'number' ? C.text : 'var(--text-dim)', textAlign: typeof v === 'number' ? 'right' : 'left', fontVariantNumeric: 'tabular-nums' }}>
                           {v == null ? '—' : String(v)}
                         </td>
                       )
@@ -133,7 +133,7 @@ export function BlockView({ block }: { block: Block }) {
         </Section>
       )
     case 'markdown':
-      return <div style={{ fontSize: 15, lineHeight: 1.65, color: '#d6d9e8', maxWidth: 820 }}>{renderMarkdown(block.text)}</div>
+      return <div style={{ fontSize: 15, lineHeight: 1.65, color: 'var(--text-dim)', maxWidth: 820 }}>{renderMarkdown(block.text)}</div>
     case 'timeline':
       return (
         <Section title={block.title}>
@@ -161,7 +161,7 @@ export function BlockView({ block }: { block: Block }) {
       )
     case 'link':
       return (
-        <a href={block.href} target="_blank" rel="noopener noreferrer" style={{ alignSelf: 'flex-start', height: 38, padding: '0 16px', borderRadius: 10, border: '1px solid rgba(103,216,242,.3)', background: 'rgba(103,216,242,.08)', color: '#a9e9f8', fontSize: 14, display: 'inline-flex', alignItems: 'center' }}>
+        <a href={block.href} target="_blank" rel="noopener noreferrer" style={{ alignSelf: 'flex-start', height: 38, padding: '0 16px', borderRadius: 10, border: '1px solid rgba(103,216,242,.3)', background: 'rgba(103,216,242,.08)', color: 'var(--cyan-soft)', fontSize: 14, display: 'inline-flex', alignItems: 'center' }}>
           {block.label} ↗
         </a>
       )

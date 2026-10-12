@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { api } from '../api/client'
 import { onSupportUpdated } from '../api/events'
 import { C } from '../lib/colors'
+import { toastErr, toastOk } from '../lib/feedback'
 import { dayTime, hhmm } from '../lib/format'
 import { useYui } from '../store/yui'
 
@@ -101,9 +102,15 @@ export function SupportBanners({ onHeight }: { onHeight: (h: number) => void }) 
 
   const endAccess = async () => {
     setBusy(true)
-    await api.del('/api/support/sessions').catch(() => {})
-    setBusy(false)
-    load()
+    try {
+      await api.del('/api/support/sessions')
+      toastOk(st?.session === 'support' ? 'Você saiu do suporte.' : 'Acesso do suporte encerrado.')
+      load()
+    } catch (e) {
+      toastErr(e, 'Não consegui encerrar o acesso')
+    } finally {
+      setBusy(false)
+    }
   }
   const ack = async (id: string) => {
     setNotices((list) => list.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n)))

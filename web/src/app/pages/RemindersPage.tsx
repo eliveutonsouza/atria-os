@@ -3,6 +3,7 @@ import type { ReminderInfo, ReminderRepeat } from '@shared/protocol'
 import { api } from '../../api/client'
 import { useApi } from '../../api/useApi'
 import { C } from '../../lib/colors'
+import { toastErr, toastOk } from '../../lib/feedback'
 import { useYui } from '../../store/yui'
 import { ActionSheet, BottomSheet } from '../../views/Sheet'
 import { ConfirmDeleteModal, Empty, ErrorNote, Skeleton, useHeader } from '../../views/ui'
@@ -76,7 +77,7 @@ function Editor({ draft, onChange, onClose, onSaved, onStop, phone }: { draft: D
     setBusy(true)
     ;(draft.id ? api.put(`/api/reminders/${draft.id}`, body) : api.post('/api/reminders', body))
       .then(onSaved)
-      .catch((e: Error) => useYui.getState().say(`Não salvei o lembrete: ${e.message}`))
+      .catch((e: Error) => toastErr(e, 'Não salvei o lembrete'))
       .finally(() => setBusy(false))
   }
   const h = phone ? 46 : 38
@@ -146,8 +147,9 @@ export function RemindersPage() {
       .then(() => {
         if (draft?.id === r.id) setDraft(null)
         reload()
+        toastOk('Lembrete cancelado.')
       })
-      .catch((e: Error) => useYui.getState().say(`Não cancelei o lembrete: ${e.message}`))
+      .catch((e: Error) => toastErr(e, 'Não cancelei o lembrete'))
   const remove = () => {
     if (!del) return
     setBusy(true)
@@ -158,7 +160,7 @@ export function RemindersPage() {
         setDel(null)
         reload()
       })
-      .catch((e: Error) => useYui.getState().say(`Não excluí o lembrete: ${e.message}`))
+      .catch((e: Error) => toastErr(e, 'Não excluí o lembrete'))
       .finally(() => setBusy(false))
   }
   const editable = (r: ReminderInfo) => r.status === 'pending' || r.status === 'missed'

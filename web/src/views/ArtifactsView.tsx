@@ -8,7 +8,7 @@ import { useYui } from '../store/yui'
 import { PathPrompt } from '../vault/VaultDialogs'
 import { ActionSheet } from './Sheet'
 import { ConfirmDeleteModal, Empty, ErrorNote, Skeleton, useHeader } from './ui'
-import { Entregas } from './Entregas'
+import { Entregas, type Entrega } from './Entregas'
 
 const KIND: Record<ArtifactInfo['kind'], string> = { website: 'Site', report: 'Relatório', chart: 'Gráfico', table: 'Tabela', html: 'Página', image: 'Imagem', other: 'Arquivo' }
 
@@ -62,31 +62,35 @@ const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(mi
 export function ArtifactsView() {
   const { data, loading, error } = useApi<ArtifactInfo[]>('/api/artifacts')
   const custom = useApi<CustomItem[]>('/api/custom')
-  const entregas = useApi<{ id: string }[]>('/api/entregas?limit=1')
+  const entregas = useApi<Entrega[]>('/api/entregas?limit=200')
   const phone = useYui((s) => s.device === 'phone')
   const coarse = useYui((s) => s.coarse)
   const [act, setAct] = useState<{ view: CustomItem; action: 'rename' | 'delete' } | null>(null)
   const [menu, setMenu] = useState<CustomItem | null>(null)
-  useHeader('Artifacts', 'Artefatos')
+  useHeader('Artefatos', 'Artefatos')
   if ((loading && !data) || (custom.loading && !custom.data)) return <Skeleton kpis={0} rows={5} />
   if (error || !data) return <ErrorNote />
   const views = custom.data ?? []
   const files = entregas.data ?? []
-  if (!data.length && !views.length && !files.length) return <Empty text="Ainda não há artefatos." hint="Sites, relatórios, apresentações e telas que a Yui monta aparecem aqui." />
+  const filesPending = (entregas.loading && !entregas.data) || (!!entregas.error && !entregas.data)
+  if (!data.length && !views.length && !files.length && !filesPending) return <Empty text="Ainda não há artefatos." hint="Sites, relatórios, apresentações e telas que a Yui monta aparecem aqui." />
   const openView = (v: CustomItem) => useYui.getState().show('custom', { customId: v.id })
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
-      {files.length > 0 && <Entregas />}
+      {(files.length > 0 || filesPending) && <Entregas data={entregas.data} loading={entregas.loading} error={entregas.error} reload={entregas.reload} />}
       {data.length > 0 && (
-        <div style={grid}>
-          {data.map((a) => (
-            <button key={a.id} onClick={() => open(a)} className="hov-bg2" style={cardStyle}>
-              <span className="eyebrow" style={{ color: C.cyan }}>{KIND[a.kind]}</span>
-              <span style={{ fontSize: 15, fontWeight: 600, overflowWrap: 'anywhere' }}>{a.title}</span>
-              <span style={{ fontSize: 12, color: C.t3 }}>{a.project ? `${a.project} · ` : ''}{ago(a.createdAt)}</span>
-            </button>
-          ))}
-        </div>
+        <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="eyebrow" style={{ color: C.cyan }}>Sites e relatórios · {data.length}</div>
+          <div style={grid}>
+            {data.map((a) => (
+              <button key={a.id} onClick={() => open(a)} className="hov-bg2" style={cardStyle}>
+                <span className="eyebrow" style={{ color: C.cyan }}>{KIND[a.kind]}</span>
+                <span style={{ fontSize: 15, fontWeight: 600, overflowWrap: 'anywhere' }}>{a.title}</span>
+                <span style={{ fontSize: 12, color: C.t3 }}>{a.project ? `${a.project} · ` : ''}{ago(a.createdAt)}</span>
+              </button>
+            ))}
+          </div>
+        </section>
       )}
       {views.length > 0 && (
         <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

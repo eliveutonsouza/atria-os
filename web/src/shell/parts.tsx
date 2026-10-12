@@ -7,6 +7,9 @@ import { OrbEngine, orbTarget } from '../yui/orbEngine'
 import { toggleLive } from '../voice/live'
 import { ProjectPicker, RunsButton, useRunsFeed } from './ProjectPicker'
 
+const IS_MAC = typeof navigator !== 'undefined' && /mac|iphone|ipad|ipod/i.test(navigator.platform || navigator.userAgent)
+const PALETTE_KEY = IS_MAC ? '⌘K' : 'Ctrl K'
+
 export const STATE_META: Record<YuiState, [string, string]> = {
   idle: ['Disponível', C.t2],
   listening: ['Ouvindo', C.cyan],
@@ -137,12 +140,12 @@ export function TopBar() {
         <button
           onClick={() => set({ palette: true, inboxOpen: false })}
           className="hov-bg"
-          aria-label="Abrir comandos (Ctrl K)"
+          aria-label={`Abrir comandos (${PALETTE_KEY})`}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, height: coarse ? 44 : 36, minWidth: coarse ? 44 : undefined, flexShrink: 0, padding: narrow ? 0 : '0 12px 0 10px', borderRadius: 12, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.03)', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 600, letterSpacing: '.14em' }}
         >
           <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, #fff, #67d8f2 45%, #a68cf7)' }} />
           {!narrow && <span>ATRIA OS</span>}
-          {!narrow && <span className="mono" style={{ fontSize: 11, letterSpacing: 0, color: C.t3, fontWeight: 400 }}>⌘K</span>}
+          {!narrow && <span className="mono" style={{ fontSize: 11, letterSpacing: 0, color: C.t3, fontWeight: 400 }}>{PALETTE_KEY}</span>}
         </button>
         <ProjectPicker />
       </div>
@@ -187,9 +190,10 @@ export function TopBar() {
           onClick={() => set({ histOpen: !useYui.getState().histOpen, inboxOpen: false })}
           className="hov-txt"
           title="Conversa"
+          aria-label="Conversa"
           style={{ height: bh, minWidth: coarse ? 44 : undefined, padding: '0 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.03)', color: C.t2, fontSize: 12, cursor: 'pointer' }}
         >
-          {narrow ? '≡' : 'Histórico'}
+          {narrow ? '≡' : 'Conversa'}
         </button>
       </div>
     </div>
@@ -332,6 +336,8 @@ export function Dock() {
   const voiceMode = useYui((s) => s.voiceMode)
   const pending = useYui((s) => s.pending)
   const app = useYui((s) => s.shellMode === 'app')
+  const coarse = useYui((s) => s.coarse)
+  const hit = coarse ? 44 : 40 // alvos de toque ≥44px
   const [input, setInput] = useState('')
   const isC = mode === 'center', isF = mode === 'focus'
   const hide = isF || app
@@ -383,13 +389,13 @@ export function Dock() {
             aria-expanded={quick}
             className="hov-icon"
             onClick={() => setQuick(!quick)}
-            style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: quick ? 'rgba(103,216,242,.12)' : 'transparent', color: quick ? C.cyan : C.t2, fontSize: 22, fontWeight: 300, cursor: 'pointer', transform: quick ? 'rotate(45deg)' : 'none', transition: 'transform .2s' }}
+            style={{ width: hit, height: hit, borderRadius: 12, border: 'none', background: quick ? 'rgba(103,216,242,.12)' : 'transparent', color: quick ? C.cyan : C.t2, fontSize: 22, fontWeight: 300, cursor: 'pointer', transform: quick ? 'rotate(45deg)' : 'none', transition: 'transform .2s' }}
           >
             +
           </button>
           {quick && (
             <>
-              <div onClick={() => setQuick(false)} style={{ position: 'fixed', inset: 0, zIndex: 0 }} />
+              <div aria-hidden onClick={() => setQuick(false)} style={{ position: 'fixed', inset: 0, zIndex: 0 }} />
               <div
                 role="menu"
                 aria-label="Atalhos de pedido"
@@ -436,7 +442,7 @@ export function Dock() {
                 ? 'Pergunte ou segure espaço para falar…'
                 : 'Continue conversando…'
           }
-          style={{ flex: 1, minWidth: 0, height: 40, border: 'none', outline: 'none', background: 'transparent', color: C.text, fontSize: 15, fontFamily: 'var(--sans)' }}
+          style={{ flex: 1, minWidth: 0, height: hit, border: 'none', background: 'transparent', color: C.text, fontSize: 15, fontFamily: 'var(--sans)' }}
         />
         <button
           title={micOn ? 'Encerrar voz' : 'Falar'}
@@ -444,7 +450,7 @@ export function Dock() {
           aria-pressed={micOn}
           onClick={toggleLive}
           style={{
-            width: 40, height: 40, flexShrink: 0, borderRadius: 12, border: `1px solid ${micOn ? 'rgba(103,216,242,.6)' : 'rgba(255,255,255,.08)'}`,
+            width: hit, height: hit, flexShrink: 0, borderRadius: 12, border: `1px solid ${micOn ? 'rgba(103,216,242,.6)' : 'rgba(255,255,255,.08)'}`,
             background: micOn ? 'rgba(103,216,242,.15)' : 'transparent', color: micOn ? C.cyan : C.t2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
@@ -458,7 +464,7 @@ export function Dock() {
           title="Enviar"
           aria-label="Enviar"
           onClick={send}
-          style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#67d8f2,#a68cf7)', color: '#0a0c1d', fontSize: 17, fontWeight: 700, cursor: 'pointer' }}
+          style={{ width: hit, height: hit, flexShrink: 0, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#67d8f2,#a68cf7)', color: '#0a0c1d', fontSize: 17, fontWeight: 700, cursor: 'pointer' }}
         >
           ↑
         </button>

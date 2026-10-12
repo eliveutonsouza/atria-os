@@ -29,7 +29,7 @@ export function Inbox() {
     <>
       <div onClick={() => useYui.getState().set({ inboxOpen: false })} style={{ position: 'absolute', inset: 0, zIndex: 48 }} />
       <div role="dialog" aria-label="Pendências" style={{ position: 'absolute', top: 'calc(60px + var(--sat))', right: 'calc(16px + var(--sar))', width: 'min(380px,calc(100% - 32px))', maxHeight: 'calc(var(--vvh) - 80px - var(--sat))', overflowY: 'auto', zIndex: 50, padding: 8, borderRadius: 16, background: 'rgba(16,20,42,.94)', border: '1px solid rgba(255,255,255,.1)', backdropFilter: 'blur(16px)', boxShadow: '0 24px 60px rgba(0,0,0,.5)' }}>
-        <div style={{ padding: '10px 12px 8px', fontSize: 12, color: C.t2 }}>{inbox.length ? `${inbox.length} coisas precisam de você` : 'Nada pendente agora.'}</div>
+        <div style={{ padding: '10px 12px 8px', fontSize: 12, color: C.t2 }}>{inbox.length === 1 ? '1 coisa precisa de você' : inbox.length ? `${inbox.length} coisas precisam de você` : 'Nada pendente agora.'}</div>
         {inbox.map((ib) => (
           <button key={ib.id} onClick={() => openInboxItem(ib)} className="hov-item" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 3, padding: 12, border: 'none', borderRadius: 10, background: 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer' }}>
             <span style={{ fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: toneColor(ib.tone), fontWeight: 600 }}>{ib.tag}</span>
@@ -184,32 +184,32 @@ export function CommandPalette() {
     const all: PalItem[] = [
       { label: 'Abrir dashboard', hint: 'Ctrl J', fn: () => { close(); enterApp(s().appPage) } },
       { label: 'Falar com Yui', hint: 'Ctrl L', fn: () => { close(); setTimeout(() => dockInput.el?.focus(), 30) } },
-      { label: 'Morning brief', hint: 'view', fn: go('brief') },
-      { label: 'Dashboard', hint: 'view', fn: go('dashboard') },
-      { label: 'Agentes', hint: 'view', fn: go('agents') },
-      { label: 'Execuções', hint: 'view', fn: go('runs') },
+      { label: 'Resumo da manhã', hint: 'tela', fn: go('brief') },
+      { label: 'Dashboard', hint: 'tela', fn: go('dashboard') },
+      { label: 'Agentes', hint: 'tela', fn: go('agents') },
+      { label: 'Execuções', hint: 'tela', fn: go('runs') },
       { label: 'Trocar projeto da conversa', hint: 'Ctrl P', fn: () => s().set({ palette: false, shellMode: 'yui', projectsOpen: true }) },
       ...projects.map((p) => ({ label: `Conversar no projeto · ${p.name}`, hint: 'projeto', fn: () => { close(); void switchProject(p.slug) } })),
-      ...projects.map((p) => ({ label: `Projeto · ${p.name}`, hint: 'view', fn: go('project', { project: p.slug }) })),
+      ...projects.map((p) => ({ label: `Projeto · ${p.name}`, hint: 'tela', fn: go('project', { project: p.slug }) })),
       // demais repositórios do GitHub: abrir clona sob demanda
       ...repos
         .filter((r) => !r.archived && !projects.some((p) => p.slug === r.slug))
         .map((r) => ({ label: `Projeto · ${r.slug}`, hint: 'GitHub', fn: go('project', { project: r.slug }) })),
-      { label: 'Logs', hint: 'view', fn: go('logs') },
-      { label: 'Relatório', hint: 'artifact', fn: go('report') },
-      { label: 'Preview do site', hint: 'artifact', fn: go('website') },
-      { label: 'Infraestrutura', hint: 'view', fn: go('infra') },
-      ...(!isStandalone() ? [{ label: 'Instalar app (celular/desktop)', hint: 'PWA', fn: () => { close(); void install() } }] : []),
-      { label: s().pushEnabled ? 'Notificações: desativar neste dispositivo' : 'Notificações: ativar neste dispositivo', hint: 'push', fn: () => { close(); void (s().pushEnabled ? disablePush() : enablePush()).then((m) => s().say(m)).catch(() => s().say('Não consegui mudar as notificações agora.')) } },
-      { label: 'Notificações: enviar teste', hint: 'push', fn: () => { close(); void testPush().then((m) => s().say(m)).catch(() => s().say('Falhou o teste de notificação.')) } },
-      { label: 'Ferramentas · conectores, MCP, skills, plugins', hint: 'view', fn: go('tools') },
-      { label: 'Workflows', hint: 'view', fn: go('workflows') },
+      { label: 'Registros', hint: 'tela', fn: go('logs') },
+      { label: 'Relatório', hint: 'artefato', fn: go('report') },
+      { label: 'Prévia do site', hint: 'artefato', fn: go('website') },
+      { label: 'Infraestrutura', hint: 'tela', fn: go('infra') },
+      ...(!isStandalone() ? [{ label: 'Instalar app (celular/desktop)', hint: 'app instalado', fn: () => { close(); void install() } }] : []),
+      { label: s().pushEnabled ? 'Notificações: desativar neste dispositivo' : 'Notificações: ativar neste dispositivo', hint: 'notificação', fn: () => { close(); void (s().pushEnabled ? disablePush() : enablePush()).then((m) => s().say(m)).catch(() => s().say('Não consegui mudar as notificações agora.')) } },
+      { label: 'Notificações: enviar teste', hint: 'notificação', fn: () => { close(); void testPush().then((m) => s().say(m)).catch(() => s().say('Falhou o teste de notificação.')) } },
+      { label: 'Ferramentas · conectores, MCP, skills, plugins', hint: 'tela', fn: go('tools') },
+      { label: 'Workflows', hint: 'tela', fn: go('workflows') },
       { label: '+ Novo workflow', hint: 'ação', fn: go('workflow') },
-      { label: 'Rotinas', hint: 'view', fn: go('routines') },
-      { label: 'Claude Code · mapa', hint: 'view', fn: go('claude') },
+      { label: 'Rotinas', hint: 'tela', fn: go('routines') },
+      { label: 'Claude Code · mapa', hint: 'tela', fn: go('claude') },
       { label: 'Terminal · Claude Code', hint: 'Ctrl `', fn: go('terminal', { kind: 'claude' }) },
-      { label: 'Terminal · Shell', hint: 'view', fn: go('terminal', { kind: 'shell' }) },
-      { label: 'Artefatos', hint: 'view', fn: go('artifact') },
+      { label: 'Terminal · Shell', hint: 'tela', fn: go('terminal', { kind: 'shell' }) },
+      { label: 'Artefatos', hint: 'tela', fn: go('artifact') },
       { label: 'Histórico da conversa', hint: '', fn: () => s().set({ palette: false, histOpen: true }) },
       { label: '+ Nova missão', hint: 'ação', fn: () => { close(); s().say('Qual é a missão? Descreva o objetivo e eu monto a equipe.'); setTimeout(() => dockInput.el?.focus(), 30) } },
       { label: 'Voltar para Yui', hint: 'Esc', fn: () => { close(); s().close() } },

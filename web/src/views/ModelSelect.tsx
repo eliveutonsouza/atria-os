@@ -76,7 +76,7 @@ export function ModelSelect({ value, onChange, options, placeholderDefault, allo
           {onTest && <SmallBtn onClick={runTest} disabled={!value.trim()}>Testar</SmallBtn>}
         </div>
       )}
-      {test && <span role="status" style={{ fontSize: 12, color: test.text === 'Testando…' ? C.t2 : test.ok ? C.ok : '#f39aa4' }}>{test.text}</span>}
+      {test && <span role="status" style={{ fontSize: 12, color: test.text === 'Testando…' ? C.t2 : test.ok ? C.ok : 'var(--crit-soft)' }}>{test.text}</span>}
     </div>
   )
 }

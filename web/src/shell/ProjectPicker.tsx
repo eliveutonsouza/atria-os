@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChatMessage, RunInfo } from '@shared/protocol'
 import { api } from '../api/client'
 import { C, toneColor } from '../lib/colors'
+import { confirmAction, toastErr, toastOk } from '../lib/feedback'
 import { useYui } from '../store/yui'
 
 // Seletor de projeto e painel de execuções da tela principal: várias tarefas rodam ao mesmo tempo
@@ -21,6 +22,25 @@ export async function switchProject(slug: string | null) {
     if (useYui.getState().activeProject === r.activeProject) useYui.getState().set({ hist: r.history })
   } catch {
     useYui.getState().say('Não consegui trocar de projeto agora.')
+  }
+}
+
+/** Cancela uma execução depois de confirmar; avisa se falhar. */
+async function cancelRun(r: RunInfo) {
+  const queued = r.state === 'queued'
+  const ok = await confirmAction({
+    title: queued ? 'Tirar da fila?' : 'Cancelar esta execução?',
+    text: queued ? `“${r.task}” sai da fila e não vai rodar.` : `“${r.task}” para agora; o que já foi feito fica como está.`,
+    confirmLabel: queued ? 'Tirar da fila' : 'Cancelar execução',
+    cancelLabel: 'Voltar',
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    await api.post(`/api/runs/${r.id}/cancel`)
+    toastOk(queued ? 'Tirada da fila.' : 'Execução cancelada.')
+  } catch (e) {
+    toastErr(e, 'Não consegui cancelar')
   }
 }
 
@@ -84,10 +104,12 @@ function useOutside(open: boolean, close: () => void) {
   useEffect(() => {
     if (!open) return
     const onDown = (e: PointerEvent) => {
+      // cliques na confirmação (modal por cima) não fecham o painel
+      if ((e.target as Element | null)?.closest?.('[aria-modal="true"]')) return
       if (ref.current && !ref.current.contains(e.target as Node)) close()
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close()
+      if (e.key === 'Escape' && !document.querySelector('[aria-modal="true"]')) close()
     }
     document.addEventListener('pointerdown', onDown)
     document.addEventListener('keydown', onKey)
@@ -192,7 +214,7 @@ export function ProjectPicker() {
               }}
               placeholder="Buscar projeto…"
               aria-label="Buscar projeto"
-              style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', color: C.text, fontSize: 14, fontFamily: 'inherit', outline: 'none' }}
+              style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', color: C.text, fontSize: 14, fontFamily: 'inherit' }}
             />
             {!coarse && <span className="mono" style={{ fontSize: 11 }}>Ctrl P</span>}
           </label>
@@ -269,7 +291,7 @@ export function RunsPopover() {
     return groups.get(b)!.filter((r) => ACTIVE.includes(r.state)).length - groups.get(a)!.filter((r) => ACTIVE.includes(r.state)).length
   })
   const nameOf = (k: string) => (k ? projects.find((p) => p.slug === k)?.name ?? k : 'Geral')
-  const btn = { height: coarse ? 40 : 28, padding: '0 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: C.t2, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' } as const
+  const btn = { height: coarse ? 44 : 28, padding: '0 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,.1)', background: 'transparent', color: C.t2, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' } as const
   const openRun = (id: string) => {
     close()
     useYui.getState().show('runs', { runId: id })
@@ -307,7 +329,7 @@ export function RunsPopover() {
               {isCur ? (
                 <span style={{ letterSpacing: 0, color: C.t3, fontWeight: 500, textTransform: 'none' }}>· projeto atual</span>
               ) : (
-                <button onClick={() => void switchProject(k || null)} style={{ ...btn, marginLeft: 'auto', height: coarse ? 36 : 24, letterSpacing: 0, textTransform: 'none', fontSize: 11, color: '#a9e9f8', border: '1px solid rgba(103,216,242,.25)' }}>
+                <button onClick={() => void switchProject(k || null)} style={{ ...btn, marginLeft: 'auto', height: coarse ? 44 : 24, letterSpacing: 0, textTransform: 'none', fontSize: 11, color: '#a9e9f8', border: '1px solid rgba(103,216,242,.25)' }}>
                   Ir para o projeto
                 </button>
               )}
@@ -327,7 +349,7 @@ export function RunsPopover() {
                 return (
                   <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 12, border: '1px dashed rgba(255,255,255,.12)', fontSize: 12, color: C.t3 }}>
                     <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Na fila · {r.task}</span>
-                    <button onClick={() => void api.post(`/api/runs/${r.id}/cancel`)} style={btn}>Remover</button>
+                    <button onClick={() => void cancelRun(r)} style={btn}>Cancelar</button>
                   </div>
                 )
               return (
@@ -358,7 +380,7 @@ export function RunsPopover() {
                       </button>
                     )}
                     <button onClick={() => openRun(r.id)} style={{ ...btn, color: C.cyan }}>Ver</button>
-                    <button onClick={() => void api.post(`/api/runs/${r.id}/cancel`)} style={btn}>Parar</button>
+                    <button onClick={() => void cancelRun(r)} style={btn}>Cancelar</button>
                   </div>
                 </div>
               )

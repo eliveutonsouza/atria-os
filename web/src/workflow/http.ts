@@ -35,14 +35,33 @@ export function describeCron(cron: string | null | undefined): string {
   if (!cron) return 'manual'
   const preset = CRON_PRESETS.find((p) => p.cron === cron)
   if (preset) return preset.label.toLowerCase()
-  const m = /^(\d+)\s+(\d+)\s+\*\s+\*\s+(\S+)$/.exec(cron)
-  if (m) {
-    const hh = `${m[2].padStart(2, '0')}:${m[1].padStart(2, '0')}`
-    if (m[3] === '*') return `todo dia às ${hh}`
-    if (m[3] === '1-5') return `dias úteis às ${hh}`
-    if (/^\d$/.test(m[3])) return `toda ${DOW[Number(m[3])]} às ${hh}`
+  const f = cron.trim().split(/\s+/)
+  if (f.length !== 5) return cron
+  const [min, hour, dom, mon, dow] = f
+  const num = (v: string) => /^\d+$/.test(v)
+  if (mon !== '*') return cron
+  const every = /^\*\/(\d+)$/
+  if (every.test(min) && hour === '*' && dom === '*' && dow === '*') return `a cada ${every.exec(min)![1]} minutos`
+  if (num(min) && hour === '*' && dom === '*' && dow === '*') return Number(min) ? `a cada hora (aos ${min} min)` : 'a cada hora'
+  if (num(min) && every.test(hour) && dom === '*' && dow === '*') return `a cada ${every.exec(hour)![1]} horas`
+  if (!num(min) || !num(hour)) return cron
+  const hh = `${Number(hour)}h${Number(min) ? String(min).padStart(2, '0') : ''}`
+  if (num(dom) && dow === '*') return `todo dia ${dom} do mês às ${hh}`
+  if (dom !== '*') return cron
+  if (dow === '*') return `todo dia às ${hh}`
+  if (dow === '1-5') return `dias úteis às ${hh}`
+  if (dow === '0,6' || dow === '6,0') return `fins de semana às ${hh}`
+  if (/^[0-7](,[0-7])*$/.test(dow)) {
+    const days = dow.split(',').map((d) => DOW[Number(d) % 7])
+    return days.length === 1 ? `toda ${days[0]} às ${hh}` : `${days.slice(0, -1).join(', ')} e ${days.at(-1)} às ${hh}`
   }
   return cron
+}
+
+/** Cron em português; se não der para traduzir, "horário personalizado" (mostre o cron só no title). */
+export function friendlyCron(cron: string | null | undefined): string {
+  const d = describeCron(cron)
+  return cron && d === cron ? 'horário personalizado' : d
 }
 
 export function hhmm(iso: string | null | undefined): string {

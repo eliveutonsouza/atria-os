@@ -1,14 +1,13 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { OpsBoard, Overview, ScheduleOccurrence, StatsOverview } from '@shared/protocol'
-import { useApi } from '../../api/useApi'
+import { useApi, type ApiState } from '../../api/useApi'
 import { C, toneColor } from '../../lib/colors'
-import { dockInput } from '../../shell/parts'
 import { useYui } from '../../store/yui'
-import { useHeader } from '../../views/ui'
+import { ErrorNote, useHeader } from '../../views/ui'
 import { Card, dayLabel, Dot, elapsed, fmtCost, fmtTokens, HBar, Kpi, Legend, openApp, ORIGIN_LABEL } from './common'
 import { UsageSummaryCard } from './UsagePage'
 
-// Visão geral (Overview.dc.html): KPIs, execuções por dia, sucesso por agente, trabalhando agora, próximos agendamentos, projetos.
+// Início (Overview.dc.html): KPIs, execuções por dia, sucesso por agente, trabalhando agora, próximos agendamentos, projetos.
 
 function greeting(name: string) {
   const h = new Date().getHours()
@@ -20,6 +19,38 @@ const dayTip = (d: { date: string; done: number; routine: number; failed: number
   `${d.date.slice(8)}/${d.date.slice(5, 7)} — ${d.done} concluídas, ${d.routine} rotinas, ${d.failed} falhas`
 
 const linkBtn = { border: 'none', background: 'transparent', color: '#7fdcf5', fontSize: 12, cursor: 'pointer' } as const
+
+/** Bloco que depende de uma busca: esqueleto enquanto carrega, erro com "Tentar de novo", senão o conteúdo. */
+function Loaded({ s, rows = 3, children }: { s: ApiState<unknown>; rows?: number; children: ReactNode }) {
+  if (!s.data && s.error) return <ErrorNote text="Não consegui carregar isso agora." retry={s.reload} />
+  if (!s.data)
+    return (
+      <div aria-busy="true" aria-label="Carregando" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {Array.from({ length: rows }).map((_, i) => <div key={i} className="skel" style={{ height: 36, opacity: 1 - i * 0.15 }} />)}
+      </div>
+    )
+  return <>{children}</>
+}
+
+/** Seletor do período (7 ou 30 dias). */
+function PeriodToggle({ days, onChange }: { days: 7 | 30; onChange: (d: 7 | 30) => void }) {
+  return (
+    <div role="group" aria-label="Período" style={{ display: 'inline-flex', gap: 4, padding: 3, borderRadius: 12, border: '1px solid rgba(255,255,255,.08)', background: 'rgba(255,255,255,.02)' }}>
+      {([7, 30] as const).map((d) => (
+        <button
+          key={d}
+          type="button"
+          aria-pressed={days === d}
+          onClick={() => onChange(d)}
+          className={days === d ? 'app-btn small primary' : 'app-btn small'}
+          style={days === d ? undefined : { border: 'none', background: 'transparent' }}
+        >
+          Últimos {d} dias
+        </button>
+      ))}
+    </div>
+  )
+}
 
 export function OverviewPage() {
   const userName = useYui((s) => s.userName)
@@ -36,22 +67,7 @@ export function OverviewPage() {
   )
   const ov = useApi<Overview>('/api/overview', [], 60000)
 
-  useHeader(
-    'Visão geral · ao vivo',
-    greeting(userName),
-    [
-      { label: `Últimos ${days} dias`, fn: () => setDays(days === 7 ? 30 : 7) },
-      {
-        label: '+ Nova missão',
-        primary: true,
-        fn: () => {
-          useYui.getState().say('Qual é a missão? Descreva o objetivo e eu monto o plano com os agentes certos.')
-          setTimeout(() => dockInput.el?.focus(), 30)
-        },
-      },
-    ],
-    [days, userName],
-  )
+  useHeader('Início · ao vivo', greeting(userName), [{ label: '+ Nova missão', primary: true, fn: () => openApp('missions', 'new') }], [userName])
 
   const k = stats.data?.kpis
   const daily = stats.data?.daily ?? []
@@ -61,9 +77,14 @@ export function OverviewPage() {
   const byAgent = (stats.data?.byAgent ?? []).filter((a) => a.success !== null).slice(0, 7)
   const delta = k ? k.runsToday - k.runsYesterday : 0
   const tools = stats.data?.topTools ?? []
+  // rótulos do eixo: início, ⅓ e ⅔ do período (servem para 7 e para 30 dias)
+  const ticks = daily.length ? [0, Math.floor(daily.length / 3), Math.floor((daily.length * 2) / 3)] : []
 
   return (
     <>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <PeriodToggle days={days} onChange={setDays} />
+      </div>
       <section className="app-grid-5">
         <Kpi label="Execuções hoje" value={k ? String(k.runsToday) : '—'} delta={k ? `${delta >= 0 ? '+' : ''}${delta} vs. ontem` : undefined} deltaColor={delta >= 0 ? C.ok : C.t2} />
         <Kpi label={`Sucesso · ${days} dias`} value={k?.success7d != null ? `${k.success7d}%` : '—'} color={C.ok} delta={k ? `${k.failed7d} falha${k.failed7d === 1 ? '' : 's'}` : undefined} />
@@ -76,7 +97,8 @@ export function OverviewPage() {
 
       <section className="app-grid-3">
         <Card className="app-span-2" title="Execuções por dia" right={<Legend items={[{ label: 'concluídas', color: C.cyan }, { label: 'falhas', color: C.warn }, { label: 'rotinas', color: C.violet }]} />}>
-          <div role="img" aria-label="Execuções por dia nos últimos 30 dias" style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 170 }}>
+          <Loaded s={stats} rows={4}>
+          <div role="img" aria-label={`Execuções por dia nos últimos ${days} dias`} style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 170 }}>
             {daily.map((d, i) => {
               const total = d.done + d.failed + d.routine
               const h = (v: number) => `${(v / maxDay) * 100}%`
@@ -102,13 +124,14 @@ export function OverviewPage() {
             })}
           </div>
           <div className="app-mono" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.t3 }}>
-            {[0, 10, 20].map((i) => (
+            {ticks.map((i) => (
               <span key={i}>{daily[i] ? `${daily[i].date.slice(8)}/${daily[i].date.slice(5, 7)}` : ''}</span>
             ))}
             <span>hoje</span>
           </div>
+          </Loaded>
           {coarse && (
-            <div role="status" style={{ fontSize: 12.5, color: selDay ? '#c9cde0' : C.t3, minHeight: 18 }}>
+            <div role="status" style={{ fontSize: 12.5, color: selDay ? C.soft : C.t3, minHeight: 18 }}>
               {(() => {
                 const d = daily.find((x) => x.date === selDay)
                 return d ? dayTip(d) : 'Toque numa barra para ver o dia.'
@@ -118,6 +141,7 @@ export function OverviewPage() {
         </Card>
 
         <Card title="Sucesso por agente" right={`${days} dias`}>
+          <Loaded s={stats}>
           {byAgent.length === 0 && <span className="app-muted">Ainda sem execuções concluídas no período.</span>}
           {byAgent.map((a) => (
             <HBar
@@ -129,9 +153,11 @@ export function OverviewPage() {
               onClick={() => openApp('agents', a.agentId)}
             />
           ))}
+          </Loaded>
         </Card>
 
         <Card className="app-span-2" title="Trabalhando agora" right={<button onClick={() => openApp('ops')} style={linkBtn}>Ver operações →</button>}>
+          <Loaded s={board} rows={2}>
           {working.length === 0 ? (
             <span className="app-muted">Nenhum agente trabalhando agora. Peça algo para a Yui ou rode um workflow.</span>
           ) : (
@@ -171,9 +197,11 @@ export function OverviewPage() {
               })}
             </div>
           )}
+          </Loaded>
         </Card>
 
         <Card title="Próximos agendamentos" right={<button onClick={() => openApp('schedule')} style={linkBtn}>Agenda →</button>}>
+          <Loaded s={occ}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {next.length === 0 && <span className="app-muted">Nenhuma rotina agendada. Crie uma em Agendamentos ou peça para a Yui.</span>}
             {next.map((n) => (
@@ -187,9 +215,11 @@ export function OverviewPage() {
               </div>
             ))}
           </div>
+          </Loaded>
         </Card>
 
         <Card className="app-span-2" title="Projetos" right={<button onClick={() => openApp('projects')} style={linkBtn}>Todos →</button>}>
+          <Loaded s={ov}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {(ov.data?.projects ?? []).length === 0 && <span className="app-muted">Nenhum projeto clonado ainda. Conecte o GitHub em Configurações.</span>}
             {(ov.data?.projects ?? []).slice(0, 6).map((p) => (
@@ -212,13 +242,16 @@ export function OverviewPage() {
               </button>
             ))}
           </div>
+          </Loaded>
         </Card>
 
         <Card title="Ferramentas mais usadas" right={`${days} dias`}>
+          <Loaded s={stats}>
           {tools.length === 0 && <span className="app-muted">Sem uso registrado ainda.</span>}
           {tools.slice(0, 7).map((t) => (
             <HBar key={t.name} label={t.name} value={String(t.count)} pct={(t.count / (tools[0]?.count || 1)) * 100} color={C.violet} labelW={110} mono />
           ))}
+          </Loaded>
         </Card>
       </section>
     </>

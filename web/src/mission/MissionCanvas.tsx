@@ -95,7 +95,7 @@ export function MissionCanvas({ steps, setSteps, selected, onSelect, onOpen, pos
 // Zoom/encaixe com alvos de 44px para toque.
 function TouchControls() {
   const rf = useReactFlow()
-  const btn: CSSProperties = { width: 44, height: 44, border: 'none', background: 'rgba(16,20,42,.92)', color: '#dfe3f3', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }
+  const btn: CSSProperties = { width: 44, height: 44, border: 'none', background: 'rgba(16,20,42,.92)', color: 'var(--text-btn)', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }
   return (
     <Panel position="bottom-left" style={{ display: 'flex', flexDirection: 'column', gap: 1, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.08)' }}>
       <button aria-label="Aproximar" style={btn} onClick={() => void rf.zoomIn()}>+</button>

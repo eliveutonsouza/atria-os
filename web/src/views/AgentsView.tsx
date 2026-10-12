@@ -21,7 +21,7 @@ export function AgentsView() {
   const narrow = useYui((s) => s.narrow)
   const agentsWorking = useYui((s) => s.agentsWorking)
   const { data, loading, error } = useApi<AgentInfo[]>('/api/agents', [agentsWorking], 15000)
-  useHeader('Agent network', 'Agentes', [
+  useHeader('Equipe de agentes', 'Agentes', [
     { label: '+ Novo agente', fn: () => void newAgent(), primary: true },
     { label: 'Ferramentas', fn: () => useYui.getState().show('tools') },
     { label: 'Execuções', fn: () => useYui.getState().show('runs') },

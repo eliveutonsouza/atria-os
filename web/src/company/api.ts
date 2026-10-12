@@ -6,11 +6,22 @@ import { useYui } from '../store/yui'
 
 export type CompanyTab = 'perfil' | 'documentos' | 'busca'
 
-export function goTab(id: CompanyTab | `doc:${string}`) {
-  useYui.getState().set({ appParams: { id } })
+// Aba com edição não salva registra aqui uma pergunta antes de sair (useUnsavedGuard).
+let leaveGuard: (() => Promise<boolean>) | null = null
+export function setLeaveGuard(g: () => Promise<boolean>): () => void {
+  leaveGuard = g
+  return () => {
+    if (leaveGuard === g) leaveGuard = null
+  }
 }
 
-export const STAGES = ['Recebido', 'Lendo / OCR', 'Extraindo dados', 'Embeddings', 'No Qdrant'] as const
+export function goTab(id: CompanyTab | `doc:${string}`) {
+  const go = () => useYui.getState().set({ appParams: { id } })
+  if (!leaveGuard) return go()
+  void leaveGuard().then((ok) => ok && go())
+}
+
+export const STAGES = ['Recebido', 'Lendo / OCR', 'Extraindo dados', 'Preparando busca', 'Pronto para a Yui consultar'] as const
 
 export const CAT_COLORS: Record<CompanyCategory, [string, string]> = {
   Comercial: ['rgba(245,181,74,0.14)', '#f5c97a'],

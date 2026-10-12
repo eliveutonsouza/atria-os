@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ProjectDetail, ProjectSummary } from '@shared/protocol'
-import { api } from '../api/client'
+import { api, ApiError } from '../api/client'
 import { useApi } from '../api/useApi'
 import { startRun } from '../lib/actions'
 import { C, toneColor } from '../lib/colors'
@@ -25,7 +25,7 @@ export function ProjectView() {
   const [removing, setRemoving] = useState(false)
   const [editing, setEditing] = useState(false)
   const actions: HeaderAction[] = []
-  if (data?.hasPreview) actions.push({ label: 'Live preview', fn: () => useYui.getState().show('website', { project: data.slug }) })
+  if (data?.hasPreview) actions.push({ label: 'Prévia ao vivo', fn: () => useYui.getState().show('website', { project: data.slug }) })
   if (data?.hasLogs) actions.push({ label: 'Ver logs', fn: () => useYui.getState().show('logs', { project: data.slug }) })
   if (data?.issue) actions.push({ label: 'Pedir correção', primary: true, fn: () => startRun('backend', data.slug, `Investigue e corrija o problema: ${data.issue}`) })
   if (data) {
@@ -77,8 +77,8 @@ function ProjectSettingsCard({ slug, editing, setEditing, onSaved, onRemove }: {
   const rows: [string, string][] = c
     ? [
         ['Objetivo', c.goal || '—'],
-        ['URL de saúde', c.healthUrl || '—'],
-        ['Container dos logs', c.container || '—'],
+        ['Endereço para checar se está no ar', c.healthUrl || '—'],
+        ['Onde ler os registros', c.container || '—'],
         ['Pasta de preview', c.preview || '—'],
         ['Pedem aprovação', c.approvalPatterns?.length ? c.approvalPatterns.join(' · ') : 'nenhum comando extra'],
       ]
@@ -89,7 +89,11 @@ function ProjectSettingsCard({ slug, editing, setEditing, onSaved, onRemove }: {
         <Eyebrow>Configuração do projeto</Eyebrow>
         {!editing && c && <button className="app-btn small" onClick={() => setEditing(true)}>Editar</button>}
       </div>
-      {cfg.error && <span style={{ fontSize: 13, color: C.t3 }}>Este projeto ainda não está clonado no Atria OS.</span>}
+      {cfg.error && (cfg.error instanceof ApiError && cfg.error.status === 404 ? (
+        <span style={{ fontSize: 13, color: C.t3 }}>Este projeto ainda não está clonado no Atria OS.</span>
+      ) : (
+        <ErrorNote text="Não consegui ler a configuração do projeto." retry={() => cfg.reload()} />
+      ))}
       {!editing && c && (
         <div style={{ display: 'flex', flexDirection: 'column', fontSize: 13 }}>
           {rows.map(([k, v]) => (
@@ -159,10 +163,10 @@ function SettingsForm({ slug, initial: c, onCancel, onSaved }: { slug: string; i
           <textarea style={{ ...input, minHeight: 64, resize: 'vertical' }} maxLength={600} value={form.goal} onChange={set('goal')} placeholder="Ex.: levar o Stoqmate a 50 clientes pagantes até dezembro; prioridade é estabilidade." />
         </Field>
       </div>
-      <Field label="URL de saúde" hint="Testada a cada minuto; fora do ar vira alerta.">
+      <Field label="Endereço para checar se está no ar" hint="Testado a cada minuto; se cair, vira alerta.">
         <input style={input} value={form.healthUrl} onChange={set('healthUrl')} placeholder="https://meusite.com/health" inputMode="url" />
       </Field>
-      <Field label="Container dos logs" hint="Nome do container Docker.">
+      <Field label="Onde ler os registros" hint="Nome do container Docker do projeto.">
         <input style={input} value={form.container} onChange={set('container')} placeholder="meusite-api" />
       </Field>
       <Field label="Pasta de preview" hint="Relativa ao projeto, com index.html.">

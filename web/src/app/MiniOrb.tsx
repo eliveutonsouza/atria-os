@@ -11,6 +11,7 @@ import { exitApp } from './nav'
 export function MiniOrb() {
   const app = useYui((s) => s.shellMode === 'app')
   const narrow = useYui((s) => s.narrow)
+  const coarse = useYui((s) => s.coarse)
   const msg = useYui((s) => s.msg)
   const yst = useYui((s) => s.yst)
   const inbox = useYui((s) => s.inbox)
@@ -68,9 +69,11 @@ export function MiniOrb() {
     <>
       {(bubble || live || hover) && !showInput && !drawer && (
         <div
-          role="status"
+          role={narrow ? 'button' : 'status'}
           aria-live="polite"
+          tabIndex={narrow ? 0 : undefined}
           onClick={narrow ? () => exitApp() : undefined}
+          onKeyDown={narrow ? (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), exitApp()) : undefined}
           style={{
             // celular: bolha acima do orb (não cobre conteúdo nem o campo), toque abre a conversa
             position: 'absolute', right: narrow ? 14 : right, bottom: narrow ? bottom + 70 : bottom, zIndex: 46, maxWidth: narrow ? 'min(300px, calc(100dvw - 40px))' : 300, padding: '10px 14px',
@@ -80,7 +83,7 @@ export function MiniOrb() {
           }}
         >
           <div style={{ fontSize: 10, letterSpacing: '.22em', color, fontWeight: 600, marginBottom: 4 }}>YUI · {label.toUpperCase()}</div>
-          {live ? <span style={{ color: C.t2 }}>“{transcript}”</span> : bubble ?? 'Clique para conversar · Ctrl+L para digitar · segure Espaço para falar'}
+          {live ? <span style={{ color: C.t2 }}>“{transcript}”</span> : bubble ?? (coarse ? 'Toque para conversar' : 'Clique para conversar · Ctrl+L para digitar · segure Espaço para falar')}
         </div>
       )}
       <div
@@ -104,9 +107,9 @@ export function MiniOrb() {
             if (e.key === 'Enter') send()
             if (e.key === 'Escape') (e.target as HTMLInputElement).blur()
           }}
-          style={{ flex: 1, minWidth: 0, height: narrow ? 40 : 32, border: 'none', outline: 'none', background: 'transparent', color: C.text, fontSize: 14, fontFamily: 'var(--sans)', padding: '0 6px' }}
+          style={{ flex: 1, minWidth: 0, height: coarse ? 44 : narrow ? 40 : 32, border: 'none', background: 'transparent', color: C.text, fontSize: 14, fontFamily: 'var(--sans)', padding: '0 6px' }}
         />
-        <button aria-label="Enviar" onClick={send} style={{ width: narrow ? 40 : 32, height: narrow ? 40 : 32, flexShrink: 0, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#67d8f2,#a68cf7)', color: '#0a0c1d', fontWeight: 700, cursor: 'pointer' }}>
+        <button aria-label="Enviar" onClick={send} style={{ width: coarse ? 44 : narrow ? 40 : 32, height: coarse ? 44 : narrow ? 40 : 32, flexShrink: 0, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#67d8f2,#a68cf7)', color: '#0a0c1d', fontWeight: 700, cursor: 'pointer' }}>
           ↑
         </button>
       </div>

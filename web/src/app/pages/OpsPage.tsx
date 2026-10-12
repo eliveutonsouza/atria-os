@@ -4,6 +4,7 @@ import { useApi } from '../../api/useApi'
 import { C } from '../../lib/colors'
 import { useYui } from '../../store/yui'
 import { useHeader } from '../../views/ui'
+import { plural } from '../../lib/feedback'
 import { agentColor, Card, elapsed, openApp, ORIGIN_LABEL, Tag } from './common'
 
 // Operações (Ops.dc.html): metodologia de execução — pipeline com contadores, quadro ao vivo e linha do tempo 24h.
@@ -53,10 +54,10 @@ export function OpsPage() {
   const d = board.data
   const p = d?.pipeline
   const pipe = [
-    { k: 'Entrada', t: 'Você', n: p ? `${p.inbound} pedido${p.inbound === 1 ? '' : 's'} hoje` : 'voz · texto · rotina', c: C.t2, on: false },
-    { k: 'Conversa', t: 'Yui', n: 'GPT-Live · texto', c: C.cyan, on: true },
+    { k: 'Entrada', t: 'Você', n: p ? `${plural(p.inbound, 'pedido', 'pedidos')} hoje` : 'voz · texto · rotina', c: C.t2, on: false },
+    { k: 'Conversa', t: 'Yui', n: 'voz · texto', c: C.cyan, on: true },
     { k: 'Decide', t: 'Cérebro', n: p ? `${p.brain} ${p.brain === 1 ? 'delegação' : 'delegações'} hoje` : 'tarefa · missão · workflow', c: C.lav, on: !!p?.brain },
-    { k: 'Planeja', t: 'Missões & workflows', n: p ? `${p.missions} missão · ${p.workflows} workflow` : '—', c: C.violet, on: !!(p?.missions || p?.workflows) },
+    { k: 'Planeja', t: 'Missões & workflows', n: p ? `${plural(p.missions, 'missão', 'missões')} · ${plural(p.workflows, 'workflow', 'workflows')}` : '—', c: C.violet, on: !!(p?.missions || p?.workflows) },
     { k: 'Executa', t: 'Agentes', n: p ? `${p.running} rodando · ${p.queued} na fila` : '—', c: C.cyan, on: !!p?.running },
     { k: 'Controle', t: 'Aprovação', n: p ? `${p.approvals} aguardando você` : '—', c: C.warn, on: !!p?.approvals },
     { k: 'Resultado', t: 'Entrega', n: p ? `${p.doneToday} hoje` : '—', c: C.ok, on: false },
