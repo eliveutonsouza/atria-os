@@ -24,6 +24,8 @@ export const runBus = new EventEmitter<{
   rated: [RunInfo];
   approval: [ApprovalInfo];
 }>();
+// workflows esperam o fim de cada nó com um listener próprio (waitRun): vários nós em paralelo passam de 10
+runBus.setMaxListeners(100);
 
 type RunRow = {
   id: string; mission_id: string | null; step_id: string | null; workflow_run_id: string | null; routine_id: string | null; origin: string; display: 'blocks' | 'html' | null; agent_id: string; project: string | null; instruction: string; task: string; state: RunState;

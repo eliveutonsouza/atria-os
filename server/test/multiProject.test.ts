@@ -92,3 +92,12 @@ test('voz: aviso de outro projeto falado pelo GPT-Live é reconhecido pela trans
   assert.equal(live.matchesForeign('Claro, abrindo o terminal para você agora.', said), false);
   assert.equal(live.matchesForeign('ok', said), false);
 });
+
+test('voz: a mesma resposta não é falada duas vezes, mas respostas diferentes passam', async () => {
+  const live = await import('../src/live.ts');
+  const now = Date.now();
+  const spoken = [{ text: 'Concluída. A página está publicada em preview e validada. Não enviei pelo Telegram.', at: now - 5_000 }];
+  assert.equal(live.isRepeatSpeech('Concluída. A página está publicada em preview e validada. Não enviei pelo Telegram. Quer ver?', spoken, now), true);
+  assert.equal(live.isRepeatSpeech('Enviei os quatro arquivos do QR Code pelo Telegram agora.', spoken, now), false);
+  assert.equal(live.isRepeatSpeech('Concluída. A página está publicada em preview e validada. Não enviei pelo Telegram.', spoken, now + 120_000), false);
+});

@@ -33,6 +33,8 @@ Exceção à regra de delegar: hora, data, dia da semana, período do dia, clima
 com o bloco "Agora" abaixo (ou com a "Atualização do relógio" mais recente que o backend mandar). Nunca pergunte de volta
 "horas do quê?": "que horas são" é a hora atual. Previsão de outros dias/cidades, cotações e lembretes => delegue.
 Ajuste a saudação ao período (bom dia / boa tarde / boa noite).
+Não faça interjeições ("uhum", "hum", "tá") enquanto o usuário fala: espere ele terminar. Nunca repita o que acabou de dizer;
+se o backend entregar um resultado que você já comunicou, não diga de novo. Se ouvir uma conversa que não é com você, fique em silêncio.
 
 ${contextoAgora(0)}${memoryBlock() ? `\n\n${memoryBlock()}` : ''}`;
 
@@ -43,6 +45,8 @@ interface LiveState {
   muted: boolean;
   userBuf: string;
   yuiBuf: string;
+  outWords: number; // palavras que o GPT-Live falou desde a última fala do usuário (watchdog)
+  spoken: { text: string; at: number }[]; // falas recentes (GPT-Live e backend) para não repetir
   pendingRequest: string;
   lastActivity: number;
   speakingTimer?: NodeJS.Timeout;
@@ -58,13 +62,21 @@ interface LiveState {
 
 // A fala transcrita corresponde a um aviso de outro projeto? (o GPT-Live parafraseia: compara palavras)
 const words = (t: string) => new Set(t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? []);
-export function matchesForeign(spoken: string, said: string): boolean {
+export function matchesForeign(spoken: string, said: string, min = 0.5): boolean {
   const a = words(spoken);
   if (a.size < 3) return false;
   const b = words(said);
   let hit = 0;
   for (const w of a) if (b.has(w)) hit++;
-  return hit / a.size >= 0.5;
+  return hit / a.size >= min;
+}
+// Já foi dito (quase igual) nos últimos 90 s? Evita a Yui repetir a mesma resposta por caminhos diferentes.
+export function isRepeatSpeech(text: string, spoken: { text: string; at: number }[], now = Date.now()): boolean {
+  return spoken.some((p) => now - p.at < 90_000 && (matchesForeign(text, p.text, 0.8) || matchesForeign(p.text, text, 0.8)));
+}
+function rememberSpoken(st: LiveState, text: string) {
+  st.spoken.push({ text, at: Date.now() });
+  if (st.spoken.length > 12) st.spoken.shift();
 }
 function takeForeign(st: LiveState, text: string): { project: string | null } | null {
   const now = Date.now();
@@ -122,11 +134,18 @@ function flushUser() {
   saveMessage('user', text, 'voice');
   emit({ type: 'user.said', text, final: true });
   st.userBuf = '';
+  st.outWords = 0;
   // Watchdog: se o GPT-Live não delegar em WATCH_MS, o servidor atende o pedido ele mesmo.
   clearTimeout(st.watchTimer);
   if (!done && !isSmallTalk(text) && !isNowQuestion(text)) {
     st.watchTimer = setTimeout(() => {
       if (live !== st || !st.pendingRequest) return;
+      // o GPT-Live já respondeu por conta própria (mais que "deixa eu ver"): responder de novo faria a Yui falar em dobro
+      if (st.outWords >= 8) {
+        console.log(`live: watchdog dispensado (GPT-Live já respondeu) ← "${st.pendingRequest.slice(0, 80)}"`);
+        st.pendingRequest = '';
+        return;
+      }
       const request = st.pendingRequest;
       st.pendingRequest = '';
       console.log(`live: watchdog ← "${request.slice(0, 120)}"`);
@@ -149,13 +168,14 @@ async function serve(st: LiveState, request: string, delegationId: string | null
   inf.answered = true;
   inf.answer = answer;
   if (live !== st) return;
-  send(st, { type: 'session.commentary.append', delegation_id: inf.delegationId, content: answer });
+  send(st, { type: 'session.commentary.append', delegation_id: inf.delegationId, content: answer }, delegationId ? 'delegação' : 'watchdog');
 }
 
 function flushYui() {
   if (!live || !live.yuiBuf.trim()) return;
   const text = live.yuiBuf.trim();
   live.yuiBuf = '';
+  rememberSpoken(live, text);
   // aviso de outro projeto falado em voz: já foi gravado na conversa daquele projeto (narrate)
   const foreign = takeForeign(live, text);
   if (foreign) {
@@ -168,7 +188,8 @@ function flushYui() {
 }
 
 function seedInput(): OpenAI.Live.InitialItem[] {
-  return recentMessages(30).map((m) =>
+  // interjeições soltas ('Uhum.', 'Hum.') não voltam para a próxima sessão: o modelo as imitaria
+  return recentMessages(30).filter((m) => m.who === 'user' || (m.text.match(/\S+/g) ?? []).length > 3).map((m) =>
     m.who === 'user'
       ? ({ role: 'user', type: 'message', content: [{ type: 'input_text', text: m.text }] } as OpenAI.Live.InitialItem)
       : ({ role: 'assistant', type: 'message', content: [{ type: 'output_text', text: m.text }] } as OpenAI.Live.InitialItem),
@@ -204,7 +225,7 @@ export async function startLive(offerSdp: string): Promise<{ sdp: string; sessio
   });
   const sessionId = res.session.id;
   const sideband = new SidebandWS(openai, { session_id: sessionId, graceful_close: true });
-  live = { sessionId, startedAt: Date.now(), sideband, muted: false, userBuf: '', yuiBuf: '', pendingRequest: '', lastActivity: Date.now(), lastProgressNote: new Map(), inflight: null, foreign: [] };
+  live = { sessionId, startedAt: Date.now(), sideband, muted: false, userBuf: '', yuiBuf: '', outWords: 0, spoken: [], pendingRequest: '', lastActivity: Date.now(), lastProgressNote: new Map(), inflight: null, foreign: [] };
   wire(live);
   // Sessão longa: o relógio do prompt envelhece; manda o "agora" de novo a cada 5 min.
   const st = live;
@@ -233,6 +254,7 @@ function wire(st: LiveState) {
     if (live !== st) return;
     flushUser();
     st.yuiBuf += e.delta;
+    st.outWords += (e.delta.match(/\S+/g) ?? []).length;
     st.lastActivity = Date.now();
     emit({ type: 'yui.say', text: st.yuiBuf, final: false });
     setYuiState('speaking');
@@ -249,7 +271,7 @@ function wire(st: LiveState) {
     const delegationId = e.delegation.id;
     const inf = st.inflight;
     // Watchdog já pegou este pedido: a resposta vai para esta delegação, sem pensar de novo.
-    if (!st.pendingRequest && inf && !inf.delegationId && Date.now() - inf.at < 20_000) {
+    if (!st.pendingRequest && inf && !inf.delegationId && Date.now() - inf.at < 60_000) {
       console.log(`live: delegação ${delegationId} ← reaproveita watchdog`);
       if (inf.answered) send(st, { type: 'session.thinking.append', delegation_id: delegationId, content: `Resultado já entregue ao usuário: ${inf.answer ?? ''}` });
       else inf.delegationId = delegationId;
@@ -277,7 +299,16 @@ function wire(st: LiveState) {
   });
 }
 
-function send(st: LiveState, ev: OpenAI.Live.Sideband.ConnectClientEvent) {
+function send(st: LiveState, ev: OpenAI.Live.Sideband.ConnectClientEvent, origin = '') {
+  if (ev.type === 'session.commentary.append') {
+    const content = (ev as { content?: string }).content ?? '';
+    if (isRepeatSpeech(content, st.spoken)) {
+      console.log(`live: fala repetida descartada (${origin || 'commentary'}) ← "${content.slice(0, 80)}"`);
+      return;
+    }
+    rememberSpoken(st, content);
+    console.log(`live: commentary (${origin || 'commentary'}) ← "${content.slice(0, 80)}"`);
+  }
   try {
     st.sideband.send(ev);
   } catch (e) {
@@ -334,7 +365,7 @@ export async function handleText(text: string): Promise<void> {
     answer = 'Não consegui pensar nisso agora — algo falhou do meu lado.';
   }
   if (live) {
-    send(live, { type: 'session.commentary.append', delegation_id: null, content: clip(answer) });
+    send(live, { type: 'session.commentary.append', delegation_id: null, content: clip(answer) }, 'texto');
     return;
   }
   sayOnScreen(answer, 'idle', req.project ?? null);
@@ -370,7 +401,7 @@ export function narrate(text: string, opts: { speak: boolean; end?: 'success' | 
       entry.timer.unref();
       st.foreign.push(entry);
     }
-    send(live, { type: opts.speak ? 'session.commentary.append' : 'session.thinking.append', delegation_id: null, content: clip(text) });
+    send(live, { type: opts.speak ? 'session.commentary.append' : 'session.thinking.append', delegation_id: null, content: clip(text) }, 'narração');
     if (opts.end) setYuiState(opts.end);
     return;
   }

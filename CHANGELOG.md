@@ -2,6 +2,12 @@
 
 Versões marcadas do Atria OS. Cada tag `vX.Y.Z` publica as imagens no GHCR e pode ser aplicada pelo Atria Central (Atualizações).
 
+## v1.7.2
+- Voz: a Yui não repete mais a mesma resposta. O servidor só responde pelo "plano B" quando o GPT-Live não respondeu sozinho, descarta fala quase idêntica a uma dita nos últimos 90 s e reaproveita a resposta de delegação tardia.
+- Voz: instruções contra interjeições ("uhum", "hum") enquanto você fala e contra repetir resultado já dito; interjeições soltas não voltam no histórico da próxima sessão.
+- Logs da voz mostram a origem de cada fala (delegação, plano B, texto, narração) e as descartadas.
+- Aviso de "muitos listeners" nas execuções (workflows com vários passos em paralelo) corrigido.
+
 ## v1.7.1
 - Toque no celular e no tablet: abas, chips, seletor de projeto, status das contas, navegação das Configurações, comandos do Claude, Skills e barra do Navegador com alvo de 44 px também no iPad (antes só no celular).
 - Teste de celular ignora botões fora da tela e mostra o total de telas com aviso.
