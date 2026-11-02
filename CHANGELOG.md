@@ -2,7 +2,7 @@
 
 Versões marcadas do Atria OS. Cada tag `vX.Y.Z` publica as imagens no GHCR e pode ser aplicada pelo Atria Central (Atualizações).
 
-## Próxima versão
+## v1.8.2
 - Correção da v1.8.1: o servidor não subia (rota `/manifest.webmanifest` duplicada) e a atualização voltava sozinha para a v1.8.0. Agora sobe normal e o manifesto do app também usa o nome do assistente.
 
 ## v1.8.1
