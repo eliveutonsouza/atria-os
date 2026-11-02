@@ -412,7 +412,8 @@ app.addHook('onSend', async (req, reply, payload) => {
 
 // ---------- SPA ----------
 if (existsSync(config.webDist)) {
-  await app.register(fastifyStatic, { root: config.webDist, wildcard: false, index: false });
+  // manifest.webmanifest sai do registro automático: a rota abaixo serve com o nome do assistente.
+  await app.register(fastifyStatic, { root: config.webDist, wildcard: false, index: false, globIgnore: ['manifest.webmanifest'] });
   const indexHtml = () => brand(readFileSync(join(config.webDist, 'index.html'), 'utf8'), config.assistantName);
   app.get('/manifest.webmanifest', (_req, reply) => {
     const f = join(config.webDist, 'manifest.webmanifest');
