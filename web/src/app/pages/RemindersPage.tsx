@@ -8,6 +8,7 @@ import { useYui } from '../../store/yui'
 import { ActionSheet, BottomSheet } from '../../views/Sheet'
 import { ConfirmDeleteModal, Empty, ErrorNote, Skeleton, useHeader } from '../../views/ui'
 import { Tag } from './common'
+import { ai } from '../../lib/assistant'
 
 // Lembretes (Desktop-Lembretes.dc.html): abas Próximos/Enviados/Cancelados, lista com data relativa
 // e painel de edição (à direita no desktop, folha inferior no celular). Horários no fuso de São Paulo.
@@ -107,7 +108,7 @@ function Editor({ draft, onChange, onClose, onSaved, onStop, phone }: { draft: D
           ))}
         </select>
       </label>
-      <div style={{ fontSize: 11.5, color: C.t3 }}>Horário de Brasília. Na hora, a Yui avisa por notificação no celular e fala se o painel estiver aberto.</div>
+      <div style={{ fontSize: 11.5, color: C.t3 }}>Horário de Brasília. Na hora, a {ai()} avisa por notificação no celular e fala se o painel estiver aberto.</div>
       {onStop && (
         <button className="vault-link-btn" style={{ alignSelf: 'flex-start', color: C.t2, minHeight: phone ? 44 : undefined }} onClick={onStop}>
           Parar de lembrar (vai para Cancelados)

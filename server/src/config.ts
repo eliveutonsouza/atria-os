@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { normalizePersona, type Persona } from './persona.ts';
+import { normalizeAssistantName } from './brand.ts';
 
 /** Lê a variável; para ATRIA_X vazia, usa a reserva YUI_X (instalações de antes do nome Atria OS). */
 export function readEnv(name: string): string | undefined {
@@ -66,6 +67,9 @@ export const config = {
   },
   get voice() {
     return dyn('voice.name', 'ATRIA_VOICE', 'marin');
+  },
+  get assistantName(): string {
+    return normalizeAssistantName(dyn('assistant.name', 'ATRIA_ASSISTANT_NAME', ''));
   },
   get persona(): Persona {
     return normalizePersona({

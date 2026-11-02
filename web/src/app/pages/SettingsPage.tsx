@@ -15,6 +15,7 @@ import {
 import { MonitorSection } from './settings/MonitorSection'
 import { NoticesSection } from './settings/NoticesSection'
 import { SupportSection } from './settings/SupportSection'
+import { ai } from '../../lib/assistant'
 
 // Configurações (Settings.dc.html): menu de seções à esquerda, conteúdo à direita.
 // A seção ativa mora na URL: /app/settings/<seção>.
@@ -23,7 +24,7 @@ const TABS = [
   { id: 'start', label: 'Primeiros passos' },
   { id: 'account', label: 'Conta' },
   { id: 'connections', label: 'Conexões' },
-  { id: 'voice', label: 'Yui & voz' },
+  { id: 'voice', get label() { return `${ai()} & voz` } },
   { id: 'models', label: 'Modelos' },
   { id: 'agents', label: 'Agentes & aprovações' },
   { id: 'notifications', label: 'Notificações' },

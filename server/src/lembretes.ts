@@ -124,7 +124,7 @@ export function disparar(nowMs = Date.now()): Lembrete[] {
     } catch (e) {
       console.error('lembrete: aviso', (e as Error).message);
     }
-    void sendPush({ title: 'Lembrete da Yui', body: r.text, url: '/', tag: `reminder-${r.id}`, priority: 'high' }, { force: true }).catch((e) =>
+    void sendPush({ title: `Lembrete da ${config.assistantName}`, body: r.text, url: '/', tag: `reminder-${r.id}`, priority: 'high' }, { force: true }).catch((e) =>
       console.error('lembrete: push', (e as Error).message),
     );
   }
@@ -162,7 +162,7 @@ const S = (props: Record<string, unknown>, required: string[]) => ({ type: 'obje
 
 registerBrain({
   name: 'lembretes',
-  instructions: `- "Me lembra…", "me avisa às…", "timer/cronômetro de X minutos", "todo dia às 8 me lembra…" => lembrete_criar (aviso no celular + Yui fala na hora). Calcule o horário com o bloco "Agora" (fuso ${config.timezone}); "daqui X min" => daqui_minutos. Confirme em 1 frase com dia e hora. Lembrete NÃO é rotina: create_routine só quando um agente precisa trabalhar.
+  instructions: `- "Me lembra…", "me avisa às…", "timer/cronômetro de X minutos", "todo dia às 8 me lembra…" => lembrete_criar (aviso no celular + o assistente fala na hora). Calcule o horário com o bloco "Agora" (fuso ${config.timezone}); "daqui X min" => daqui_minutos. Confirme em 1 frase com dia e hora. Lembrete NÃO é rotina: create_routine só quando um agente precisa trabalhar.
 - "Quais meus lembretes?" => lembrete_listar. "Cancela o lembrete X" => lembrete_cancelar.`,
   snapshot,
   tools: [

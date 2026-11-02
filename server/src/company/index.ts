@@ -348,7 +348,7 @@ registerBrain({
     if (name === 'empresa_consultar') {
       if (!ready) return Promise.resolve({ ok: false, error: 'base da empresa indisponível' });
       if (ctx.dryRun) return Promise.resolve({ ok: true, dryRun: true });
-      return search(String(args.pergunta), { answer: true, who: 'Yui' }).then((r) => ({
+      return search(String(args.pergunta), { answer: true, who: config.assistantName }).then((r) => ({
         resposta: r.answer,
         semResposta: r.noAnswer,
         fontes: r.hits.slice(0, 4).map((h) => `${h.docName}${h.page ? ` p.${h.page}` : ''}`),

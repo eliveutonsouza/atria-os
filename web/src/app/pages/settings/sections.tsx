@@ -10,6 +10,7 @@ import { Chip, Field, input, SmallBtn, StatusPill } from '../../../views/kit'
 import { ModelSelect } from '../../../views/ModelSelect'
 import { ConfirmDeleteModal, ErrorNote, Skeleton } from '../../../views/ui'
 import { EmbeddedTerminal } from './EmbeddedTerminal'
+import { ai, setAssistantName } from '../../../lib/assistant'
 
 // ---------- dados compartilhados ----------
 
@@ -36,7 +37,9 @@ export function useSettings() {
     setMsg(null)
     setSaving(true)
     try {
-      setData(await api.put<SettingsPayload>('/api/settings', patch))
+      const saved = await api.put<SettingsPayload>('/api/settings', patch)
+      setData(saved)
+      setAssistantName(saved.values['assistant.name'])
       setMsg({ ok: true, text: 'Salvo.' })
       return true
     } catch (e) {
@@ -140,14 +143,14 @@ export function SetupSteps({ onGo }: { onGo: (tab: 'connections' | 'notification
   const steps = [
     { done: !st.needsPassword, t: 'Acesso criado', d: 'Senha do painel definida.' },
     { done: st.claude !== 'none', t: 'Conta Claude conectada', d: st.claude === 'claude.ai' ? 'Login claude.ai: agentes com conectores, skills e plugins.' : st.claude === 'token' ? 'Usando token — conecte o login claude.ai para ter conectores.' : 'Os agentes precisam da sua conta Claude para trabalhar.', go: 'connections' as const },
-    { done: st.openai, t: 'OpenAI conectada', d: 'Voz da Yui (GPT-Live) e o cérebro que decide o que fazer.', go: 'connections' as const },
+    { done: st.openai, t: 'OpenAI conectada', d: `Voz da ${ai()} (GPT-Live) e o cérebro que decide o que fazer.`, go: 'connections' as const },
     { done: st.github, t: 'GitHub conectado', d: 'Opcional: catálogo automático e clone dos seus repositórios.', go: 'connections' as const },
     { done: st.push > 0, t: 'App e notificações', d: 'Opcional: instale no celular/desktop e receba aprovações.', go: 'notifications' as const },
     { done: !!st.monitor, t: 'Monitoramento (opcional)', d: 'Para quem administra várias instalações do Atria OS: envia a saúde desta instância para o Atria Central.', go: 'system' as const },
   ]
   const n = steps.filter((s) => s.done).length
   return (
-    <Section title={`Primeiros passos · ${n} de ${steps.length}`} hint={st.completed ? 'Tudo pronto para o dia a dia. Os opcionais você ativa quando quiser.' : 'Conecte o essencial para a Yui e os agentes funcionarem.'}>
+    <Section title={`Primeiros passos · ${n} de ${steps.length}`} hint={st.completed ? 'Tudo pronto para o dia a dia. Os opcionais você ativa quando quiser.' : `Conecte o essencial para a ${ai()} e os agentes funcionarem.`}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {steps.map((s) => (
           <div key={s.t} style={{ display: 'grid', gridTemplateColumns: '26px minmax(0,1fr) auto', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,.02)', border: `1px solid ${s.done ? 'rgba(79,224,176,.18)' : 'rgba(255,255,255,.06)'}` }}>
@@ -200,12 +203,12 @@ export function AccountSection() {
   }
   return (
     <>
-      <Section title="Você" hint="Como a Yui te chama e para onde vão os avisos.">
+      <Section title="Você" hint={`Como a ${ai()} te chama e para onde vão os avisos.`}>
         <SettingsLoadError s={settings} />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
           <Field label="Nome"><input value={name} onChange={(e) => setName(e.target.value)} style={input} autoComplete="name" /></Field>
           <Field label="E-mail" hint="Usado como remetente das notificações push."><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={input} autoComplete="email" /></Field>
-          <Field label="Cidade" hint="Para a Yui saber o clima e os feriados. Ex.: Goiânia, GO."><input value={city} onChange={(e) => setCity(e.target.value)} style={input} autoComplete="address-level2" placeholder="Cidade, UF" /></Field>
+          <Field label="Cidade" hint={`Para a ${ai()} saber o clima e os feriados. Ex.: Goiânia, GO.`}><input value={city} onChange={(e) => setCity(e.target.value)} style={input} autoComplete="address-level2" placeholder="Cidade, UF" /></Field>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <button type="button" className={bigCls(true)} style={bigBtn(true)} disabled={!data || saving} onClick={() => save({ 'user.name': name, 'user.email': email, 'user.city': city })}>{saving ? 'Salvando…' : 'Salvar'}</button>
@@ -238,7 +241,7 @@ function UserMemory() {
     void load()
   }, [load])
   const forget = async (m: MemoryItem) => {
-    const ok = await confirmAction({ title: 'Esquecer esta lembrança?', text: `A Yui deixa de saber: “${m.text}”.`, confirmLabel: 'Esquecer', danger: true })
+    const ok = await confirmAction({ title: 'Esquecer esta lembrança?', text: `A ${ai()} deixa de saber: “${m.text}”.`, confirmLabel: 'Esquecer', danger: true })
     if (!ok) return
     try {
       await api.del(`/api/memory/${m.id}`)
@@ -258,7 +261,7 @@ function UserMemory() {
     }
   }
   return (
-    <Section title="Memória da Yui" hint="Fatos e preferências que a Yui leva para toda conversa (voz, painel e Telegram). Por voz: “Yui, lembra que…”, “o que você sabe de mim?”, “esquece que…”.">
+    <Section title={`Memória da ${ai()}`} hint={`Fatos e preferências que a ${ai()} leva para toda conversa (voz, painel e Telegram). Por voz: “${ai()}, lembra que…”, “o que você sabe de mim?”, “esquece que…”.`}>
       {data && (
         <span style={{ fontSize: 12, color: C.t3 }}>
           {data.used} de {data.max} caracteres usados
@@ -329,7 +332,7 @@ export function ConnectionsSection() {
         name="GitHub"
         ok={st.github}
         status={st.github ? 'conectado' : 'opcional'}
-        desc={st.github ? 'Repositórios no catálogo; os ativos são clonados sozinhos.' : 'Conecte para a Yui enxergar e clonar seus repositórios.'}
+        desc={st.github ? 'Repositórios no catálogo; os ativos são clonados sozinhos.' : `Conecte para a ${ai()} enxergar e clonar seus repositórios.`}
         action={<button type="button" className={bigCls(!st.github)} style={bigBtn(!st.github)} onClick={() => setTerm(term === 'github' ? null : 'github')}>{st.github ? 'Trocar conta' : 'Conectar GitHub'}</button>}
       />
       {term === 'github' && (
@@ -382,9 +385,12 @@ export function VoiceSection() {
   }, [data])
   const set = (k: string, val: string | number | boolean) => setV((o) => ({ ...o, [k]: val }))
   return (
-    <Section title="Yui & voz" hint="Mudanças valem na próxima conversa por voz.">
+    <Section title={`${ai()} & voz`} hint="Mudanças valem na próxima conversa por voz.">
       <SettingsLoadError s={settings} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
+        <Field label="Nome do assistente" hint="Como ele se chama na tela, na voz e nas mensagens. Vazio volta para Yui.">
+          <input type="text" maxLength={30} placeholder="Yui" value={String(v['assistant.name'] ?? '')} onChange={(e) => set('assistant.name', e.target.value)} style={input} />
+        </Field>
         <Field label="Voz">
           <select value={String(v['voice.name'] ?? 'marin')} onChange={(e) => set('voice.name', e.target.value)} style={input}>
             {VOICES.map((x) => <option key={x} value={x}>{x}</option>)}
@@ -409,7 +415,7 @@ export function VoiceSection() {
         <input type="checkbox" checked={!!v['ui.reducedMotion']} onChange={(e) => set('ui.reducedMotion', e.target.checked)} />
         Reduzir movimento (animações mais calmas)
       </label>
-      <div style={{ fontSize: 13, fontWeight: 600, marginTop: 6 }}>Personalidade da Yui</div>
+      <div style={{ fontSize: 13, fontWeight: 600, marginTop: 6 }}>Personalidade da {ai()}</div>
       <div style={{ fontSize: 12, opacity: 0.7, marginTop: -6 }}>Vale na voz ao vivo e nas respostas faladas do Telegram. O padrão é o jeito de sempre.</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
         <Field label="Calor e emoção">
@@ -452,7 +458,7 @@ export function VoiceSection() {
         </button>
       </div>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <button type="button" className={bigCls(true)} style={bigBtn(true)} disabled={!data || saving} onClick={() => save({ 'voice.name': v['voice.name'], 'voice.idleMin': v['voice.idleMin'], 'voice.pttKey': v['voice.pttKey'], 'ui.particleDensity': v['ui.particleDensity'], 'ui.reducedMotion': !!v['ui.reducedMotion'], 'persona.warmth': v['persona.warmth'] ?? 'atual', 'persona.humor': v['persona.humor'] ?? 'atual', 'persona.length': v['persona.length'] ?? 'curtas', 'persona.pace': Number(v['persona.pace'] ?? 1), 'persona.reactions': !!v['persona.reactions'] })}>{saving ? 'Salvando…' : 'Salvar'}</button>
+        <button type="button" className={bigCls(true)} style={bigBtn(true)} disabled={!data || saving} onClick={() => save({ 'assistant.name': String(v['assistant.name'] ?? '').trim(), 'voice.name': v['voice.name'], 'voice.idleMin': v['voice.idleMin'], 'voice.pttKey': v['voice.pttKey'], 'ui.particleDensity': v['ui.particleDensity'], 'ui.reducedMotion': !!v['ui.reducedMotion'], 'persona.warmth': v['persona.warmth'] ?? 'atual', 'persona.humor': v['persona.humor'] ?? 'atual', 'persona.length': v['persona.length'] ?? 'curtas', 'persona.pace': Number(v['persona.pace'] ?? 1), 'persona.reactions': !!v['persona.reactions'] })}>{saving ? 'Salvando…' : 'Salvar'}</button>
         <SaveMsg msg={msg} />
       </div>
     </Section>
@@ -463,8 +469,8 @@ export function VoiceSection() {
 
 // Cada select: chave da configuração, lista do catálogo (GET /api/models) e textos (Desktop-Modelos.dc.html).
 const MODEL_ROWS: { key: string; title: string; desc: string; list: (c: ModelsCatalog) => ModelOption[]; openai: boolean }[] = [
-  { key: 'models.live', title: 'Voz em tempo real', desc: 'Conversa por voz com a Yui (GPT-Live).', list: (c) => c.openai.live, openai: true },
-  { key: 'models.brain', title: 'Cérebro da Yui', desc: 'Entende pedidos, escolhe ferramentas e responde.', list: (c) => c.openai.chat, openai: true },
+  { key: 'models.live', title: 'Voz em tempo real', get desc() { return `Conversa por voz com a ${ai()} (GPT-Live).` }, list: (c) => c.openai.live, openai: true },
+  { key: 'models.brain', get title() { return `Cérebro da ${ai()}` }, desc: 'Entende pedidos, escolhe ferramentas e responde.', list: (c) => c.openai.chat, openai: true },
   { key: 'models.planner', title: 'Planejador', desc: 'Monta missões, workflows e decide aprovações.', list: (c) => c.openai.chat, openai: true },
   { key: 'models.embed', title: 'Embeddings', desc: 'Busca por significado no Cérebro e na Empresa.', list: (c) => c.openai.embed, openai: true },
   { key: 'claude.model', title: 'Claude Code (agentes)', desc: 'Modelo usado pelos agentes que não escolheram um próprio.', list: (c) => c.claude, openai: false },
@@ -625,7 +631,7 @@ export function AgentsApprovalsSection() {
       <Section title="Aprovações" hint="Workflows, rotinas, missões e projetos rodam no automático. Só pedem sua permissão onde você pediu.">
         <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: C.soft }}>
           <li>Bloqueado sempre (negado, sem perguntar): apagar o sistema, a pasta de trabalho ou todos os dados, formatar disco, apagar um banco de dados inteiro, faxina em massa do Docker, mexer nos sistemas de produção protegidos e sobrescrever o histórico do ramo principal do código (force push na main).</li>
-          <li>Workflows: a Yui decide os passos de Aprovação com base nas suas decisões anteriores; marque “Sempre me perguntar” no passo para decidir você.</li>
+          <li>Workflows: a {ai()} decide os passos de Aprovação com base nas suas decisões anteriores; marque “Sempre me perguntar” no passo para decidir você.</li>
           <li>Missões: só pedem OK nas etapas em que você pediu aprovação.</li>
           <li>Por projeto: cada projeto pode listar ações que sempre pedem aprovação (campo <span className="mono">approvalPatterns</span> do arquivo <span className="mono">atria.json</span>).</li>
         </ul>
@@ -787,7 +793,7 @@ export function NotificationsSection() {
       {del && (
         <ConfirmDeleteModal
           title={`Remover ${del.device || 'dispositivo'}?`}
-          text="Este aparelho deixa de receber aprovações, falhas e entregas da Yui. Dá para ativar de novo pelo próprio aparelho."
+          text={`Este aparelho deixa de receber aprovações, falhas e entregas da ${ai()}. Dá para ativar de novo pelo próprio aparelho.`}
           rows={[{ label: 'Aparelho', value: del.device || 'Dispositivo' }, { label: 'Inscrito em', value: new Date(del.created_at).toLocaleString('pt-BR') }]}
           busy={busy}
           onCancel={() => setDel(null)}

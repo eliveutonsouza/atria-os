@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { db, now, uid } from './db.ts';
 import { registerBrain } from './extensions.ts';
 import { upsertNote } from './vault.ts';
+import { config } from './config.ts';
 
 // Memória do usuário (ideia do USER.md do Hermes): fatos e preferências curtas que a Yui leva para toda conversa.
 // Segurança: só grava o que veio da fala/texto do PRÓPRIO usuário no turno (citação literal conferida no
@@ -46,7 +47,7 @@ function mirror() {
   const items = listMemory();
   const body = items.length ? items.map((m) => `- ${m.text}`).join('\n') : '_Nada guardado ainda._';
   try {
-    upsertNote('Yui/Memória do usuário.md', `# Memória do usuário\n\n> Espelho somente leitura: edite pelo Atria (Configurações › Memória) ou dizendo "Yui, lembra que…" / "esquece que…".\n\n${body}\n`);
+    upsertNote('Yui/Memória do usuário.md', `# Memória do usuário\n\n> Espelho somente leitura: edite pelo Atria (Configurações › Memória) ou dizendo "${config.assistantName}, lembra que…" / "esquece que…".\n\n${body}\n`);
   } catch (e) {
     console.error('memória: espelho no vault', (e as Error).message);
   }
@@ -102,7 +103,7 @@ registerBrain({
         required: ['texto', 'citacao'],
       },
     },
-    { type: 'function', name: 'memoria_listar', strict: true, description: 'O que a Yui guardou sobre o usuário.', parameters: { type: 'object', additionalProperties: false, properties: {}, required: [] } },
+    { type: 'function', name: 'memoria_listar', strict: true, description: 'O que o assistente guardou sobre o usuário.', parameters: { type: 'object', additionalProperties: false, properties: {}, required: [] } },
     {
       type: 'function', name: 'memoria_esquecer', strict: true,
       description: 'Apaga lembranças que contêm o trecho dito pelo usuário.',

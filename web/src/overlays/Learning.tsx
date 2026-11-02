@@ -5,6 +5,7 @@ import { confirmAction } from '../lib/feedback'
 import { useYui } from '../store/yui'
 import { BottomSheet } from '../views/Sheet'
 import { ErrorNote } from '../views/ui'
+import { ai } from '../lib/assistant'
 
 // Cartão diário "Yui aprendeu" (canvas Atria — Yui aprendeu): o que a revisão em segundo plano propôs guardar —
 // memória sobre o usuário e skills novas/atualizadas. Só entra o que for marcado; o resto é descartado.
@@ -79,7 +80,7 @@ export function LearningModal() {
     }
   }
   const discardAll = async () => {
-    if (!(await confirmAction({ title: 'Descartar tudo?', text: `Nada do que a Yui propôs hoje será guardado (${list.length} ${list.length === 1 ? 'item' : 'itens'}).`, confirmLabel: 'Descartar tudo', danger: true }))) return
+    if (!(await confirmAction({ title: 'Descartar tudo?', text: `Nada do que a ${ai()} propôs hoje será guardado (${list.length} ${list.length === 1 ? 'item' : 'itens'}).`, confirmLabel: 'Descartar tudo', danger: true }))) return
     void decide([])
   }
   const later = () => {
@@ -98,16 +99,16 @@ export function LearningModal() {
   const content = (
     <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <span style={{ fontSize: 11, letterSpacing: '.24em', color: C.lav, fontWeight: 700 }}>YUI APRENDEU · HOJE</span>
+        <span style={{ fontSize: 11, letterSpacing: '.24em', color: C.lav, fontWeight: 700 }}>{ai().toUpperCase()} APRENDEU · HOJE</span>
         <span id="ya-title" style={{ fontSize: phone ? 19 : 22, fontWeight: phone ? 500 : 400, lineHeight: 1.35 }}>Escolha o que eu devo guardar</span>
         {!phone && <span style={{ fontSize: 13, color: C.t2 }}>Só entra o que você marcar; o resto é descartado. Lições dos agentes já valem sozinhas e podem ser desfeitas na ficha de cada um.</span>}
       </div>
-      {loadErr && <ErrorNote text="Não consegui buscar o que a Yui aprendeu." retry={load} />}
+      {loadErr && <ErrorNote text={`Não consegui buscar o que a ${ai()} aprendeu.`} retry={load} />}
       {!items && !loadErr && <span style={{ fontSize: 13, color: C.t3 }}>Carregando…</span>}
       {items && !list.length && <span style={{ fontSize: 13, color: C.t3 }}>Nada para revisar agora.</span>}
       {memories.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <span style={label}>Sobre você · memória da Yui</span>
+          <span style={label}>Sobre você · memória da {ai()}</span>
           {memories.map((p) => (
             <label key={p.id} style={box}>
               <input type="checkbox" checked={checked.has(p.id)} onChange={() => setChecked(toggle(checked, p.id))} style={check} />
@@ -181,7 +182,7 @@ export function LearningModal() {
   )
   if (phone)
     return (
-      <BottomSheet label="Yui aprendeu" onClose={close} tone="rgba(166,140,247,.35)" zIndex={59}>
+      <BottomSheet label={`${ai()} aprendeu`} onClose={close} tone="rgba(166,140,247,.35)" zIndex={59}>
         {content}
       </BottomSheet>
     )

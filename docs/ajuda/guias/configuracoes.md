@@ -9,6 +9,7 @@ nao_usar_quando: Para mudar como um agente trabalha, use Agentes › Configuraç
 frases:
   - "Yui, como conecto a minha conta Claude?"
   - "Como troco a voz da Yui?"
+  - "Como mudo o nome da Yui?"
   - "Como ativo as notificações no celular?"
 dicas:
   - Primeiros passos mostra o que falta conectar e leva direto a cada item com Configurar.
@@ -33,7 +34,7 @@ Tem as seções Primeiros passos, Conta, Conexões, Yui & voz, Modelos, Agentes 
 1. **Primeiros passos.** Veja o que já está pronto e clique em **Configurar** no que falta.
 2. **Conta.** Nome e e-mail (Você) e **Trocar senha** (mínimo de 8 caracteres).
 3. **Conexões.** **Conectar conta Claude** abre um terminal: digite /login, autorize no link, cole o código e digite /exit. **Conectar GitHub** segue o mesmo jeito com um código de 8 letras. Cole a **Chave da OpenAI**, use **Testar chave** e **Salvar chave**. Conectores pendentes têm **Autorizar no claude.ai**.
-4. **Yui & voz.** Voz, Encerrar voz após (min parada), Tecla de falar (Espaço, Crase, F8 ou Alt direito) e densidade das partículas do orb.
+4. **Yui & voz.** **Nome do assistente** (troque "Yui" pelo nome que quiser; vale na tela, na voz, no Telegram e nesta Ajuda; vazio volta para Yui), **Personalidade** (calor e emoção, humor, tamanho das respostas, ritmo e reações; "Restaurar personalidade padrão" volta ao jeito de antes), Voz, Encerrar voz após (min parada), Tecla de falar (Espaço, Crase, F8 ou Alt direito) e densidade das partículas do orb.
 5. **Modelos.** Escolha em listas: **Voz em tempo real**, **Cérebro da Yui**, **Planejador**, **Embeddings** (lidos da sua conta OpenAI) e **Claude Code (agentes)** (lido do Claude Code logado; a primeira opção, "Padrão da conta", deixa a conta decidir). O modelo salvo aparece sempre, mesmo fora da lista. **Outro…** abre um campo para digitar o nome exato, com **Testar** para conferir se a conta tem acesso. **Atualizar lista** relê os modelos na hora; **Restaurar padrões** volta os cinco para o padrão do Atria OS. Em **Preços da OpenAI** cole um JSON como `{"gpt-6-luna":{"in":1.25,"out":10}}` — valores em US$ por 1 milhão de tokens (in, out, cachedIn, audioIn, audioOut) ou `perMinute` para voz cobrada por minuto; o nome vale como prefixo. Serve para o Consumo calcular custo de modelos novos. Agentes ao mesmo tempo também fica aqui.
 6. **Agentes & aprovações.** Lista do que sempre pede aprovação e a opção "Pedir aprovação para ações sensíveis em conectores".
 7. **Notificações.** Instalar app, Ativar notificações, Enviar teste e Dispositivos inscritos. Cada aparelho da lista tem **Remover** (pede confirmação); ele para de receber avisos até você ativar de novo nele.

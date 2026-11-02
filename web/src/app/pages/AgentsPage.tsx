@@ -9,6 +9,7 @@ import { useYui } from '../../store/yui'
 import { AgentDetailView, FireAgentModal } from '../../views/AgentDetailView'
 import { Empty, ErrorNote, Skeleton, useHeader } from '../../views/ui'
 import { agentColor, Card, Dot, fmtCost, fmtDuration, fmtTokens, HBar, Kpi, openApp, relTime, useViewParams } from './common'
+import { ai } from '../../lib/assistant'
 
 // Agentes (Agents.dc.html): equipe à esquerda; à direita o agente escolhido com Estatísticas | Configuração | Execuções.
 
@@ -183,7 +184,7 @@ export function AgentsPage() {
             ))}
           </>
         )}
-        {filter === 'active' && phone && list.length === 0 && !agents.loading && <Empty text="Nenhum agente ainda." hint="Crie um com “+ Novo agente” ou peça para a Yui." />}
+        {filter === 'active' && phone && list.length === 0 && !agents.loading && <Empty text="Nenhum agente ainda." hint={`Crie um com “+ Novo agente” ou peça para a ${ai()}.`} />}
         {filter === 'active' && list.map((a) => {
           const sel = a.id === id
           const c = a.status === 'running' ? C.cyan : a.status === 'waiting' ? C.warn : null
@@ -218,7 +219,7 @@ export function AgentsPage() {
       </section>
       {!phone && (
         <section style={{ flex: 1, minWidth: 0, width: '100%', padding: '18px 20px', borderRadius: 18, background: 'linear-gradient(180deg, rgba(20,24,50,.62), rgba(12,14,32,.62))', border: '1px solid rgba(160,170,255,.11)', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {!id ? <Empty text="Nenhum agente ainda." hint="Crie um com “+ Novo agente” ou peça para a Yui." /> : detail}
+          {!id ? <Empty text="Nenhum agente ainda." hint={`Crie um com “+ Novo agente” ou peça para a ${ai()}.`} /> : detail}
         </section>
       )}
     </div>
@@ -302,7 +303,7 @@ function AgentRunsTab({ id, info }: { id: string; info?: AgentInfo }) {
   useHeader('Agente · execuções', info?.name ?? 'Execuções do agente', [], [id, info?.name])
   const mine = (runs.data?.runs ?? []).filter((r) => r.agentId === id)
   if (!runs.data) return runs.error ? <ErrorNote text="Não consegui carregar as execuções." retry={runs.reload} /> : <Skeleton rows={4} kpis={0} />
-  if (!mine.length) return <Empty text="Esse agente ainda não rodou recentemente." hint="Use “Testar” ou peça uma tarefa para a Yui." />
+  if (!mine.length) return <Empty text="Esse agente ainda não rodou recentemente." hint={`Use “Testar” ou peça uma tarefa para a ${ai()}.`} />
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {mine.map((r) => (

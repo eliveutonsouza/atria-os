@@ -9,6 +9,7 @@ import { BottomTabs } from './BottomTabs'
 import { NavRail, RAIL_W } from './NavRail'
 import './nav'
 import './app.css'
+import { ai } from '../lib/assistant'
 
 // Dashboard (modo app): entra com fade + slide enquanto o orb da Yui voa para o canto.
 
@@ -61,7 +62,7 @@ class PageBoundary extends Component<{ children: ReactNode; page: string }, { er
     if (prev.page !== this.props.page && this.state.err) this.setState({ err: null })
   }
   render() {
-    if (this.state.err) return <div style={{ padding: 40, color: '#c9cde0', fontSize: 14 }}>Essa página falhou ao abrir. Tente de novo ou peça para a Yui.</div>
+    if (this.state.err) return <div style={{ padding: 40, color: '#c9cde0', fontSize: 14 }}>Essa página falhou ao abrir. Tente de novo ou peça para a {ai()}.</div>
     return this.props.children
   }
 }

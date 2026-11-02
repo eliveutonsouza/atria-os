@@ -232,14 +232,14 @@ const localDay = () => {
 function announceOnce() {
   if (kvGet('learn_announced') === localDay()) return;
   kvSet('learn_announced', localDay());
-  narrate('Aprendi algumas coisas hoje. Quando quiser, revise no cartão “Yui aprendeu”.', { speak: false, project: null });
+  narrate(`Aprendi algumas coisas hoje. Quando quiser, revise no cartão “${config.assistantName} aprendeu”.`, { speak: false, project: null });
 }
 addInboxSource({
   prefixes: ['learn:'],
   items: () => {
     const n = pendingProposals().length;
     if (!n || kvGet('learn_later') === localDay()) return [];
-    return [{ id: `learn:${localDay()}`, tag: 'Aprendizado · hoje', label: `Yui aprendeu ${n} ${n === 1 ? 'coisa' : 'coisas'}. Quer guardar?`, tone: 'lav', action: { type: 'view', view: 'runs' } }];
+    return [{ id: `learn:${localDay()}`, tag: 'Aprendizado · hoje', label: `${config.assistantName} aprendeu ${n} ${n === 1 ? 'coisa' : 'coisas'}. Quer guardar?`, tone: 'lav', action: { type: 'view', view: 'runs' } }];
   },
   dismiss: () => {
     kvSet('learn_later', localDay());
@@ -372,7 +372,7 @@ registerAgentOptions((agentId, ctx) => {
         { nome: z.string().describe('kebab-case, ex.: deploy-stoqmate'), descricao: z.string().describe('1 frase: quando usar'), corpo: z.string().describe('passos numerados em markdown, sem rm/curl/wget/ssh/sudo') },
         async ({ nome, descricao, corpo }) => {
           const r = propose('skill', { nome, descricao, corpo }, agentId, ctx.runId);
-          return 'error' in r ? { content: [{ type: 'text', text: `Não propus: ${r.error}` }], isError: true } : { content: [{ type: 'text', text: `Skill "${r.skill!.nome}" proposta; o usuário decide no cartão "Yui aprendeu".` }] };
+          return 'error' in r ? { content: [{ type: 'text', text: `Não propus: ${r.error}` }], isError: true } : { content: [{ type: 'text', text: `Skill "${r.skill!.nome}" proposta; o usuário decide no cartão "${config.assistantName} aprendeu".` }] };
         },
       ),
     ],
@@ -398,7 +398,7 @@ async function draftSkillFromRun(runId: string): Promise<SkillDraft> {
 
 registerBrain({
   name: 'aprendizado',
-  instructions: '- "Salva isso como skill", "transforma o que o agente fez em skill" => salvar_skill (sem id = última execução concluída). A skill fica para o usuário aprovar no cartão "Yui aprendeu"; diga isso em 1 frase.\n- "O que o agente X aprendeu?" => licoes_agente.',
+  instructions: '- "Salva isso como skill", "transforma o que o agente fez em skill" => salvar_skill (sem id = última execução concluída). A skill fica para o usuário aprovar no cartão de aprendizado; diga isso em 1 frase.\n- "O que o agente X aprendeu?" => licoes_agente.',
   tools: [
     {
       type: 'function', name: 'salvar_skill', strict: true,
@@ -423,7 +423,7 @@ registerBrain({
       if (ctx.dryRun) return { ok: true };
       const run = getRun(id)!;
       const r = propose('skill', await draftSkillFromRun(id), run.agentId, id);
-      return 'error' in r ? { ok: false, error: r.error } : { ok: true, skill: r.skill!.nome, nota: 'fica para aprovar no cartão "Yui aprendeu"' };
+      return 'error' in r ? { ok: false, error: r.error } : { ok: true, skill: r.skill!.nome, nota: `fica para aprovar no cartão "${config.assistantName} aprendeu"` };
     })();
   },
 });

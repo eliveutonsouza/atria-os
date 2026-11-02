@@ -5,6 +5,7 @@ import { onCompanyEvent } from '../api/events'
 import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
 import { fmtNum, goTab, useStacked } from './api'
+import { ai } from '../lib/assistant'
 
 // Como funciona a busca (Pipeline.dc.html): o fluxo com números reais e o "Perguntar à base",
 // que usa a mesma busca da ferramenta empresa_consultar.
@@ -24,8 +25,8 @@ function stagesOf(s: CompanyStats | null): Stage[] {
     { t: 'Extração', d: 'tipo, resumo, campos e entidades', m: n(s?.ready, 'fichas'), c: '#a68cf7', icon: 'M4 6h16M4 12h10M4 18h6M17 15l3 3-3 3', ok: s?.services.openai },
     { t: 'Guardado', d: 'documentos, páginas e trechos', m: n(s?.chunks, 'trechos'), c: '#4fe0b0', icon: 'M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3', ok: s?.services.postgres },
     { t: 'Preparando busca', d: 'cada trecho ganha um índice pelo sentido', m: n(s?.vectors, 'trechos'), c: '#cbbcff', icon: 'M5 12a2 2 0 1 0 0-.01M12 5a2 2 0 1 0 0-.01M19 12a2 2 0 1 0 0-.01M12 19a2 2 0 1 0 0-.01M7 11l3-4M14 7l3 4M17 13l-3 4M10 17l-3-4', ok: s?.services.openai },
-    { t: 'Pronto para a Yui', d: 'busca pelo sentido e pela palavra', m: n(s?.vectors, 'trechos'), c: '#f5b54a', icon: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5', ok: s?.services.qdrant },
-    { t: 'Yui e agentes', d: 'consultam e citam a fonte', m: n(s?.queries7d, 'consultas/7d'), c: '#f78cc8', icon: 'M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM8 12h8M12 8v8', ok: true },
+    { t: `Pronto para a ${ai()}`, d: 'busca pelo sentido e pela palavra', m: n(s?.vectors, 'trechos'), c: '#f5b54a', icon: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5', ok: s?.services.qdrant },
+    { t: `${ai()} e agentes`, d: 'consultam e citam a fonte', m: n(s?.queries7d, 'consultas/7d'), c: '#f78cc8', icon: 'M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM8 12h8M12 8v8', ok: true },
   ]
 }
 
@@ -167,7 +168,7 @@ export function SearchTab() {
         <div className="co-card" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 14, fontWeight: 600 }}>Perguntar à base</span>
-            <span style={{ fontSize: 11.5, color: '#8c92ad' }}>a mesma busca que a Yui e os agentes usam</span>
+            <span style={{ fontSize: 11.5, color: '#8c92ad' }}>a mesma busca que a {ai()} e os agentes usam</span>
           </div>
           <form
             style={{ display: 'flex', gap: 8, flexDirection: narrow ? 'column' : 'row' }}
@@ -262,7 +263,7 @@ export function SearchTab() {
           <div style={{ padding: 16, borderRadius: 16, background: 'rgba(166,140,247,0.06)', border: '1px solid rgba(166,140,247,0.24)', display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 600 }}>Quem usa</span>
             <span style={{ fontSize: 12.5, color: '#c9cde0', lineHeight: 1.55 }}>
-              A Yui (voz e texto) e todos os agentes podem consultar esses documentos. Cada resposta cita o documento e a página.
+              A {ai()} (voz e texto) e todos os agentes podem consultar esses documentos. Cada resposta cita o documento e a página.
             </span>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginTop: 4 }}>
               <div style={{ display: 'flex', flexDirection: 'column' }}>

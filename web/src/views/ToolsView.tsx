@@ -9,6 +9,7 @@ import { useYui } from '../store/yui'
 import { card, ConfirmDeleteModal, Empty, ErrorNote, Modal, Skeleton, useHeader } from './ui'
 import { toastErr, toastOk } from '../lib/feedback'
 import { Chip, Field, input, mcpStatusMeta, SearchBox, SmallBtn, STATUS_META, StatusPill, Tabs } from './kit'
+import { ai } from '../lib/assistant'
 
 // Painel Ferramentas: o que a Yui e os agentes conseguem usar — conectores do dia a dia, MCP, skills,
 // plugins e apps/stacks da VPS — com status vivo e quem usa cada um.
@@ -157,7 +158,7 @@ export function ToolsView() {
                 m.status === 'needs-auth' ? (
                   <SmallBtn onClick={() => window.open(CONNECTORS_URL, '_blank', 'noopener')}>Autorizar</SmallBtn>
                 ) : (
-                  <SmallBtn onClick={() => submitText(`Testa o conector ${short} com uma consulta rápida somente leitura.`)}>Pedir à Yui</SmallBtn>
+                  <SmallBtn onClick={() => submitText(`Testa o conector ${short} com uma consulta rápida somente leitura.`)}>Pedir à {ai()}</SmallBtn>
                 )
               if (phone)
                 return (
@@ -269,7 +270,7 @@ function ToolList({ items, onEdit }: { items: ToolboxItem[]; onEdit: (t: Toolbox
                     {t.examples.length > 0 && (
                       <div className="h-scroll" style={{ gap: 6 }}>
                         {t.examples.slice(0, 3).map((ex) => (
-                          <Chip key={ex} onClick={() => submitText(ex)} title="Pedir à Yui">
+                          <Chip key={ex} onClick={() => submitText(ex)} title={`Pedir à ${ai()}`}>
                             “{ex}”
                           </Chip>
                         ))}
@@ -290,7 +291,7 @@ function ToolList({ items, onEdit }: { items: ToolboxItem[]; onEdit: (t: Toolbox
                     {t.examples.length > 0 && (
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
                         {t.examples.slice(0, 3).map((ex) => (
-                          <Chip key={ex} onClick={() => submitText(ex)} title="Pedir à Yui">
+                          <Chip key={ex} onClick={() => submitText(ex)} title={`Pedir à ${ai()}`}>
                             “{ex}”
                           </Chip>
                         ))}
@@ -476,7 +477,7 @@ function ToolForm({ initial, defaultType, categories, agents, onClose, onSaved }
           <input style={input} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex.: autorize em claude.ai" />
         </Field>
         <div style={{ gridColumn: '1 / -1' }}>
-          <Field label="Exemplos de pedido" hint="Um por linha; viram atalhos para pedir à Yui.">
+          <Field label="Exemplos de pedido" hint={`Um por linha; viram atalhos para pedir à ${ai()}.`}>
             <textarea style={{ ...input, minHeight: 72, resize: 'vertical' }} value={examples} onChange={(e) => setExamples(e.target.value)} placeholder="Resume meus e-mails não lidos" />
           </Field>
         </div>
@@ -493,7 +494,7 @@ function ToolForm({ initial, defaultType, categories, agents, onClose, onSaved }
       {confirm && initial && (
         <ConfirmDeleteModal
           title={`Excluir ${initial.name}?`}
-          text="Sai da caixa de ferramentas: a Yui deixa de saber para que serve e qual agente usa. O conector, app ou repositório em si não é alterado."
+          text={`Sai da caixa de ferramentas: a ${ai()} deixa de saber para que serve e qual agente usa. O conector, app ou repositório em si não é alterado.`}
           rows={[
             { label: 'Acesso', value: `${initial.access.type} · ${initial.access.ref}` },
             { label: 'Agente padrão', value: initial.agent ?? 'qualquer' },

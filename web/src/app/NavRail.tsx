@@ -4,6 +4,7 @@ import { useYui } from '../store/yui'
 import { exitApp } from './nav'
 import { NavIcon } from './navItems'
 import { openPage } from './Sidebar'
+import { ai } from '../lib/assistant'
 
 // Tablet: trilho de ícones (prancha Tablet-Missoes). "Mais" abre o menu completo (gaveta).
 
@@ -39,7 +40,7 @@ export function NavRail() {
         background: 'rgba(10,12,29,.7)', borderRight: '1px solid rgba(255,255,255,.06)', overflowY: 'auto',
       }}
     >
-      <button aria-label="Falar com a Yui" title="Falar com a Yui" onClick={() => exitApp()} style={{ ...btn(false), height: 52 }}>
+      <button aria-label={`Falar com a ${ai()}`} title={`Falar com a ${ai()}`} onClick={() => exitApp()} style={{ ...btn(false), height: 52 }}>
         <span aria-hidden style={{ width: 32, height: 32, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, #fff, #67d8f2 45%, #a68cf7)', boxShadow: '0 0 18px rgba(103,216,242,.4)' }} />
       </button>
       {ITEMS.map((it) => {

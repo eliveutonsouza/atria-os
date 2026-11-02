@@ -9,6 +9,7 @@ import { card, Empty, ErrorNote, Modal, ModalButtons, Skeleton, useHeader } from
 import { plural, toast, toastErr } from '../lib/feedback'
 import { input, SearchBox, Tabs } from './kit'
 import { fmtInstalls, scopeLabel, SkillDrawer } from './SkillDrawer'
+import { ai } from '../lib/assistant'
 
 // Loja de skills (Main.dc.html / Phone.dc.html): ranking do skills.sh (populares, em alta, hot),
 // busca e as já instaladas. Clicar abre a ficha (SkillDrawer) para escolher onde instalar.
@@ -119,7 +120,7 @@ export function SkillsView({ tab: initialTab }: { tab?: string }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       {!phone && (
         <p style={{ margin: '-6px 0 0', color: C.t2, fontSize: 14, maxWidth: 680 }}>
-          Conhecimento pronto para o Claude. Instale na plataforma inteira (Yui e todos os agentes) ou só nos agentes que precisam.
+          Conhecimento pronto para o Claude. Instale na plataforma inteira ({ai()} e todos os agentes) ou só nos agentes que precisam.
         </p>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: phone ? 'repeat(4,minmax(0,1fr))' : 'repeat(auto-fit,minmax(150px,1fr))', gap: phone ? 8 : 14 }}>

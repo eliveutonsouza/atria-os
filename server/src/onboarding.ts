@@ -19,7 +19,7 @@ function status(): SetupStatus {
     ? (db.prepare('SELECT COUNT(*) AS n FROM push_subscriptions').get() as { n: number }).n
     : 0;
   const m = monitorConfig();
-  return { needsPassword: !hasPassword(), claude, github: githubEnabled(), openai, push, monitor: m.enabled && !!m.url && !!m.key, completed: hasPassword() && claude !== 'none' && openai };
+  return { needsPassword: !hasPassword(), claude, github: githubEnabled(), openai, push, monitor: m.enabled && !!m.url && !!m.key, completed: hasPassword() && claude !== 'none' && openai, assistantName: config.assistantName };
 }
 
 export function register(app: FastifyInstance): void {

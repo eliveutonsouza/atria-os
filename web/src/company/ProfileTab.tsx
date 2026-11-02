@@ -7,6 +7,7 @@ import { useAction, useUnsavedGuard } from '../lib/feedback'
 import { useYui } from '../store/yui'
 import { fmtNum, goTab, initials, setLeaveGuard, uploadLogo, Icon, useStacked } from './api'
 import { Svg } from './ui'
+import { ai } from '../lib/assistant'
 
 // Perfil da empresa (Main.dc.html): o que entra no prompt de todo agente e da Yui.
 
@@ -233,7 +234,7 @@ export function ProfileTab() {
             </div>
             <div className="co-eyebrow" style={{ color: C.cyan }}>Como os agentes vão ver</div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: 11.5, lineHeight: 1.65, color: '#c9cde0', padding: 12, borderRadius: 10, background: 'rgba(6,7,13,0.6)', border: '1px solid rgba(255,255,255,0.06)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 320, overflowY: 'auto' }}>{preview}</div>
-            <span style={{ fontSize: 11.5, color: '#8c92ad' }}>Entra no início de toda conversa da Yui e de toda execução de agente. Detalhes ficam na base de documentos.</span>
+            <span style={{ fontSize: 11.5, color: '#8c92ad' }}>Entra no início de toda conversa da {ai()} e de toda execução de agente. Detalhes ficam na base de documentos.</span>
           </div>
           <div className="co-card" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <span style={{ fontSize: 13, fontWeight: 600 }}>Base de conhecimento</span>

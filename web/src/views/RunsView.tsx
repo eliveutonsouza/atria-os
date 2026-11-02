@@ -8,6 +8,7 @@ import { useYui } from '../store/yui'
 import { Empty, ErrorNote, Skeleton, useHeader } from './ui'
 import { CompareModal, RedoButton } from './Compare'
 import { toastErr } from '../lib/feedback'
+import { ai } from '../lib/assistant'
 
 interface RunsResp { running: number; queued: number; background: number; runs: RunInfo[] }
 
@@ -103,7 +104,7 @@ export function RunsView() {
         <div><div className="eyebrow">Na fila</div><div style={{ fontSize: 36, fontWeight: 300 }}>{queued}</div></div>
         <div><div className="eyebrow">Em segundo plano</div><div style={{ fontSize: 36, fontWeight: 300, color: C.t2 }}>{data?.background ?? 0}</div></div>
       </div>
-      {!runs.length && <Empty text="Ainda não há execuções para mostrar." hint="Peça algo para a Yui e os agentes acordam." />}
+      {!runs.length && <Empty text="Ainda não há execuções para mostrar." hint={`Peça algo para a ${ai()} e os agentes acordam.`} />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {runs.map((r) => {
           const ex = expanded === r.id

@@ -7,6 +7,7 @@ import { useYui } from '../store/yui'
 import { askYui, excerpt, nodeColors, openConstellation, openInEditor } from './data'
 import { Star } from './ui'
 import { Icon, eyebrow, glass, mono } from './styles'
+import { ai } from '../lib/assistant'
 
 // Painel da estrela selecionada: caminho, trecho, links, backlinks, sugestões da Yui e ações.
 export function NotePanel({
@@ -166,7 +167,7 @@ export function NotePanel({
 
         {sugs.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ ...eyebrow, color: '#f5b54a' }}>Yui sugere ligar</span>
+            <span style={{ ...eyebrow, color: '#f5b54a' }}>{ai()} sugere ligar</span>
             {sugs.map((s) => (
               <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: coarse ? 48 : 34, padding: '0 8px', borderRadius: 8, border: '1px dashed rgba(245,181,74,0.35)', fontSize: 12, color: '#dfe3f3' }}>
                 <button onClick={() => onPick(s.id)} title={s.reason} style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', color: 'inherit', textAlign: 'left', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>
@@ -192,9 +193,9 @@ export function NotePanel({
           <button
             className="app-btn"
             style={{ gridColumn: 'span 2', height: coarse ? 44 : 34, fontSize: 12.5, borderColor: 'rgba(103,216,242,0.2)', color: asked ? C.ok : C.cyanSoft }}
-            onClick={() => askYui(node.title).then(() => setAsked(true)).catch((e: unknown) => toastErr(e, 'Não consegui perguntar à Yui'))}
+            onClick={() => askYui(node.title).then(() => setAsked(true)).catch((e: unknown) => toastErr(e, `Não consegui perguntar à ${ai()}`))}
           >
-            {asked ? 'A Yui está respondendo…' : 'Perguntar à Yui sobre esta nota'}
+            {asked ? `A ${ai()} está respondendo…` : `Perguntar à ${ai()} sobre esta nota`}
           </button>
         </div>
       )}

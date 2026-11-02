@@ -6,6 +6,7 @@ import { useYui } from '../../store/yui'
 import { ErrorNote, useHeader } from '../../views/ui'
 import { Card, dayLabel, Dot, elapsed, fmtCost, fmtTokens, HBar, Kpi, Legend, openApp, ORIGIN_LABEL } from './common'
 import { UsageSummaryCard } from './UsagePage'
+import { ai } from '../../lib/assistant'
 
 // Início (Overview.dc.html): KPIs, execuções por dia, sucesso por agente, trabalhando agora, próximos agendamentos, projetos.
 
@@ -159,7 +160,7 @@ export function OverviewPage() {
         <Card className="app-span-2" title="Trabalhando agora" right={<button onClick={() => openApp('ops')} className="touch-link" style={linkBtn}>Ver operações →</button>}>
           <Loaded s={board} rows={2}>
           {working.length === 0 ? (
-            <span className="app-muted">Nenhum agente trabalhando agora. Peça algo para a Yui ou rode um workflow.</span>
+            <span className="app-muted">Nenhum agente trabalhando agora. Peça algo para a {ai()} ou rode um workflow.</span>
           ) : (
             <div className="app-grid-2" style={{ gap: 10 }}>
               {working.map((w) => {
@@ -203,7 +204,7 @@ export function OverviewPage() {
         <Card title="Próximos agendamentos" right={<button onClick={() => openApp('schedule')} className="touch-link" style={linkBtn}>Agenda →</button>}>
           <Loaded s={occ}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {next.length === 0 && <span className="app-muted">Nenhuma rotina agendada. Crie uma em Agendamentos ou peça para a Yui.</span>}
+            {next.length === 0 && <span className="app-muted">Nenhuma rotina agendada. Crie uma em Agendamentos ou peça para a {ai()}.</span>}
             {next.map((n) => (
               <div
                 key={`${n.routineId}${n.at}`}

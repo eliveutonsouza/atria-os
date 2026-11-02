@@ -1,6 +1,7 @@
 import type { CompanyCategory, CompanyDoc } from '@shared/protocol'
 import { ConfirmDeleteModal } from '../views/ui'
 import { CAT_COLORS, goTab, pipeSegments, statusOf, typeColors, type CompanyTab } from './api'
+import { ai } from '../lib/assistant'
 
 // Componentes visuais compartilhados das abas da Empresa.
 
@@ -70,7 +71,7 @@ export function DeleteModal({ docs, onCancel, onConfirm, busy }: { docs: { name:
   return (
     <ConfirmDeleteModal
       title={docs.length === 1 ? 'Excluir 1 documento?' : `Excluir ${docs.length} documentos?`}
-      text={`Apaga o arquivo, o texto lido e a busca da Yui, junto com a nota no vault. A Yui e os agentes deixam de encontrar esse conteúdo na hora. Documentos: ${names.slice(0, 8).join(' · ')}${names.length > 8 ? ` · e mais ${names.length - 8}` : ''}`}
+      text={`Apaga o arquivo, o texto lido e a busca da ${ai()}, junto com a nota no vault. A ${ai()} e os agentes deixam de encontrar esse conteúdo na hora. Documentos: ${names.slice(0, 8).join(' · ')}${names.length > 8 ? ` · e mais ${names.length - 8}` : ''}`}
       busy={busy}
       onCancel={onCancel}
       onConfirm={onConfirm}

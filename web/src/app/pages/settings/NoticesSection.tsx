@@ -6,6 +6,7 @@ import { confirmAction } from '../../../lib/feedback'
 import { useYui } from '../../../store/yui'
 import { input, StatusPill } from '../../../views/kit'
 import { bigBtn, bigCls, SaveMsg, Section, useSettings } from './sections'
+import { ai } from '../../../lib/assistant'
 
 // Configurações › Avisos (Settings.dc.html do canvas de workflows): Telegram, e-mail (Resend) e celular (push).
 // Usados pelos passos "Avisar" e "Pedir informação" dos workflows.
@@ -106,7 +107,7 @@ export function NoticesSection() {
       }
     })
   const unlink = async () => {
-    const ok = await confirmAction({ title: 'Desvincular o chat do Telegram?', text: 'A Yui para de mandar avisos e de aceitar respostas por esse chat. Para ligar de novo, gere um código novo.', confirmLabel: 'Desvincular', danger: true, undoable: true })
+    const ok = await confirmAction({ title: 'Desvincular o chat do Telegram?', text: `A ${ai()} para de mandar avisos e de aceitar respostas por esse chat. Para ligar de novo, gere um código novo.`, confirmLabel: 'Desvincular', danger: true, undoable: true })
     if (!ok) return
     return act('unlink', async () => {
       try {
@@ -218,7 +219,7 @@ export function NoticesSection() {
         )}
         {tg?.linked && (
           <label style={{ ...row, fontSize: 13, gap: 10 }}>
-            <span>Yui responde em áudio</span>
+            <span>{ai()} responde em áudio</span>
             <select
               value={String(data?.values['notify.telegram.voiceReply'] ?? 'off')}
               onChange={(e) => void save({ 'notify.telegram.voiceReply': e.target.value })}

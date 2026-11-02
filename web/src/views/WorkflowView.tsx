@@ -30,6 +30,7 @@ import { CRON_PRESETS, describeCron, send } from '../workflow/http'
 import { ActionSheet, BottomSheet } from './Sheet'
 import { ErrorNote, Skeleton, useHeader } from './ui'
 import { toast, useAction, useUnsavedGuard } from '../lib/feedback'
+import { ai } from '../lib/assistant'
 
 // Editor de workflow: fluxograma (@xyflow/react) ⇄ markdown canônico, com execução ao vivo.
 
@@ -586,7 +587,7 @@ function MermaidTab({ draft, run }: { draft: Draft; run: WorkflowRunInfo | null 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ flex: 1, fontSize: 12, color: C.t3 }}>{run ? 'Execução aberta: passo atual destacado, concluídos em verde.' : 'É assim que a Yui e os agentes enxergam o fluxo.'}</span>
+        <span style={{ flex: 1, fontSize: 12, color: C.t3 }}>{run ? 'Execução aberta: passo atual destacado, concluídos em verde.' : `É assim que a ${ai()} e os agentes enxergam o fluxo.`}</span>
         <button className="wf-btn ghost" onClick={copy}>{copied ? 'Copiado' : 'Copiar Mermaid'}</button>
       </div>
       <div style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,.06)', background: '#0a0c1a', padding: 10 }}>
@@ -720,7 +721,7 @@ function StepProps({ step, steps, agents, touch, onChange, onDelete }: { step: W
             <span>
               <b style={{ color: C.text, fontWeight: 600 }}>Sempre me perguntar</b>
               <br />
-              Desmarcado, a Yui decide sozinha com base nas suas decisões anteriores e só te chama quando não tiver certeza.
+              Desmarcado, a {ai()} decide sozinha com base nas suas decisões anteriores e só te chama quando não tiver certeza.
             </span>
           </label>
         </>
@@ -978,7 +979,7 @@ function NotifyProps({ step, onChange }: { step: WorkflowNode; onChange: (p: Par
       <span className="wf-label">Por onde</span>
       <ChannelChips value={step.notifyVia ?? []} onChange={(notifyVia) => onChange({ notifyVia })} />
       <span className="wf-label">Mensagem</span>
-      {radio('ai', 'A Yui escreve', 'Resume os passos anteriores seguindo a instrução abaixo.')}
+      {radio('ai', `A ${ai()} escreve`, 'Resume os passos anteriores seguindo a instrução abaixo.')}
       {radio('template', 'Texto fixo', 'Com marcadores: {{Título do passo}}, {{Título do passo.saida}}, {{3}} (passo 3), {{data}} ou a chave de um campo pedido antes.')}
       <Field label={msg.mode === 'ai' ? 'Instrução' : 'Texto'}>
         <textarea
@@ -1172,7 +1173,7 @@ function YuiDecisionFeedback({ runId, nodeId, approved, feedback }: { runId: str
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4, padding: '8px 10px', borderRadius: 10, background: 'rgba(166,140,247,.07)', border: '1px solid rgba(166,140,247,.18)' }}>
       <span style={{ fontSize: 11.5, color: C.lav }}>
-        Decidido pela Yui{feedback === 'agree' ? ' · você concordou' : feedback === 'disagree' ? ' · você discordou (ela aprendeu)' : ''}
+        Decidido pela {ai()}{feedback === 'agree' ? ' · você concordou' : feedback === 'disagree' ? ' · você discordou (ela aprendeu)' : ''}
       </span>
       {!feedback && !writing && (
         <span style={{ display: 'flex', gap: 6 }}>
@@ -1184,7 +1185,7 @@ function YuiDecisionFeedback({ runId, nodeId, approved, feedback }: { runId: str
         <span style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <input className="wf-input" autoFocus aria-label="Por que você discorda" placeholder={approved ? 'Por que não deveria ter aprovado? (opcional)' : 'Por que deveria ter aprovado? (opcional)'} value={note} onChange={(e) => setNote(e.target.value)} />
           <span style={{ display: 'flex', gap: 6 }}>
-            <button className="wf-btn" disabled={busy} style={{ height: 26, fontSize: 11.5 }} onClick={() => void send_(false)}>Ensinar a Yui</button>
+            <button className="wf-btn" disabled={busy} style={{ height: 26, fontSize: 11.5 }} onClick={() => void send_(false)}>Ensinar a {ai()}</button>
             <button className="wf-btn ghost" disabled={busy} style={{ height: 26, fontSize: 11.5 }} onClick={() => setWriting(false)}>Voltar</button>
           </span>
         </span>

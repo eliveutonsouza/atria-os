@@ -14,6 +14,7 @@ import { depsText, missionNextId, missionNumbers, missionRemove } from '../workf
 import { BottomSheet } from './Sheet'
 import { ConfirmDeleteModal, useHeader } from './ui'
 import { useAction, useUnsavedGuard } from '../lib/feedback'
+import { ai } from '../lib/assistant'
 
 // Nova missão / rascunho: pedido à esquerda (objetivo, projeto, detalhes, "pedir meu OK"), plano à direita
 // (quadro de etapas + painel da etapa). Planeja com a Yui ou monta à mão; só executa ao "Iniciar missão".
@@ -186,7 +187,7 @@ function Editor({ mission, restricted = false, onClose }: { mission: MissionInfo
   }
 
   const start = async () => {
-    if (!steps.length) return say('Adicione pelo menos uma etapa (ou planeje com a Yui) antes de iniciar.')
+    if (!steps.length) return say(`Adicione pelo menos uma etapa (ou planeje com a ${ai()}) antes de iniciar.`)
     const id = dirty ? await save() : mid
     if (!id) return
     setBusy('start')
@@ -310,7 +311,7 @@ function Editor({ mission, restricted = false, onClose }: { mission: MissionInfo
       </fieldset>
       {!phone && <span style={{ flex: 1 }} />}
       <button className="wf-btn primary" disabled={!!busy} onClick={() => void plan()} style={{ height: h }}>
-        {busy === 'plan' ? 'Planejando…' : mid && steps.length ? 'Replanejar com a Yui' : 'Planejar com a Yui'}
+        {busy === 'plan' ? 'Planejando…' : mid && steps.length ? `Replanejar com a ${ai()}` : `Planejar com a ${ai()}`}
       </button>
       {phone ? (
         <button className="wf-btn" disabled={!!busy} onClick={() => void manual()} style={{ height: h }}>
@@ -342,7 +343,7 @@ function Editor({ mission, restricted = false, onClose }: { mission: MissionInfo
   )
   const emptyHint = steps.length === 0 && (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center', fontSize: 13, color: C.t3, pointerEvents: 'none' }}>
-      {busy === 'plan' ? 'A Yui está montando o plano…' : 'Ainda sem etapas. Planeje com a Yui ou use “+ Etapa”.'}
+      {busy === 'plan' ? `A ${ai()} está montando o plano…` : `Ainda sem etapas. Planeje com a ${ai()} ou use “+ Etapa”.`}
     </div>
   )
   const panel = (s: MissionStep) => (
@@ -392,7 +393,7 @@ function Editor({ mission, restricted = false, onClose }: { mission: MissionInfo
         {ptab === 'pedido' && <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>{pedido}</div>}
         {ptab === 'etapas' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {steps.length === 0 && <div style={{ fontSize: 13, color: C.t3, padding: '8px 2px' }}>Ainda sem etapas. Planeje com a Yui na aba Pedido ou adicione à mão.</div>}
+            {steps.length === 0 && <div style={{ fontSize: 13, color: C.t3, padding: '8px 2px' }}>Ainda sem etapas. Planeje com a {ai()} na aba Pedido ou adicione à mão.</div>}
             {steps.map((s) => (
               <button
                 key={s.id}

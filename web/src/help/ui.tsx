@@ -5,6 +5,7 @@ import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
 import { renderNote } from '../vault/markdown'
 import { copyText, goHelp, openPage, PAGE_LABEL, sendToYui, type HelpTab, type Step } from './api'
+import { ai } from '../lib/assistant'
 
 // Componentes visuais compartilhados das abas da Ajuda.
 
@@ -58,12 +59,12 @@ export function PhraseRow({ text, onToast }: { text: string; onToast: (m: string
           onClick={() => {
             setBusy(true)
             sendToYui(text)
-              .then(() => onToast('Enviado — acompanhe na Yui.'))
+              .then(() => onToast(`Enviado — acompanhe na ${ai()}.`))
               .catch(() => onToast('Não consegui enviar.'))
               .finally(() => setBusy(false))
           }}
         >
-          Enviar à Yui
+          Enviar à {ai()}
         </button>
       </div>
     </div>
@@ -149,7 +150,7 @@ export function AskBox({ compact = false, examples = EXAMPLES }: { compact?: boo
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder={compact ? 'Pergunte à Yui…' : 'Pergunte qualquer coisa: "como agendo um relatório toda segunda?"'}
+            placeholder={compact ? `Pergunte à ${ai()}…` : 'Pergunte qualquer coisa: "como agendo um relatório toda segunda?"'}
             className="hp-input"
             style={{ height: compact ? 42 : 46 }}
           />
@@ -167,13 +168,13 @@ export function AskBox({ compact = false, examples = EXAMPLES }: { compact?: boo
           ))}
         </div>
       )}
-      {busy && <div style={{ paddingLeft: narrow ? 0 : 44, fontSize: 13, color: C.t2 }}>A Yui está lendo os guias…</div>}
+      {busy && <div style={{ paddingLeft: narrow ? 0 : 44, fontSize: 13, color: C.t2 }}>A {ai()} está lendo os guias…</div>}
       {err && <div style={{ paddingLeft: narrow ? 0 : 44, fontSize: 13, color: C.crit }}>{err}</div>}
       {ans && (
         <div className="hp-answer" style={{ marginLeft: narrow ? 0 : 44 }}>
           {ans.semResposta || !ans.resposta ? (
             <span style={{ fontSize: 14, lineHeight: 1.6, color: '#dfe3f3' }}>
-              Ainda não tenho um guia que responda isso. Anotei a pergunta — ela vira um guia novo. Enquanto isso, tente dizer o mesmo para a Yui na conversa.
+              Ainda não tenho um guia que responda isso. Anotei a pergunta — ela vira um guia novo. Enquanto isso, tente dizer o mesmo para a {ai()} na conversa.
             </span>
           ) : (
             <AnswerText text={ans.resposta} />

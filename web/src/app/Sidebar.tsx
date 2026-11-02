@@ -4,6 +4,7 @@ import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
 import { enterApp, exitApp } from './nav'
 import { NavIcon, useNavGroups } from './navItems'
+import { ai } from '../lib/assistant'
 
 // Sidebar (Sidebar.dc.html): aparece ao encostar o mouse na borda esquerda; fixável; drawer no celular.
 
@@ -107,7 +108,7 @@ export function Sidebar() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px 14px' }}>
           <button
             onClick={() => exitApp()}
-            title="Conversar com a Yui (Ctrl+J)"
+            title={`Conversar com a ${ai()} (Ctrl+J)`}
             style={{ display: 'flex', alignItems: 'center', gap: 10, border: 'none', background: 'transparent', color: C.text, cursor: 'pointer', padding: 0, minHeight: coarse ? 44 : undefined }}
           >
             <img src="/favicon.svg" alt="" width={24} height={24} style={{ borderRadius: 6 }} />

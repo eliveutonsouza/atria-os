@@ -8,6 +8,7 @@ import { AMBER, rgba } from './palette'
 import { toastErr } from '../lib/feedback'
 import { IconBtn } from './ui'
 import { Icon, SPACE_BG, eyebrow, ghostBtn, glass, mono, primaryBtn } from './styles'
+import { ai } from '../lib/assistant'
 
 const RADII = [0, 190, 330, 460]
 const K = 0.78
@@ -266,7 +267,7 @@ export function Constellation({ path, graph }: { path: string; graph: VaultGraph
           <div style={{ borderRadius: 16, padding: 16, background: 'rgba(245,181,74,0.06)', border: '1px solid rgba(245,181,74,0.3)', display: 'flex', flexDirection: 'column', gap: 10, backdropFilter: 'blur(10px)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ width: 14, height: 14, borderRadius: '50%', background: 'radial-gradient(circle at 38% 34%, #fff, #67d8f2 34%, #a68cf7 80%)' }} />
-              <span style={{ ...eyebrow, color: AMBER }}>Yui percebeu</span>
+              <span style={{ ...eyebrow, color: AMBER }}>{ai()} percebeu</span>
             </div>
             <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: '#dfe3f3' }}>
               {sugs.length === 1 ? '1 nota fala' : `${sugs.length} notas falam`} do mesmo assunto mas não {sugs.length === 1 ? 'está ligada' : 'estão ligadas'} a esta. Quer que eu crie os links?
@@ -290,7 +291,7 @@ export function Constellation({ path, graph }: { path: string; graph: VaultGraph
               ['link que sai desta nota', '#67d8f2'],
               ['citada por (outra nota cita esta)', '#a68cf7'],
               ['link nos dois sentidos', 'linear-gradient(90deg, #67d8f2, #a68cf7)'],
-              ['sugestão da Yui', `repeating-linear-gradient(90deg, ${AMBER} 0 6px, rgba(0,0,0,0) 6px 11px)`],
+              [`sugestão da ${ai()}`, `repeating-linear-gradient(90deg, ${AMBER} 0 6px, rgba(0,0,0,0) 6px 11px)`],
             ].map(([l, bg]) => (
               <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: '#c9cde0' }}>
                 <span style={{ width: 26, height: 2, background: bg, borderRadius: 1 }} />

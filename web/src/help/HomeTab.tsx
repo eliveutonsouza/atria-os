@@ -5,6 +5,7 @@ import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
 import { fmtHours, goHelp, GROUP_ORDER, useHelpIndex } from './api'
 import { AskBox, Loading } from './ui'
+import { ai } from '../lib/assistant'
 
 // Início da Ajuda: Pergunte, "Seu dia com a Yui", guias por grupo, resultados do mês e receitas populares.
 
@@ -44,7 +45,7 @@ export function HomeTab() {
         <section className="hp-home">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
             <div className="hp-card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <span style={{ fontSize: 14, fontWeight: 600 }}>Seu dia com a Yui</span>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Seu dia com a {ai()}</span>
               {index.dia.map((d, i) => (
                 <div key={i} style={{ display: 'grid', gridTemplateColumns: '54px minmax(0, 1fr)', gap: 10 }}>
                   <span className="app-mono" style={{ fontSize: 11.5, color: DAY_COLORS[i % DAY_COLORS.length], paddingTop: 2 }}>

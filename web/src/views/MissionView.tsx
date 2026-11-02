@@ -8,6 +8,7 @@ import { useYui } from '../store/yui'
 import { MissionEditor } from './MissionEditor'
 import { ConfirmDeleteModal, Empty, ErrorNote, Eyebrow, Skeleton, useHeader } from './ui'
 import { act as runAct, confirmAction } from '../lib/feedback'
+import { ai } from '../lib/assistant'
 
 // Missão: plano de execução multi-agente (PRD §94/§36) — grafo de etapas + lista com estado ao vivo.
 
@@ -102,7 +103,7 @@ function MissionDetail({ id, m, loading, error, reload, onEdit }: { id?: string;
   const [delOpen, setDelOpen] = useState(false)
   const edit = onEdit ? [{ label: 'Editar etapas', fn: onEdit }] : []
   useHeader('Missão', m?.title ?? 'Missão', m ? [...actions, ...edit, { label: 'Excluir missão', fn: () => setDelOpen(true), danger: true }] : actions, [m?.status, m?.id, !!onEdit, acting])
-  if (!id) return <Empty text="Nenhuma missão aberta." hint="Peça algo grande: “Yui, cria uma landing page para uma clínica.”" />
+  if (!id) return <Empty text="Nenhuma missão aberta." hint={`Peça algo grande: “${ai()}, cria uma landing page para uma clínica.”`} />
   if (loading && !m) return <Skeleton kpis={0} rows={5} />
   if (error || !m) return <ErrorNote text="Não encontrei essa missão." />
 

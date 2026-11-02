@@ -10,6 +10,7 @@ import { ConfirmDeleteModal, ErrorNote, useHeader } from '../../views/ui'
 import { outgoing, renderNote, splitFrontmatter } from '../../vault/markdown'
 import { ContextMenu, PathPrompt } from '../../vault/VaultDialogs'
 import '../../vault/vault.css'
+import { ai } from '../../lib/assistant'
 
 // Vault (Vault.dc.html): árvore de arquivos, VS Code (openvscode-server em /code) e leitura,
 // com painel de conexões. No celular não há VS Code: leitura + edição simples.
@@ -383,7 +384,7 @@ function Connections({ path, text, resolve, onOpen, status, onCommit, committing
       </div>
       {!!sugs.length && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ ...label, color: C.warn }}>Yui sugere ligar</span>
+          <span style={{ ...label, color: C.warn }}>{ai()} sugere ligar</span>
           {sugs.map((s) => (
             <div key={s.id} className="vault-sug" title={s.reason}>
               <button className="vault-sug-name" onClick={() => onOpen(s.id)}>{s.title}</button>

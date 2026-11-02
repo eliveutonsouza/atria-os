@@ -7,6 +7,7 @@ import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
 import { card, Empty, ErrorNote, Skeleton, useHeader } from './ui'
 import { Chip, SearchBox, SmallBtn } from './kit'
+import { ai } from '../lib/assistant'
 
 // Mapa visual do Claude Code para o dia a dia: catálogo curado (shared/claude-guide.json) cruzado com o
 // que está realmente instalado no Claude do container (skills, slash commands, plugins).
@@ -165,7 +166,7 @@ export function ClaudeGuideView() {
                   <code className="mono" style={{ fontSize: 12, color: 'var(--cyan-soft)', background: 'rgba(0,0,0,.3)', borderRadius: 8, padding: '6px 10px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{k.example}</code>
                   <div style={{ display: 'flex', gap: 6, marginTop: 'auto', paddingTop: 4, flexWrap: 'wrap' }}>
                     {k.command && <SmallBtn onClick={() => openInTerminal(k)}>Abrir no terminal</SmallBtn>}
-                    <SmallBtn onClick={() => submitText(`Sobre o Claude Code: ${k.title} — ${k.what} Me ajuda a usar isso agora.`)}>Pedir à Yui</SmallBtn>
+                    <SmallBtn onClick={() => submitText(`Sobre o Claude Code: ${k.title} — ${k.what} Me ajuda a usar isso agora.`)}>Pedir à {ai()}</SmallBtn>
                   </div>
                 </article>
               )

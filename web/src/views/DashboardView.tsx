@@ -4,6 +4,7 @@ import { C, toneColor } from '../lib/colors'
 import { useYui } from '../store/yui'
 import { card, Empty, ErrorNote, Eyebrow, Skeleton, useHeader } from './ui'
 import { Bars, KpiTile, LineArea } from '../charts/Charts'
+import { ai } from '../lib/assistant'
 
 function hourLabels(): string[] {
   const h = new Date().getHours()
@@ -54,7 +55,7 @@ export function DashboardView() {
       </div>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <Eyebrow style={{ marginBottom: 8 }}>Projetos</Eyebrow>
-        {data.projects.length === 0 && <Empty text="Ainda não há projetos no workspace." hint="Diga: “Yui, crie um projeto novo.”" />}
+        {data.projects.length === 0 && <Empty text="Ainda não há projetos no workspace." hint={`Diga: “${ai()}, crie um projeto novo.”`} />}
         {data.projects.map((p) => {
           const c = toneColor(p.tone)
           return (

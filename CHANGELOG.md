@@ -2,6 +2,9 @@
 
 Versões marcadas do Atria OS. Cada tag `vX.Y.Z` publica as imagens no GHCR e pode ser aplicada pelo Atria Central (Atualizações).
 
+## Próxima versão
+- Nome do assistente personalizável: em Configurações › Yui & voz, o campo "Nome do assistente" troca "Yui" na tela, na voz, no Telegram, nos avisos e na Ajuda. Vazio volta para Yui. Aceita letras, números, espaço, ponto, hífen e apóstrofo (até 30).
+
 ## v1.8.0
 - Yui & voz: nova "Personalidade da Yui" nas Configurações. Calor e emoção, humor, tamanho das respostas, ritmo da fala e reações ("hmm", "nossa"). Vale na voz ao vivo e nas respostas faladas do Telegram. Todos os padrões mantêm o jeito de antes; "Restaurar personalidade padrão" volta a eles.
 

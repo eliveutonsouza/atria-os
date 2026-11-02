@@ -9,6 +9,7 @@ import { PathPrompt } from '../vault/VaultDialogs'
 import { ActionSheet } from './Sheet'
 import { ConfirmDeleteModal, Empty, ErrorNote, Skeleton, useHeader } from './ui'
 import { Entregas, type Entrega } from './Entregas'
+import { ai } from '../lib/assistant'
 
 const KIND: Record<ArtifactInfo['kind'], string> = { website: 'Site', report: 'Relatório', chart: 'Gráfico', table: 'Tabela', html: 'Página', image: 'Imagem', other: 'Arquivo' }
 
@@ -73,7 +74,7 @@ export function ArtifactsView() {
   const views = custom.data ?? []
   const files = entregas.data ?? []
   const filesPending = (entregas.loading && !entregas.data) || (!!entregas.error && !entregas.data)
-  if (!data.length && !views.length && !files.length && !filesPending) return <Empty text="Ainda não há artefatos." hint="Sites, relatórios, apresentações e telas que a Yui monta aparecem aqui." />
+  if (!data.length && !views.length && !files.length && !filesPending) return <Empty text="Ainda não há artefatos." hint={`Sites, relatórios, apresentações e telas que a ${ai()} monta aparecem aqui.`} />
   const openView = (v: CustomItem) => useYui.getState().show('custom', { customId: v.id })
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
@@ -94,12 +95,12 @@ export function ArtifactsView() {
       )}
       {views.length > 0 && (
         <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div className="eyebrow" style={{ color: C.violet }}>Telas criadas pela Yui · {views.length}</div>
+          <div className="eyebrow" style={{ color: C.violet }}>Telas criadas pela {ai()} · {views.length}</div>
           <div style={grid}>
             {views.map((v) => (
               <div key={v.id} style={{ ...cardStyle, cursor: 'default', padding: 0, gap: 0 }}>
                 <button onClick={() => openView(v)} className="hov-bg2" style={{ background: 'none', border: 'none', color: 'inherit', textAlign: 'left', padding: '18px 20px 10px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 8, fontFamily: 'inherit', borderRadius: '16px 16px 0 0' }}>
-                  <span className="eyebrow" style={{ color: C.lav }}>{v.source === 'yui' ? 'Yui' : 'Agente'}</span>
+                  <span className="eyebrow" style={{ color: C.lav }}>{v.source === 'yui' ? ai() : 'Agente'}</span>
                   <span style={{ fontSize: 15, fontWeight: 600, overflowWrap: 'anywhere' }}>{v.title}</span>
                   <span style={{ fontSize: 12, color: C.t3 }}>{ago(v.createdAt)}</span>
                 </button>

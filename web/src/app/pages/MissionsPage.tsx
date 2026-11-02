@@ -7,6 +7,7 @@ import { MissionEditor } from '../../views/MissionEditor'
 import { DeleteMissionModal, MissionView } from '../../views/MissionView'
 import { Empty } from '../../views/ui'
 import { Dot, openApp, relTime, Tag, useViewParams } from './common'
+import { ai } from '../../lib/assistant'
 
 // Missões: planos de execução multi-agente. Lista à esquerda, plano (MissionView) à direita.
 // "+ Nova missão" e rascunhos abrem o editor (MissionEditor) ocupando a página toda.
@@ -53,7 +54,7 @@ export function MissionsPage() {
   return (
     <div className="app-split" style={{ alignItems: 'flex-start' }}>
       <section style={{ width: id ? (device === 'tablet' ? 280 : 340) : '100%', maxWidth: '100%', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {list.length === 0 && <Empty text="Nenhuma missão ainda." hint="Toque em “+ Nova missão” ou peça algo grande para a Yui: “cria uma landing page para uma clínica”." />}
+        {list.length === 0 && <Empty text="Nenhuma missão ainda." hint={`Toque em “+ Nova missão” ou peça algo grande para a ${ai()}: “cria uma landing page para uma clínica”.`} />}
         {list.map((m) => {
           const [l, c] = STATUS[m.status]
           const done = m.steps.filter((s) => s.status === 'done').length

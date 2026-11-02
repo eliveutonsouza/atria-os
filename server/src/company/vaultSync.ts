@@ -1,6 +1,7 @@
 import type { CompanyDoc, CompanyProfile } from '../../../shared/protocol.ts';
 import { removeNote, upsertNote } from '../vault.ts';
 import { q } from './store.ts';
+import { config } from '../config.ts';
 
 // Espelho no vault: o perfil vira Empresa/Empresa.md (hub) e cada documento pronto vira
 // Empresa/<Categoria>/<nome>.md, ligado ao hub — assim aparecem no Cérebro, na galáxia Empresa.
@@ -38,7 +39,7 @@ export async function writeDocNote(d: CompanyDoc) {
     d.fields.length ? `\n## Campos\n${d.fields.map((f) => `- **${f.key}:** ${f.value}`).join('\n')}` : null,
     d.entities.length ? `\n## Entidades\n${d.entities.map((e) => `- ${e.type}: ${e.value}`).join('\n')}` : null,
     '',
-    '> Nota gerada a partir da base de documentos (Empresa › Documentos). O texto completo fica na busca da Yui e dos agentes.',
+    `> Nota gerada a partir da base de documentos (Empresa › Documentos). O texto completo fica na busca da ${config.assistantName} e dos agentes.`,
     '',
   ].filter((l) => l !== null);
   upsertNote(path, lines.join('\n'));

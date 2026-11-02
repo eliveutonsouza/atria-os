@@ -517,7 +517,7 @@ async function processRequest(id: string): Promise<void> {
       }
     }
     const when = agora();
-    const via = r.via === 'telegram' ? 'pelo Telegram' : r.via === 'yui' ? 'ditadas para a Yui' : 'pelo formulário';
+    const via = r.via === 'telegram' ? 'pelo Telegram' : r.via === 'yui' ? `ditadas para a ${config.assistantName}` : 'pelo formulário';
     const output = `Respostas de "${r.title}" (${via}, ${when.data} ${when.hora}):\n${lines.join('\n')}`;
     update(id, { status: 'done', progress: null, error: null, output, vars: JSON.stringify(vars), answered_at: now() });
     settle(id, { status: 'done', output, vars });

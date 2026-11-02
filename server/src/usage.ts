@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { UsageReport } from '../../shared/protocol.ts';
 import { db, now, uid } from './db.ts';
+import { config } from './config.ts';
 import { costFor, costForSeconds } from './pricing.ts';
 import { claudeLimits, probeClaudeUsage, claudeAccount } from './claudeUsage.ts';
 import { getInit } from './capabilities.ts';
@@ -29,7 +30,9 @@ CREATE INDEX IF NOT EXISTS ai_usage_at ON ai_usage(at);
 export type Feature = 'cerebro' | 'voz' | 'planejador' | 'workflow-decisao' | 'workflow-aprovacao' | 'workflow-gerar' | 'workflow-pedido' | 'workflow-transcricao' | 'workflow-aviso' | 'ajuda' | 'empresa' | 'empresa-embeddings' | 'aprendizado' | 'telegram-voz';
 
 export const FEATURE_LABEL: Record<string, string> = {
-  cerebro: 'Cérebro da Yui',
+  get cerebro() {
+    return `Cérebro da ${config.assistantName}`;
+  },
   voz: 'Voz (GPT-Live)',
   planejador: 'Planejador de missões',
   'workflow-gerar': 'Criar workflows',

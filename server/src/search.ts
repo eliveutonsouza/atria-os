@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { db } from './db.ts';
 import { findProject } from './projects.ts';
 import { registerBrain } from './extensions.ts';
+import { config } from './config.ts';
 
 // Busca no histórico (ideia do session_search do Hermes): índice FTS5 do SQLite sobre a conversa (messages.text)
 // e as execuções (runs.task + runs.result), sincronizado por triggers. Se o SQLite não tiver FTS5, cai para LIKE.
@@ -77,7 +78,7 @@ export function searchHistory(q: string, opts: { project?: string | null; limit?
       FROM messages_fts JOIN messages m ON m.rowid = messages_fts.rowid
       WHERE messages_fts MATCH ? ${projFilter ? 'AND m.project IS ?' : ''}
       ORDER BY m.at DESC LIMIT ?`).all(...[fq, ...(projFilter ? [opts.project ?? null] : []), limit]) as { id: string; who: string; at: string; project: string | null; snip: string }[];
-    for (const m of msgs) hits.push({ kind: 'conversa', id: m.id, at: m.at, who: m.who === 'yui' ? 'Yui' : 'Você', project: m.project, snippet: m.snip });
+    for (const m of msgs) hits.push({ kind: 'conversa', id: m.id, at: m.at, who: m.who === 'yui' ? config.assistantName : 'Você', project: m.project, snippet: m.snip });
     const rs = db.prepare(`
       SELECT r.id, r.agent_id, r.created_at AS at, r.project, r.task, snippet(runs_fts, 1, '«', '»', '…', 24) AS snip
       FROM runs_fts JOIN runs r ON r.rowid = runs_fts.rowid
@@ -88,7 +89,7 @@ export function searchHistory(q: string, opts: { project?: string | null; limit?
     const like = `%${q.trim().slice(0, 100)}%`;
     const msgs = db.prepare(`SELECT id, who, at, project, text FROM messages WHERE text LIKE ? ${projFilter ? 'AND project IS ?' : ''} ORDER BY at DESC LIMIT ?`)
       .all(...[like, ...(projFilter ? [opts.project ?? null] : []), limit]) as { id: string; who: string; at: string; project: string | null; text: string }[];
-    for (const m of msgs) hits.push({ kind: 'conversa', id: m.id, at: m.at, who: m.who === 'yui' ? 'Yui' : 'Você', project: m.project, snippet: clip(m.text) });
+    for (const m of msgs) hits.push({ kind: 'conversa', id: m.id, at: m.at, who: m.who === 'yui' ? config.assistantName : 'Você', project: m.project, snippet: clip(m.text) });
     const rs = db.prepare(`SELECT id, agent_id, created_at AS at, project, task, result FROM runs WHERE (task LIKE ? OR result LIKE ?) ${projFilter ? 'AND project IS ?' : ''} ORDER BY created_at DESC LIMIT ?`)
       .all(...[like, like, ...(projFilter ? [opts.project ?? null] : []), limit]) as { id: string; agent_id: string; at: string; project: string | null; task: string; result: string | null }[];
     for (const r of rs) hits.push({ kind: 'execucao', id: r.id, at: r.at, who: r.agent_id, project: r.project, snippet: clip(`${r.task} — ${r.result ?? ''}`) });
@@ -102,7 +103,7 @@ registerBrain({
   tools: [
     {
       type: 'function', name: 'buscar_historico', strict: true,
-      description: 'Busca na conversa antiga com a Yui e nos resultados das execuções dos agentes (mais recentes primeiro).',
+      description: 'Busca na conversa antiga com o assistente e nos resultados das execuções dos agentes (mais recentes primeiro).',
       parameters: {
         type: 'object', additionalProperties: false,
         properties: {

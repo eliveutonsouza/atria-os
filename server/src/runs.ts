@@ -518,7 +518,7 @@ function excludeFromGit(projectDir: string) {
 
 function systemAppend(agent: AgentDef, projectName: string | null, runDir?: { dir: string; root: string } | null, goal?: string | null): string {
   return [
-    `Você é o ${agent.name}, um agente da força de trabalho da Yui, no Atria OS.`,
+    `Você é o ${agent.name}, um agente da força de trabalho da ${config.assistantName}, no Atria OS.`,
     agent.prompt,
     '',
     'Regras de execução:',

@@ -569,19 +569,19 @@ async function approval(ex: Exec, node: WorkflowNode) {
     if (v && v.confianca >= AUTO_APPROVAL_MIN_CONFIDENCE) {
       recordDecision({ workflow: ex.def.slug, nodeId: node.id, runId: ex.id, by: 'yui', approved: v.aprovar, confidence: v.confianca, reason: v.motivo, context: lessonContext(ex) });
       if (v.aprovar) {
-        setNode(ex, node.id, { status: 'done', result: `Yui aprovou: ${v.motivo}`, decision: 'aprovado', decidedBy: 'yui', feedback: null });
-        ex.outputs.push({ node, result: `Aprovação (decidida pela Yui): aprovado — ${v.motivo}` });
+        setNode(ex, node.id, { status: 'done', result: `${config.assistantName} aprovou: ${v.motivo}`, decision: 'aprovado', decidedBy: 'yui', feedback: null });
+        ex.outputs.push({ node, result: `Aprovação (decidida pela ${config.assistantName}): aprovado — ${v.motivo}` });
         persist(ex, { status: 'running' });
         narrate(`${ex.def.name}: aprovei "${node.title}" — ${v.motivo}`, { speak: false });
         return;
       }
-      setNode(ex, node.id, { status: 'cancelled', result: `Yui rejeitou: ${v.motivo}`, decision: 'rejeitado', decidedBy: 'yui', feedback: null });
+      setNode(ex, node.id, { status: 'cancelled', result: `${config.assistantName} rejeitou: ${v.motivo}`, decision: 'rejeitado', decidedBy: 'yui', feedback: null });
       ex.cancelled = true;
       persist(ex);
       announce(`Parei o workflow ${ex.def.name} no passo "${node.title}": ${v.motivo}. Se eu errei, marque Discordo na execução.`);
-      throw new Error(`aprovação rejeitada pela Yui no passo ${node.id}`);
+      throw new Error(`aprovação rejeitada pela ${config.assistantName} no passo ${node.id}`);
     }
-    why = v ? `a Yui não teve certeza (${Math.round(v.confianca * 100)}%): ${v.motivo}` : 'a Yui não conseguiu avaliar';
+    why = v ? `a ${config.assistantName} não teve certeza (${Math.round(v.confianca * 100)}%): ${v.motivo}` : `a ${config.assistantName} não conseguiu avaliar`;
   }
   await humanApproval(ex, node, why);
 }
@@ -882,7 +882,7 @@ const NODE_SCHEMA = {
       },
     },
     notifyVia: { type: 'array', items: { type: 'string', enum: ['telegram', 'email', 'push'] }, description: 'input/notify: canais do aviso; demais: []' },
-    messageMode: { type: ['string', 'null'], enum: ['ai', 'template', null], description: 'notify: ai (a Yui escreve seguindo instruction) ou template (instruction é o texto fixo com {{Título do passo}}); demais: null' },
+    messageMode: { type: ['string', 'null'], enum: ['ai', 'template', null], description: 'notify: ai (o assistente escreve seguindo instruction) ou template (instruction é o texto fixo com {{Título do passo}}); demais: null' },
     attach: { type: 'boolean', description: 'notify: anexar arquivos gerados na execução; demais: false' },
   },
 };

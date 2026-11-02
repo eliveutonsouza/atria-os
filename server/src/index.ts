@@ -12,6 +12,7 @@ import { cpSync, existsSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import type { Bootstrap, ChatContext } from '../../shared/protocol.ts';
 import { config } from './config.ts';
+import { brand } from './brand.ts';
 import { db, kvGet, kvSet, now } from './db.ts';
 import { addClient, emit, setYuiState, yuiState } from './bus.ts';
 import { isAuthed, isAuthedCookieHeader, registerAuth, requireAuth } from './auth.ts';
@@ -219,7 +220,7 @@ app.post('/api/context', async (req, reply) => {
   if (ctx.view !== prev.view || ctx.params?.project !== prev.params?.project || ctx.selectedElement !== prev.selectedElement || ctx.mode !== prev.mode) {
     setUiContextNote(
       ctx.mode === 'center'
-        ? 'Tela: Yui ao centro, sem Canvas aberto.'
+        ? `Tela: ${config.assistantName} ao centro, sem Canvas aberto.`
         : `Tela: Canvas mostrando "${ctx.view}"${ctx.params?.project ? ` do projeto ${ctx.params.project}` : ''}${ctx.selectedElement ? `; elemento selecionado: ${ctx.selectedElement}` : ''}.`,
     );
   }
@@ -412,7 +413,12 @@ app.addHook('onSend', async (req, reply, payload) => {
 // ---------- SPA ----------
 if (existsSync(config.webDist)) {
   await app.register(fastifyStatic, { root: config.webDist, wildcard: false, index: false });
-  const indexHtml = () => readFileSync(join(config.webDist, 'index.html'), 'utf8');
+  const indexHtml = () => brand(readFileSync(join(config.webDist, 'index.html'), 'utf8'), config.assistantName);
+  app.get('/manifest.webmanifest', (_req, reply) => {
+    const f = join(config.webDist, 'manifest.webmanifest');
+    if (!existsSync(f)) return reply.code(404).send();
+    return reply.type('application/manifest+json').header('Cache-Control', 'no-cache').send(brand(readFileSync(f, 'utf8'), config.assistantName));
+  });
   app.get('/assets/*', (req, reply) => reply.sendFile(req.url.slice(1).split('?')[0]));
   app.setNotFoundHandler((req, reply) => {
     if (req.url.startsWith('/api/') || req.url.startsWith('/sandbox/') || req.url.startsWith('/code/')) return reply.code(404).send({ error: 'not found' });

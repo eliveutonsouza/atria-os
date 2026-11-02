@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { AppPage, HelpAnswer, HelpDoc, HelpIndex, HelpResults, HelpTaskType } from '../../shared/protocol.ts';
 import { config, readEnv } from './config.ts';
+import { brand } from './brand.ts';
 import { db, kvGet, kvSet, now } from './db.ts';
 import { emit } from './bus.ts';
 import { openai } from './brain.ts';
@@ -31,13 +32,13 @@ function readDir(sub: string, kind: 'guia' | 'receita'): ParsedDoc[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((f) => f.endsWith('.md'))
-    .map((f) => parseDoc(kind, f.replace(/\.md$/, ''), readFileSync(join(dir, f), 'utf8')));
+    .map((f) => parseDoc(kind, f.replace(/\.md$/, ''), brand(readFileSync(join(dir, f), 'utf8'), config.assistantName)));
 }
 
 export function loadHelp() {
   guides = readDir('guias', 'guia');
   recipes = readDir('receitas', 'receita');
-  const read = (f: string) => (existsSync(join(helpDir(), f)) ? readFileSync(join(helpDir(), f), 'utf8') : '');
+  const read = (f: string) => (existsSync(join(helpDir(), f)) ? brand(readFileSync(join(helpDir(), f), 'utf8'), config.assistantName) : '');
   const GROUPS = ['Começar', 'Acompanhar', 'Organizar', 'Conhecimento', 'Ferramentas', 'Sistema'];
   const gi = (g: string) => (GROUPS.indexOf(g) < 0 ? 99 : GROUPS.indexOf(g));
   index = {
@@ -68,7 +69,7 @@ function mirrorToVault() {
       str(m.resumo) || str(m.resultado),
       m.usar_quando ? `\n**Use quando:** ${str(m.usar_quando)}` : '',
       m.nao_usar_quando ? `**Não use quando:** ${str(m.nao_usar_quando)}` : '',
-      list(m.frases).length ? `\n## Diga para a Yui\n${list(m.frases).map((f) => `- ${f}`).join('\n')}` : '',
+      list(m.frases).length ? `\n## Diga para a ${config.assistantName}\n${list(m.frases).map((f) => `- ${f}`).join('\n')}` : '',
       '',
       d.markdown,
       list(m.dicas).length ? `\n## Dicas\n${list(m.dicas).map((f) => `- ${f}`).join('\n')}` : '',
@@ -124,7 +125,7 @@ export async function ask(pergunta: string, who = 'Painel'): Promise<HelpAnswer>
         model: config.brainModel,
         instructions:
           'Você é a ajuda do Atria OS. Responda em português, em 2 a 4 frases curtas e práticas, usando SÓ os trechos dados. ' +
-          'Diga onde clicar ou o que pedir à Yui. Cite a fonte no fim de cada informação como [Guia: Título], [Receita: Título] ou [FAQ]. ' +
+          `Diga onde clicar ou o que pedir à ${config.assistantName}. Cite a fonte no fim de cada informação como [Guia: Título], [Receita: Título] ou [FAQ]. ` +
           'Se os trechos não respondem, comece exatamente com "Não encontrei isso nos guias." e sugira o guia mais próximo.',
         input: `Pergunta: ${q}\n\nTrechos:\n${hits.map((h) => `(${h.p.source.kind === 'guia' ? 'Guia' : h.p.source.kind === 'receita' ? 'Receita' : 'FAQ'}: ${h.p.source.titulo} — ${h.p.section})\n${h.p.text.slice(0, 1800)}`).join('\n\n')}`,
       });
@@ -318,7 +319,7 @@ registerBrain({
   run(name, args, ctx) {
     if (name === 'ajuda_consultar') {
       if (ctx.dryRun) return Promise.resolve({ ok: true, dryRun: true });
-      return ask(String(args.pergunta), 'Yui').then((a) => ({ resposta: a.resposta, semResposta: a.semResposta, fontes: a.fontes.map((f) => f.titulo), tela: a.abrir }));
+      return ask(String(args.pergunta), config.assistantName).then((a) => ({ resposta: a.resposta, semResposta: a.semResposta, fontes: a.fontes.map((f) => f.titulo), tela: a.abrir }));
     }
     if (name === 'open_help') {
       const g = typeof args.guia === 'string' && guides.some((x) => x.id === args.guia) ? `guia:${args.guia}` : String(args.tab);

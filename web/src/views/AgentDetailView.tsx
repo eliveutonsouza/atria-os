@@ -11,6 +11,7 @@ import { confirmAction, toastErr, useAction, useUnsavedGuard } from '../lib/feed
 import { Chip, Field, input, mcpStatusMeta, SearchBox, SmallBtn, StatusPill } from './kit'
 import { ModelSelect } from './ModelSelect'
 import { AgentSkills } from './AgentSkills'
+import { ai } from '../lib/assistant'
 
 // Ficha do agente: prompt, skills, conectores MCP (allowlist), plugins, modelo e turnos — salvos no
 // frontmatter de /workspace/.claude/agents/<id>.md, aplicados a cada execução.
@@ -154,7 +155,7 @@ export function AgentDetailView({ onGone }: { onGone?: () => void } = {}) {
         </Field>
       </div>
 
-      <Field label="Especialidade" hint="A Yui usa este texto para decidir quando delegar a este agente.">
+      <Field label="Especialidade" hint={`A ${ai()} usa este texto para decidir quando delegar a este agente.`}>
         <input style={input} value={draft.description} onChange={(e) => set({ description: e.target.value })} />
       </Field>
 

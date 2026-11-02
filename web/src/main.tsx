@@ -1,20 +1,26 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Route, Routes } from 'react-router'
-import { Login } from './shell/Login'
-import { Shell } from './shell/Shell'
+import { App } from './App'
 import './styles/tokens.css'
 import { initPwa } from './pwa/pwa'
+import { setAssistantName } from './lib/assistant'
 
 initPwa()
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="*" element={<Shell />} />
-      </Routes>
-    </BrowserRouter>
-  </StrictMode>,
+// O nome vem do servidor (rota pública, também na tela de login) antes de montar; se demorar, abre com o padrão.
+async function loadName() {
+  try {
+    const r = await fetch('/api/setup/status', { signal: AbortSignal.timeout(2500) })
+    if (r.ok) setAssistantName(((await r.json()) as { assistantName?: string }).assistantName)
+  } catch {
+    /* segue com o padrão */
+  }
+}
+
+void loadName().finally(() =>
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  ),
 )

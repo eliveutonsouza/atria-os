@@ -3,6 +3,7 @@ import type { SettingsPayload } from '../../shared/protocol.ts';
 import { readEnv, setSettingsResolver } from './config.ts';
 import { db, kvGet, kvSet, now } from './db.ts';
 import { sessionKind } from './auth.ts';
+import { validAssistantName } from './brand.ts';
 
 // Configurações editáveis pelo painel. Precedência: banco > .env > padrão.
 // O .env vira só o "bootstrap" da instalação; tudo que o usuário ajusta no painel mora aqui.
@@ -47,6 +48,8 @@ export const SETTINGS: Record<string, Def> = {
   'budget.runMaxUsd': { kind: 'number', def: 0, min: 0, max: 500 },
   // Aprendizado (learning.ts): revisões por dia com o modelo do cérebro (execução longa, falha, rejeição ou 👎).
   'learn.dailyReviews': { kind: 'number', def: 30, min: 0, max: 200 },
+  // Nome do assistente (brand.ts). Padrão Yui; entra em prompts, então a validação é estrita.
+  'assistant.name': { kind: 'string', env: 'ATRIA_ASSISTANT_NAME', def: 'Yui', maxLen: 30 },
   'voice.name': { kind: 'string', env: 'ATRIA_VOICE', def: 'marin', maxLen: 40 },
   'voice.idleMin': { kind: 'number', env: 'ATRIA_LIVE_IDLE_MIN', def: 5, min: 1, max: 60 },
   'voice.pttKey': { kind: 'enum', def: 'Space', options: ['Space', 'Backquote', 'F8', 'AltRight'] },
@@ -182,6 +185,7 @@ function validate(key: string, v: unknown): string | null {
     default: {
       const s = String(v).trim();
       if (d.maxLen && s.length > d.maxLen) throw new Error(`${key}: até ${d.maxLen} caracteres`);
+      if (key === 'assistant.name' && s && !validAssistantName(s)) throw new Error('nome do assistente: até 30 letras, números, espaço, ponto, hífen ou apóstrofo');
       if (key === 'user.email' && s && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) throw new Error('e-mail inválido');
       if (key === 'pricing.openai' && s) validatePricing(s);
       if (key === 'monitor.url' && s && !validMonitorUrl(s)) throw new Error('endereço do monitor: use https://');

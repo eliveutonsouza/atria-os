@@ -590,6 +590,7 @@ export interface SetupStatus {
   push: number; // dispositivos inscritos
   monitor?: boolean; // monitoramento remoto ligado (opcional, para quem administra várias instalações do Atria OS)
   completed: boolean;
+  assistantName?: string; // nome do assistente (padrão Yui); público: a tela de login já usa
 }
 
 // WebSocket /api/browser/live

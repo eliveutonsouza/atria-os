@@ -42,8 +42,8 @@ export function recentMessages(limit = 24, project: string | null = activeProjec
 
 // Nome do dono vem das Configurações (pode mudar com o servidor no ar).
 const ownerName = () => (config.userName ? `de ${config.userName}` : 'do usuário');
-const instructionsText = () => `Você é o raciocínio por trás da Yui, a assistente do Atria OS — a central pessoal de IA ${ownerName()}.
-A Yui conversa (por voz ou texto) e você decide o que fazer usando ferramentas. A força de execução são agentes Claude Code (delegate_task).
+const instructionsText = () => `Você é o raciocínio por trás da ${config.assistantName}, a assistente do Atria OS — a central pessoal de IA ${ownerName()}.
+A ${config.assistantName} conversa (por voz ou texto) e você decide o que fazer usando ferramentas. A força de execução são agentes Claude Code (delegate_task).
 
 Como responder:
 - Responda SEMPRE em português do Brasil, 1 ou 2 frases curtas, tom calmo e direto, pronto para ser falado. Sem markdown, listas ou emojis.
@@ -84,9 +84,9 @@ const viewEnum = { type: 'string', enum: VIEW_NAMES };
 const nullableStr = (description: string) => ({ type: ['string', 'null'], description });
 
 const TOOLS: OpenAI.Responses.FunctionTool[] = [
-  { type: 'function', name: 'show_view', strict: true, description: 'Abre uma visualização no Canvas ao lado da Yui.', parameters: S({ view: viewEnum, project: nullableStr('slug ou nome do projeto, quando a view precisar'), run_id: nullableStr('id da execução para destacar') }, ['view', 'project', 'run_id']) },
+  { type: 'function', name: 'show_view', strict: true, description: 'Abre uma visualização no Canvas ao lado do assistente.', parameters: S({ view: viewEnum, project: nullableStr('slug ou nome do projeto, quando a view precisar'), run_id: nullableStr('id da execução para destacar') }, ['view', 'project', 'run_id']) },
   { type: 'function', name: 'suggest_view', strict: true, description: 'Deixa uma visualização sugerida ("Quer ver?") sem abrir agora.', parameters: S({ view: viewEnum, project: nullableStr('slug do projeto') }, ['view', 'project']) },
-  { type: 'function', name: 'close_canvas', strict: true, description: 'Fecha o Canvas e volta a Yui ao centro.', parameters: S({}, []) },
+  { type: 'function', name: 'close_canvas', strict: true, description: 'Fecha o Canvas e volta o assistente ao centro.', parameters: S({}, []) },
   { type: 'function', name: 'set_focus', strict: true, description: 'Liga/desliga tela cheia do Canvas.', parameters: S({ on: { type: 'boolean' } }, ['on']) },
   { type: 'function', name: 'switch_project', strict: true, description: 'Troca o projeto ativo.', parameters: S({ project: { type: 'string' } }, ['project']) },
   { type: 'function', name: 'get_overview', strict: true, description: 'KPIs gerais: agentes, execuções, sucesso, saúde de cada projeto.', parameters: S({}, []) },
@@ -130,7 +130,7 @@ function snapshot(ap: string | null): string {
   const runs = listRuns(12);
   const lines = [
     `Projeto ativo: ${ap ?? 'nenhum'}.`,
-    `Tela atual: ${uiContext.mode === 'center' ? 'Yui ao centro, sem Canvas' : `Canvas com view "${uiContext.view}"${uiContext.params?.project ? ` do projeto ${uiContext.params.project}` : ''}${uiContext.mode === 'focus' ? ' em tela cheia' : ''}`}.`,
+    `Tela atual: ${uiContext.mode === 'center' ? `${config.assistantName} ao centro, sem Canvas` : `Canvas com view "${uiContext.view}"${uiContext.params?.project ? ` do projeto ${uiContext.params.project}` : ''}${uiContext.mode === 'focus' ? ' em tela cheia' : ''}`}.`,
     uiContext.selectedElement ? `Elemento selecionado no preview: ${uiContext.selectedElement}.` : '',
     `Projetos no workspace: ${listProjectConfigs().filter((p) => p.cloned).map((p) => `${p.name} (${p.slug})`).join(', ') || 'nenhum'}.`,
     `Outros repositórios no GitHub (clonam sob demanda): ${listProjectConfigs().filter((p) => !p.cloned).map((p) => p.slug).join(', ') || 'nenhum'}.`,
@@ -302,7 +302,7 @@ async function thinkLoop(request: string, dryRun: boolean, ctx: ToolCtx, project
   if (!config.openaiKey) return 'Ainda não tenho a chave da OpenAI configurada no servidor.';
   if (!dryRun && ctx.channel !== 'telegram') setYuiState('thinking');
   const history = recentMessages(20, project)
-    .map((m) => `${m.who === 'user' ? 'Usuário' : 'Yui'}: ${m.text}`)
+    .map((m) => `${m.who === 'user' ? 'Usuário' : config.assistantName}: ${m.text}`)
     .join('\n');
   let input: OpenAI.Responses.ResponseInput = [
     { role: 'developer', content: `Contexto do Atria OS:\n${snapshot(project)}\n\nConversa recente:\n${history || '(início)'}` },

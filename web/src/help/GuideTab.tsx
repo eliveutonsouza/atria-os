@@ -5,6 +5,7 @@ import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
 import { asList, asText, goHelp, GROUP_ORDER, openPage, parseSteps, splitSections, unquote, useHelpIndex, useToast } from './api'
 import { Loading, Md, PhraseRow, StepList, Toast } from './ui'
+import { ai } from '../lib/assistant'
 
 // Guia de uma ferramenta: índice lateral, o que é, quando usar, passo a passo, frases para a Yui, dicas e erros.
 
@@ -198,7 +199,7 @@ export function GuideTab({ id }: { id: string | null }) {
             )}
             {frases.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <h3 className="hp-h3">Diga para a Yui</h3>
+                <h3 className="hp-h3">Diga para a {ai()}</h3>
                 {frases.map((f) => (
                   <PhraseRow key={f} text={f} onToast={showToast} />
                 ))}

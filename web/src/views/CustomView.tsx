@@ -6,6 +6,7 @@ import { useYui } from '../store/yui'
 import { CustomViewDialogs } from './ArtifactsView'
 import { GroupedBars, KpiTile, Legend, LineArea, Pie } from '../charts/Charts'
 import { card, Dot, Empty, ErrorNote, Eyebrow, Skeleton, useHeader } from './ui'
+import { ai } from '../lib/assistant'
 
 // Tela sob medida: blocos nativos montados pela Yui ou por um agente (protocol.ts → Block).
 
@@ -17,13 +18,13 @@ export function CustomView() {
   const [act, setAct] = useState<'rename' | 'delete' | null>(null)
   const [renamed, setRenamed] = useState<{ id: string; title: string } | null>(null)
   const title = renamed && renamed.id === view?.id ? renamed.title : view?.spec.title
-  useHeader(view?.spec.eyebrow ?? 'Yui', title ?? 'Tela', view
+  useHeader(view?.spec.eyebrow ?? ai(), title ?? 'Tela', view
     ? [
         { label: 'Renomear', fn: () => setAct('rename') },
         { label: 'Excluir', danger: true, fn: () => setAct('delete') },
       ]
     : [], [view?.id, title])
-  if (!id) return <Empty text="Nenhuma tela selecionada." hint="Peça: “Yui, faz um gráfico das execuções por agente.”" />
+  if (!id) return <Empty text="Nenhuma tela selecionada." hint={`Peça: “${ai()}, faz um gráfico das execuções por agente.”`} />
   if (loading && !view) return <Skeleton rows={3} />
   if (error || !view) return <ErrorNote text="Não encontrei essa tela." />
   return (

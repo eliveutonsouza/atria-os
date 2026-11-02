@@ -9,6 +9,7 @@ import { kvGet, kvSet, now } from './db.ts';
 import { findAgent, loadAllAgents } from './agents.ts';
 import { askApproval } from './runs.ts';
 import { registerAgentOptions, registerBrain, registerRunPrompt } from './extensions.ts';
+import { config } from './config.ts';
 
 // Loja de skills (https://skills.sh): ranking, busca, ficha com auditorias e instalação com 1 clique.
 // Plataforma = ~/.claude/skills/<nome> (Yui, todos os agentes e o terminal enxergam).
@@ -587,7 +588,7 @@ export function register(app: FastifyInstance): void {
         } catch (e) {
           return Promise.resolve({ ok: false, error: (e as Error).message });
         }
-        const where = scope === 'platform' ? 'plataforma toda (Yui e todos os agentes)' : agents.map((a) => findAgent(a)?.name ?? a).join(', ');
+        const where = scope === 'platform' ? `plataforma toda (${config.assistantName} e todos os agentes)` : agents.map((a) => findAgent(a)?.name ?? a).join(', ');
         const say = (t: string) => import('./live.ts').then(({ narrate }) => narrate(t, { speak: true })).catch(() => {});
         void detail(source, skill)
           .catch(() => null)

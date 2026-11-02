@@ -7,6 +7,7 @@ import { useAction } from '../lib/feedback'
 import { useYui } from '../store/yui'
 import { ACCEPT, fmtDate, fmtNum, goTab, statusOf, uploadFiles, Icon } from './api'
 import { CategoryChip, DeleteModal, HealthDot, PipeBar, Svg, TypeBadge } from './ui'
+import { ai } from '../lib/assistant'
 
 // Documentos (Docs.dc.html): upload, pipeline ao vivo, filtros, seleção, reprocessar e excluir.
 
@@ -255,7 +256,7 @@ export function DocsTab() {
     </div>
   )
 
-  const empty = docs && !docs.length ? 'Nenhum documento ainda. Envie contratos, tabelas de preço, manuais e processos — a Yui e os agentes passam a consultar tudo.' : 'Nenhum documento com esse filtro.'
+  const empty = docs && !docs.length ? `Nenhum documento ainda. Envie contratos, tabelas de preço, manuais e processos — a ${ai()} e os agentes passam a consultar tudo.` : 'Nenhum documento com esse filtro.'
   const totals = stats ? `${fmtNum(stats.docs)} documentos · ${fmtNum(stats.pages)} páginas · ${fmtNum(stats.chunks)} trechos indexados${stats.processing ? ` · ${stats.processing} em leitura` : ''}${stats.errors ? ` · ${stats.errors} com erro` : ''}` : ''
 
   // ---------- celular: cartões ----------

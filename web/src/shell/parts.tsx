@@ -6,6 +6,7 @@ import { useYui } from '../store/yui'
 import { OrbEngine, orbTarget } from '../yui/orbEngine'
 import { toggleLive } from '../voice/live'
 import { ProjectPicker, RunsButton, useRunsFeed } from './ProjectPicker'
+import { ai } from '../lib/assistant'
 
 const IS_MAC = typeof navigator !== 'undefined' && /mac|iphone|ipad|ipod/i.test(navigator.platform || navigator.userAgent)
 const PALETTE_KEY = IS_MAC ? '⌘K' : 'Ctrl K'
@@ -95,8 +96,8 @@ export function OrbButton({ w, h }: { w: number; h: number }) {
       <button
         onClick={toggleLive}
         className="orb-hit"
-        title={on ? 'Encerrar voz' : 'Falar com a Yui'}
-        aria-label={on ? 'Encerrar conversa por voz' : 'Falar com a Yui'}
+        title={on ? 'Encerrar voz' : `Falar com a ${ai()}`}
+        aria-label={on ? 'Encerrar conversa por voz' : `Falar com a ${ai()}`}
         aria-pressed={on}
         style={{ position: 'absolute', left: T.x, top: T.y, width: d, height: d, margin: `-${d / 2}px 0 0 -${d / 2}px`, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', zIndex: 26 }}
       />
@@ -106,8 +107,8 @@ export function OrbButton({ w, h }: { w: number; h: number }) {
   return (
     <button
       onClick={() => (isF ? useYui.getState().setFocus(false) : useYui.getState().close())}
-      title="Voltar para Yui"
-      aria-label="Voltar para Yui"
+      title={`Voltar para ${ai()}`}
+      aria-label={`Voltar para ${ai()}`}
       style={{ position: 'absolute', left: T.x, top: T.y, width: 64, height: 64, margin: '-32px 0 0 -32px', borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', zIndex: 45 }}
     />
   )
@@ -229,13 +230,13 @@ export function YuiCenter() {
           title="Ver execuções"
           style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, letterSpacing: '.32em', color: C.t2, fontWeight: 600, border: 'none', background: 'transparent', cursor: 'pointer', padding: coarse ? '12px 4px' : '4px', fontFamily: 'inherit' }}
         >
-          <span>YUI</span>
+          <span>{ai().toUpperCase()}</span>
           <span style={{ width: 3, height: 3, borderRadius: '50%', background: C.t4 }} />
           <span style={{ color, letterSpacing: '.2em', textDecoration: 'underline', textUnderlineOffset: 4, textDecorationColor: 'rgba(103,216,242,.4)' }}>{label}</span>
         </button>
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, letterSpacing: '.32em', color: C.t2, fontWeight: 600 }}>
-          <span>YUI</span>
+          <span>{ai().toUpperCase()}</span>
           <span style={{ width: 3, height: 3, borderRadius: '50%', background: C.t4 }} />
           <span style={{ color, letterSpacing: '.2em' }}>{label}</span>
         </div>
@@ -286,7 +287,7 @@ export function YuiLeft() {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, letterSpacing: '.3em', color: C.t2, fontWeight: 600 }}>
-        <span>YUI</span>
+        <span>{ai().toUpperCase()}</span>
         <span style={{ width: 3, height: 3, borderRadius: '50%', background: C.t4 }} />
         <span style={{ color, letterSpacing: '.18em' }}>{label}</span>
       </div>
@@ -423,7 +424,7 @@ export function Dock() {
           ref={(el) => {
             dockInput.yuiEl = el
           }}
-          aria-label="Mensagem para Yui"
+          aria-label={`Mensagem para ${ai()}`}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -446,7 +447,7 @@ export function Dock() {
         />
         <button
           title={micOn ? 'Encerrar voz' : 'Falar'}
-          aria-label={micOn ? 'Encerrar conversa por voz' : 'Falar com Yui'}
+          aria-label={micOn ? 'Encerrar conversa por voz' : `Falar com ${ai()}`}
           aria-pressed={micOn}
           onClick={toggleLive}
           style={{

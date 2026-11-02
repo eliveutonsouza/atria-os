@@ -7,6 +7,7 @@ import { useYui } from '../../store/yui'
 import { ClaudeGuideView } from '../../views/ClaudeGuideView'
 import { Chip, input, SearchBox, SmallBtn, Tabs } from '../../views/kit'
 import { ErrorNote, Skeleton, useHeader } from '../../views/ui'
+import { ai } from '../../lib/assistant'
 
 // Central de comandos (Claude.dc.html): as ferramentas do Claude Code viram botões.
 // Cada botão roda de verdade — como agente em segundo plano (resultado volta para a Yui/Execuções)
@@ -60,7 +61,7 @@ const CATS: Cat[] = [
     ],
   },
   {
-    title: 'Automatizar', color: C.warn, desc: 'Rotinas, loops e agentes em segundo plano viram agendamentos da Yui.',
+    title: 'Automatizar', color: C.warn, desc: 'Rotinas, loops e agentes em segundo plano viram agendamentos do Atria.',
     cmds: [
       { key: '/schedule', label: 'Agendar', kind: 'nav', value: 'schedule' },
       { key: '/loop', label: 'Repetir', kind: 'nav', value: 'schedule' },
@@ -134,7 +135,7 @@ function CommandsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Ag
     setSending(c.key)
     try {
       const r = await api.post<RunInfo>('/api/runs', { agentId: pickAgent(c), project: project || null, instruction: instructionFor(c, extra) })
-      setSent({ ok: true, text: `${c.key} enviado para ${r.agent}${project ? ` no ${project}` : ''}. O resultado volta para a Yui e para Execuções.`, runId: r.id })
+      setSent({ ok: true, text: `${c.key} enviado para ${r.agent}${project ? ` no ${project}` : ''}. O resultado volta para a ${ai()} e para Execuções.`, runId: r.id })
     } catch (e) {
       setSent({ ok: false, text: e instanceof ApiError ? e.message : 'Não consegui iniciar agora.' })
     } finally {
@@ -168,7 +169,7 @@ function CommandsTab({ caps, agents }: { caps: ClaudeInitInfo | null; agents: Ag
         {seg('bg', phone ? 'Segundo plano' : 'Agente em segundo plano')}
         {seg('tty', phone ? 'Terminal' : 'Terminal interativo')}
         {!phone && <span style={{ flex: 1 }} />}
-        <span style={{ fontSize: 12, color: C.t3 }}>{mode === 'bg' ? 'Resultado volta para a Yui e para Execuções' : 'Abre o Claude do projeto com o comando digitado'}</span>
+        <span style={{ fontSize: 12, color: C.t3 }}>{mode === 'bg' ? `Resultado volta para a ${ai()} e para Execuções` : 'Abre o Claude do projeto com o comando digitado'}</span>
       </section>
       <input value={extra} onChange={(e) => setExtra(e.target.value)} placeholder="Detalhes opcionais (ex.: “só a pasta src/auth”, “tema: vendas de setembro”, URL do site…)" aria-label="Detalhes do pedido" style={input} />
       {sent && (

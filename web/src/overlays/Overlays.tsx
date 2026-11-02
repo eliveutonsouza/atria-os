@@ -11,6 +11,7 @@ import { useYui } from '../store/yui'
 import { openInboxView } from '../workflow/inputs'
 import { BottomSheet } from '../views/Sheet'
 import { ConfirmDeleteModal } from '../views/ui'
+import { ai } from '../lib/assistant'
 
 function openInboxItem(ib: InboxItem) {
   const s = useYui.getState()
@@ -121,7 +122,7 @@ export function HistoryDrawer() {
               onClick={() => (h.kind === 'execucao' ? useYui.getState().show('runs', { runId: h.id }) : undefined)}
               style={{ display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'left', border: 'none', background: 'transparent', color: C.text, padding: 0, cursor: h.kind === 'execucao' ? 'pointer' : 'default' }}
             >
-              <span style={{ fontSize: 11, color: h.kind === 'execucao' ? C.lav : h.who === 'Yui' ? C.cyan : C.t2, letterSpacing: '.08em' }}>
+              <span style={{ fontSize: 11, color: h.kind === 'execucao' ? C.lav : h.who === ai() || h.who === 'Yui' ? C.cyan : C.t2, letterSpacing: '.08em' }}>
                 {h.kind === 'execucao' ? `EXECUÇÃO · ${h.who}` : h.who.toUpperCase()} · {new Date(h.at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}{h.project ? ` · ${h.project}` : ''}
               </span>
               <span style={{ fontSize: 13.5, lineHeight: 1.5, color: '#d6d9e8' }}>
@@ -138,7 +139,7 @@ export function HistoryDrawer() {
         {!hist.length && <div style={{ fontSize: 14, color: C.t3 }}>Ainda não conversamos hoje.</div>}
         {hist.map((h) => (
           <div key={h.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: h.who === 'yui' ? C.cyan : C.t2, fontWeight: 600 }}>{h.who === 'yui' ? 'Yui' : 'Você'}</span>
+            <span style={{ fontSize: 11, letterSpacing: '.16em', textTransform: 'uppercase', color: h.who === 'yui' ? C.cyan : C.t2, fontWeight: 600 }}>{h.who === 'yui' ? ai() : 'Você'}</span>
             <span style={{ fontSize: 14, lineHeight: 1.55, color: '#d6d9e8', whiteSpace: 'pre-wrap' }}>{h.text}</span>
           </div>
         ))}
@@ -147,7 +148,7 @@ export function HistoryDrawer() {
       {confirm && (
         <ConfirmDeleteModal
           title="Limpar a conversa?"
-          text="Apaga todo o histórico de mensagens entre você e a Yui guardado no Atria OS. Execuções, missões e memórias não são afetadas."
+          text={`Apaga todo o histórico de mensagens entre você e a ${ai()} guardado no Atria OS. Execuções, missões e memórias não são afetadas.`}
           rows={[{ label: 'Mensagens nesta tela', value: String(hist.length) }]}
           busy={busy}
           onCancel={() => setConfirm(false)}
@@ -183,7 +184,7 @@ export function CommandPalette() {
     const go = (v: ViewName, params = {}) => () => s().show(v, params)
     const all: PalItem[] = [
       { label: 'Abrir dashboard', hint: 'Ctrl J', fn: () => { close(); enterApp(s().appPage) } },
-      { label: 'Falar com Yui', hint: 'Ctrl L', fn: () => { close(); setTimeout(() => dockInput.el?.focus(), 30) } },
+      { label: `Falar com ${ai()}`, hint: 'Ctrl L', fn: () => { close(); setTimeout(() => dockInput.el?.focus(), 30) } },
       { label: 'Resumo da manhã', hint: 'tela', fn: go('brief') },
       { label: 'Dashboard', hint: 'tela', fn: go('dashboard') },
       { label: 'Agentes', hint: 'tela', fn: go('agents') },
@@ -212,7 +213,7 @@ export function CommandPalette() {
       { label: 'Artefatos', hint: 'tela', fn: go('artifact') },
       { label: 'Histórico da conversa', hint: '', fn: () => s().set({ palette: false, histOpen: true }) },
       { label: '+ Nova missão', hint: 'ação', fn: () => { close(); s().say('Qual é a missão? Descreva o objetivo e eu monto a equipe.'); setTimeout(() => dockInput.el?.focus(), 30) } },
-      { label: 'Voltar para Yui', hint: 'Esc', fn: () => { close(); s().close() } },
+      { label: `Voltar para ${ai()}`, hint: 'Esc', fn: () => { close(); s().close() } },
     ]
     const n = q.toLowerCase()
     return all.filter((p) => !n || p.label.toLowerCase().includes(n))

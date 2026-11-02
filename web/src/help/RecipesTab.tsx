@@ -5,6 +5,7 @@ import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
 import { asText, goHelp, parseSteps, sendToYui, splitSections, unquote, useHelpIndex, useToast } from './api'
 import { Loading, Md, StepList, Toast } from './ui'
+import { ai } from '../lib/assistant'
 
 // Receitas "Como faço para…": lista à esquerda, passo a passo à direita, botão para começar com a Yui.
 
@@ -97,12 +98,12 @@ export function RecipesTab({ id }: { id: string | null }) {
                 onClick={() => {
                   setBusy(true)
                   sendToYui(frase)
-                    .then(() => showToast('Enviado — acompanhe na Yui.'))
+                    .then(() => showToast(`Enviado — acompanhe na ${ai()}.`))
                     .catch(() => showToast('Não consegui enviar.'))
                     .finally(() => setBusy(false))
                 }}
               >
-                Fazer agora com a Yui
+                Fazer agora com a {ai()}
               </button>
             )}
           </div>

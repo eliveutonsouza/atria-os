@@ -3,12 +3,13 @@ import { exitApp } from '../nav'
 import { NavIcon, useNavGroups } from '../navItems'
 import { openPage } from '../Sidebar'
 import { useHeader } from '../../views/ui'
+import { ai } from '../../lib/assistant'
 
 // Aba "Mais" do celular (prancha Phone-Mais): o menu completo em grade, por grupo, com contadores.
 
 export function MorePage() {
   const groups = useNavGroups()
-  useHeader('Menu', 'Mais', [{ label: 'Falar com a Yui', fn: () => exitApp(), primary: true }])
+  useHeader('Menu', 'Mais', [{ label: `Falar com a ${ai()}`, fn: () => exitApp(), primary: true }])
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       {groups.map((g) => (

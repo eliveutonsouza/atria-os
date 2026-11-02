@@ -453,7 +453,7 @@ async function onMessage(m: TgMessage): Promise<void> {
   }
   held = m;
   const rows = pend.slice(0, 8).map((p) => [{ text: `${p.title} · ${p.workflowName}`.slice(0, 60), callback_data: `p:${p.id}` }]);
-  if (chatBridge) rows.push([{ text: 'Não é pedido: falar com a Yui', callback_data: 'y:held' }]);
+  if (chatBridge) rows.push([{ text: `Não é pedido: falar com a ${config.assistantName}`, callback_data: 'y:held' }]);
   await reply(m, 'Para qual pedido é isso?', { reply_markup: { inline_keyboard: rows } });
 }
 
@@ -517,7 +517,7 @@ async function talkNow(m: TgMessage): Promise<void> {
     return;
   }
   if (!text || text.startsWith('/')) {
-    await reply(m, 'Mande texto ou áudio para falar com a Yui. /projeto mostra ou troca o projeto da conversa.');
+    await reply(m, `Mande texto ou áudio para falar com a ${config.assistantName}. /projeto mostra ou troca o projeto da conversa.`);
     return;
   }
   void tg('sendChatAction', { chat_id: tgChat(), action: 'typing' }).catch(() => {});

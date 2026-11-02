@@ -8,6 +8,7 @@ import { describeCron, send } from '../workflow/http'
 import { DeleteWorkflowModal } from '../workflow/DeleteWorkflow'
 import { TYPE_META } from '../workflow/StepNode'
 import { Empty, ErrorNote, Skeleton, useHeader } from './ui'
+import { ai } from '../lib/assistant'
 
 // Lista de workflows: gatilho, time, última execução; abrir/rodar/agendar/criar (inclusive pedindo à Yui).
 
@@ -69,17 +70,17 @@ export function WorkflowsView() {
         <textarea
           className="wf-input"
           rows={2}
-          aria-label="Descreva o workflow para a Yui criar"
+          aria-label={`Descreva o workflow para a ${ai()} criar`}
           value={ask}
           onChange={(e) => setAsk(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void generate()
           }}
-          placeholder="Descreva uma rotina de trabalho e a Yui desenha o workflow. Ex.: “toda segunda, pesquisar tendências, escrever post pro Instagram, pedir minha aprovação e publicar”."
+          placeholder={`Descreva uma rotina de trabalho e a ${ai()} desenha o workflow. Ex.: “toda segunda, pesquisar tendências, escrever post pro Instagram, pedir minha aprovação e publicar”.`}
           style={{ flex: '1 1 420px' }}
         />
         <button className="wf-btn primary" disabled={busy || !ask.trim()} onClick={() => void generate()} style={{ height: 'auto', minHeight: 44, padding: '0 18px' }}>
-          {busy ? 'Criando…' : 'Criar com a Yui'}
+          {busy ? 'Criando…' : `Criar com a ${ai()}`}
         </button>
       </div>
 

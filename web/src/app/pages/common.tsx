@@ -3,6 +3,7 @@ import type { AppPage, OpsCard, ViewParams } from '@shared/protocol'
 import { C } from '../../lib/colors'
 import { useYui } from '../../store/yui'
 import { syncViewParams } from '../nav'
+import { ai } from '../../lib/assistant'
 
 // Peças visuais compartilhadas pelas páginas do dashboard (layout v3 do canvas Claude Design).
 
@@ -84,7 +85,7 @@ export function Tag({ children, color = '#a9e9f8', bg = 'rgba(103,216,242,.08)',
   )
 }
 
-export const ORIGIN_LABEL: Record<OpsCard['origin'], string> = { yui: 'Yui', manual: 'manual', routine: 'rotina', mission: 'missão', workflow: 'workflow' }
+export const ORIGIN_LABEL: Record<OpsCard['origin'], string> = { get yui() { return ai() }, manual: 'manual', routine: 'rotina', mission: 'missão', workflow: 'workflow' }
 
 export function fmtDuration(ms: number | null | undefined): string {
   if (ms == null) return '—'

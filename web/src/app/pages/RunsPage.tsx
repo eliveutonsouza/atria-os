@@ -8,6 +8,7 @@ import { useYui } from '../../store/yui'
 import { input } from '../../views/kit'
 import { ConfirmDeleteModal, Empty, ErrorNote, Skeleton, useHeader } from '../../views/ui'
 import { Dot, elapsed, fmtCost, fmtDuration, fmtTokens, openApp, relTime, Tag } from './common'
+import { ai } from '../../lib/assistant'
 
 // Execuções: tabela filtrável (agente, projeto, estado, origem) + detalhe com etapas, eventos e resultado.
 
@@ -19,7 +20,7 @@ const STATE: Record<string, [string, string]> = {
   failed: ['falhou', C.crit],
   cancelled: ['cancelado', C.t3],
 }
-const origin = (r: RunInfo) => (r.missionId ? 'missão' : r.workflowRunId ? 'workflow' : 'Yui/manual')
+const origin = (r: RunInfo) => (r.missionId ? 'missão' : r.workflowRunId ? 'workflow' : `${ai()}/manual`)
 const isActive = (r: RunInfo) => r.state === 'running' || r.state === 'queued' || r.state === 'waiting_approval'
 const PURGE_DAYS = [7, 30, 90]
 
@@ -165,7 +166,7 @@ export function RunsPage() {
         </select>
         <select aria-label="Origem" value={org} onChange={(e) => setOrg(e.target.value)} style={selectStyle}>
           <option value="">Toda origem</option>
-          <option>Yui/manual</option>
+          <option>{ai()}/manual</option>
           <option>missão</option>
           <option>workflow</option>
         </select>

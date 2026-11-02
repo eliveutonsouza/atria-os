@@ -10,6 +10,7 @@ import { galaxy } from './palette'
 import { NotePanel } from './NotePanel'
 import { Chip, IconBtn, Toggle } from './ui'
 import { Icon, SPACE_BG, glass, mono } from './styles'
+import { ai } from '../lib/assistant'
 
 const DAY = 86400_000
 const dayKey = (ms: number) => new Date(ms).toISOString().slice(0, 10)
@@ -310,7 +311,7 @@ export function Universe({ graph }: { graph: VaultGraphPayload }) {
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <Toggle on={particles} label="Partículas" onClick={() => setParticles(!particles)} />
             <Toggle on={labels} label="Rótulos" onClick={() => setLabels(!labels)} />
-            <Toggle on={showSug} tone="warn" label="Sugestões da Yui" onClick={() => setShowSug(!showSug)} />
+            <Toggle on={showSug} tone="warn" label={`Sugestões da ${ai()}`} onClick={() => setShowSug(!showSug)} />
             <Toggle
               on={false}
               label="Ver tudo"

@@ -12,6 +12,7 @@ import { renderNote } from '../vault/markdown'
 import '../vault/vault.css'
 import { CAT_COLORS, fmtDate, fmtSize, goTab, isImage, isPdf, noExt, statusOf, Icon, useStacked } from './api'
 import { DeleteModal, PipeBar, Svg, TypeBadge } from './ui'
+import { ai } from '../lib/assistant'
 
 // Detalhe do documento (DocDetail.dc.html): página com as caixas do Docling, dados extraídos,
 // texto (OCR), trechos indexados e uso pela IA.
@@ -510,10 +511,10 @@ function UsesTab({ id }: { id: string }) {
   if (!uses) return <div style={{ color: C.t2, fontSize: 13 }}>Carregando…</div>
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <span style={{ fontSize: 12.5, color: C.t2 }}>Quando a Yui ou um agente usou este documento</span>
+      <span style={{ fontSize: 12.5, color: C.t2 }}>Quando a {ai()} ou um agente usou este documento</span>
       {!uses.length && <span style={{ fontSize: 13, color: C.t3 }}>Ninguém consultou este documento ainda.</span>}
       {uses.map((u, i) => {
-        const c = u.who === 'Yui' ? C.cyan : u.who === 'Painel' ? C.t2 : C.violet
+        const c = u.who === ai() || u.who === 'Yui' ? C.cyan : u.who === 'Painel' ? C.t2 : C.violet
         const score = u.score == null ? '' : `score ${u.score.toFixed(2).replace('.', ',')}`
         // celular: cartão empilhado (quem · quando · score em cima, pergunta embaixo)
         if (narrow)

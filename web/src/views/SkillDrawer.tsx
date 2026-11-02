@@ -9,6 +9,7 @@ import { renderNote } from '../vault/markdown'
 import { BottomSheet } from './Sheet'
 import { ConfirmDeleteModal } from './ui'
 import '../help/help.css'
+import { ai } from '../lib/assistant'
 
 // Ficha da skill (Detail.dc.html / PhoneSheet.dc.html): descrição, auditorias do skills.sh (só selo),
 // onde instalar (plataforma toda ou só agentes escolhidos) e o SKILL.md que o Claude vai aprender.
@@ -161,7 +162,7 @@ export function SkillDrawer({ source, skillId, installed, presetAgents, onClose,
 
       <section aria-label="Onde instalar" style={{ padding: phone ? 0 : 16, borderRadius: 16, background: phone ? 'transparent' : 'rgba(255,255,255,.03)', border: phone ? 'none' : '1px solid rgba(255,255,255,.06)', display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div className="eyebrow">Onde instalar</div>
-        {radio('platform', 'Plataforma toda', 'A Yui e todos os agentes podem usar.')}
+        {radio('platform', 'Plataforma toda', `A ${ai()} e todos os agentes podem usar.`)}
         {radio('agents', 'Só estes agentes', 'Os outros agentes não enxergam esta skill.')}
         {scope === 'agents' && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>

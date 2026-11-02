@@ -4,6 +4,7 @@ import { C } from '../lib/colors'
 import { useYui } from '../store/yui'
 import { useHelpIndex } from './api'
 import { AskBox, Loading, Md } from './ui'
+import { ai } from '../lib/assistant'
 
 // Perguntas frequentes: filtro + acordeão por categoria; ao lado, Pergunte e as dúvidas ainda sem guia.
 
@@ -41,7 +42,7 @@ export function FaqTab() {
           <span className="sr-only">Filtrar perguntas</span>
           <input className="hp-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filtrar perguntas…" style={{ paddingLeft: 36, height: 42 }} />
         </label>
-        {!items.length && <div style={{ padding: 12, fontSize: 13.5, color: C.t2 }}>Nenhuma pergunta com esse filtro. Pergunte à Yui ao lado.</div>}
+        {!items.length && <div style={{ padding: 12, fontSize: 13.5, color: C.t2 }}>Nenhuma pergunta com esse filtro. Pergunte à {ai()} ao lado.</div>}
         {cats.map((c) => (
           <div key={c} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span className="hp-eyebrow" style={{ paddingTop: 6 }}>
@@ -68,10 +69,10 @@ export function FaqTab() {
         ))}
       </div>
       <aside style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
-        <span style={{ fontSize: 13, fontWeight: 600 }}>Não achou? Pergunte para a Yui</span>
+        <span style={{ fontSize: 13, fontWeight: 600 }}>Não achou? Pergunte para a {ai()}</span>
         <AskBox compact examples={[]} />
         <div className="hp-card" style={{ background: 'rgba(245,181,74,.06)', borderColor: 'rgba(245,181,74,.26)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <span style={{ fontSize: 13, lineHeight: 1.55, color: '#dfe3f3' }}>Perguntas que a Yui não soube responder ficam aqui — viram um guia novo.</span>
+          <span style={{ fontSize: 13, lineHeight: 1.55, color: '#dfe3f3' }}>Perguntas que a {ai()} não soube responder ficam aqui — viram um guia novo.</span>
           {unanswered.slice(0, 8).map((u) => (
             <span key={`${u.pergunta}${u.at}`} style={{ fontSize: 12.5, color: '#f5c97a' }}>
               • {u.pergunta}

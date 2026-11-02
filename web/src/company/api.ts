@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import type { CompanyCategory, CompanyDoc } from '@shared/protocol'
 import { useYui } from '../store/yui'
+import { ai } from '../lib/assistant'
 
 // Empresa: helpers sem componentes (cores, rótulos, upload com progresso, navegação entre abas).
 
@@ -21,7 +22,7 @@ export function goTab(id: CompanyTab | `doc:${string}`) {
   void leaveGuard().then((ok) => ok && go())
 }
 
-export const STAGES = ['Recebido', 'Lendo / OCR', 'Extraindo dados', 'Preparando busca', 'Pronto para a Yui consultar'] as const
+export const stages = (): string[] => ['Recebido', 'Lendo / OCR', 'Extraindo dados', 'Preparando busca', `Pronto para a ${ai()} consultar`]
 
 export const CAT_COLORS: Record<CompanyCategory, [string, string]> = {
   Comercial: ['rgba(245,181,74,0.14)', '#f5c97a'],
@@ -60,14 +61,14 @@ export const isPdf = (d: CompanyDoc) => d.mime === 'application/pdf' || d.ext.to
 
 export function statusOf(d: CompanyDoc): { text: string; color: string } {
   if (d.state === 'error') return { text: d.error ? `Erro: ${d.error}` : 'Erro na leitura', color: '#f39aa4' }
-  if (d.state === 'ready') return { text: 'Pronto para a Yui e os agentes', color: '#7ff0c8' }
+  if (d.state === 'ready') return { text: `Pronto para a ${ai()} e os agentes`, color: '#7ff0c8' }
   if (d.state === 'queued') return { text: 'Na fila…', color: '#a9e9f8' }
-  return { text: `${STAGES[Math.min(d.stage, 4)]}…`, color: '#a9e9f8' }
+  return { text: `${stages()[Math.min(d.stage, 4)]}…`, color: '#a9e9f8' }
 }
 
 // Segmentos da barra de pipeline (5 etapas).
 export function pipeSegments(d: CompanyDoc): { label: string; bg: string; active: boolean }[] {
-  return STAGES.map((label, i) => {
+  return stages().map((label, i) => {
     if (d.state === 'error') {
       const failed = Math.min(d.stage, 4)
       return { label, bg: i < failed ? '#67d8f2' : i === failed ? '#e2566a' : 'rgba(255,255,255,0.08)', active: false }

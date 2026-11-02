@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import { C, toneColor } from '../lib/colors'
 import { confirmAction, toastErr, toastOk } from '../lib/feedback'
 import { useYui } from '../store/yui'
+import { ai } from '../lib/assistant'
 
 // Seletor de projeto e painel de execuções da tela principal: várias tarefas rodam ao mesmo tempo
 // em projetos diferentes; cada projeto tem a própria conversa com a Yui.
@@ -223,7 +224,7 @@ export function ProjectPicker() {
           {!list.length && <div style={{ padding: '8px 12px', fontSize: 12, color: C.t3 }}>Nenhum projeto encontrado.</div>}
           <div style={{ height: 1, background: 'rgba(255,255,255,.06)', margin: '4px 0', flexShrink: 0 }} />
           {row(null, 'Geral (sem projeto)', C.t3)}
-          <div style={{ padding: '6px 12px 2px', fontSize: 11, color: C.t3, lineHeight: 1.5 }}>Cada projeto tem a própria conversa com a Yui. As tarefas dos outros projetos continuam rodando.</div>
+          <div style={{ padding: '6px 12px 2px', fontSize: 11, color: C.t3, lineHeight: 1.5 }}>Cada projeto tem a própria conversa com a {ai()}. As tarefas dos outros projetos continuam rodando.</div>
         </div>
       )}
     </div>
@@ -318,7 +319,7 @@ export function RunsPopover() {
       <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,.06)', overflow: 'hidden', flexShrink: 0 }}>
         <div style={{ width: `${Math.min(100, (running / max) * 100)}%`, height: 4, background: 'linear-gradient(90deg,#67d8f2,#a68cf7)', transition: 'width .4s' }} />
       </div>
-      {!order.length && <div style={{ fontSize: 13, color: C.t3, padding: '8px 0' }}>Nada rodando agora. Peça à Yui por voz ou texto — tarefas de projetos diferentes rodam ao mesmo tempo.</div>}
+      {!order.length && <div style={{ fontSize: 13, color: C.t3, padding: '8px 0' }}>Nada rodando agora. Peça à {ai()} por voz ou texto — tarefas de projetos diferentes rodam ao mesmo tempo.</div>}
       {order.map((k) => {
         const list = groups.get(k)!.sort((a, b) => ACTIVE.indexOf(a.state) - ACTIVE.indexOf(b.state))
         const isCur = k === unreadKey(activeProject)

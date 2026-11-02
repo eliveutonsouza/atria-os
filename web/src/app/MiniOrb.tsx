@@ -5,6 +5,7 @@ import { dockInput, STATE_META } from '../shell/parts'
 import { useYui } from '../store/yui'
 import { orbTarget } from '../yui/orbEngine'
 import { exitApp } from './nav'
+import { ai } from '../lib/assistant'
 
 // Yui minimizada (modo app): o orb continua vivo no canvas; aqui ficam o botão sobre ele,
 // o selo de pendências, a bolha com a última fala e um mini campo de texto (Ctrl+L).
@@ -82,7 +83,7 @@ export function MiniOrb() {
             boxShadow: '0 18px 50px rgba(0,0,0,.4)', fontSize: 12.5, lineHeight: 1.45, color: '#c9cde0', animation: 'atria-pop .28s var(--ease)',
           }}
         >
-          <div style={{ fontSize: 10, letterSpacing: '.22em', color, fontWeight: 600, marginBottom: 4 }}>YUI · {label.toUpperCase()}</div>
+          <div style={{ fontSize: 10, letterSpacing: '.22em', color, fontWeight: 600, marginBottom: 4 }}>{ai().toUpperCase()} · {label.toUpperCase()}</div>
           {live ? <span style={{ color: C.t2 }}>“{transcript}”</span> : bubble ?? (coarse ? 'Toque para conversar' : 'Clique para conversar · Ctrl+L para digitar · segure Espaço para falar')}
         </div>
       )}
@@ -97,8 +98,8 @@ export function MiniOrb() {
           ref={(el) => {
             dockInput.miniEl = el
           }}
-          aria-label="Mensagem para Yui (minimizada)"
-          placeholder="Fale com a Yui…"
+          aria-label={`Mensagem para ${ai()} (minimizada)`}
+          placeholder={`Fale com a ${ai()}…`}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onFocus={() => setFocused(true)}
@@ -114,8 +115,8 @@ export function MiniOrb() {
         </button>
       </div>
       <button
-        aria-label="Falar com a Yui"
-        title="Falar com a Yui (Ctrl+J)"
+        aria-label={`Falar com a ${ai()}`}
+        title={`Falar com a ${ai()} (Ctrl+J)`}
         // celular: toque abre o campo de texto da Yui (a bolha ou "Mais › Falar com a Yui" abrem a conversa)
         onClick={() => (narrow ? dockInput.miniEl?.focus() : exitApp())}
         onMouseEnter={() => setHover(true)}
