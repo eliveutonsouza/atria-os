@@ -50,6 +50,12 @@ export const SETTINGS: Record<string, Def> = {
   'voice.name': { kind: 'string', env: 'ATRIA_VOICE', def: 'marin', maxLen: 40 },
   'voice.idleMin': { kind: 'number', env: 'ATRIA_LIVE_IDLE_MIN', def: 5, min: 1, max: 60 },
   'voice.pttKey': { kind: 'enum', def: 'Space', options: ['Space', 'Backquote', 'F8', 'AltRight'] },
+  // Personalidade da Yui na voz (persona.ts). Todos os padrões = comportamento de antes (nada é acrescentado ao prompt).
+  'persona.warmth': { kind: 'enum', def: 'atual', options: ['atual', 'acolhedora', 'expressiva'] },
+  'persona.humor': { kind: 'enum', def: 'atual', options: ['atual', 'leve', 'descontraida'] },
+  'persona.length': { kind: 'enum', def: 'curtas', options: ['curtas', 'naturais'] },
+  'persona.pace': { kind: 'number', def: 1, min: 0.8, max: 1.3 },
+  'persona.reactions': { kind: 'boolean', def: false },
   'ui.particleDensity': { kind: 'number', def: 1, min: 0.3, max: 2 },
   'ui.reducedMotion': { kind: 'boolean', def: false },
   'approvals.mcpSensitive': { kind: 'boolean', def: false },

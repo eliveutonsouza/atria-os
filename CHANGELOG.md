@@ -2,6 +2,9 @@
 
 Versões marcadas do Atria OS. Cada tag `vX.Y.Z` publica as imagens no GHCR e pode ser aplicada pelo Atria Central (Atualizações).
 
+## v1.8.0
+- Yui & voz: nova "Personalidade da Yui" nas Configurações. Calor e emoção, humor, tamanho das respostas, ritmo da fala e reações ("hmm", "nossa"). Vale na voz ao vivo e nas respostas faladas do Telegram. Todos os padrões mantêm o jeito de antes; "Restaurar personalidade padrão" volta a eles.
+
 ## v1.7.2
 - Voz: a Yui não repete mais a mesma resposta. O servidor só responde pelo "plano B" quando o GPT-Live não respondeu sozinho, descarta fala quase idêntica a uma dita nos últimos 90 s e reaproveita a resposta de delegação tardia.
 - Voz: instruções contra interjeições ("uhum", "hum") enquanto você fala e contra repetir resultado já dito; interjeições soltas não voltam no histórico da próxima sessão.

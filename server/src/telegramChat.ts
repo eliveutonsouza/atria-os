@@ -9,6 +9,8 @@ import { transcribe } from './transcribe.ts';
 import { findProject, listProjectConfigs } from './projects.ts';
 import { pendingApprovals, resolveApproval, runBus } from './runs.ts';
 import { getSetting } from './settings.ts';
+import { config } from './config.ts';
+import { ttsInstructions } from './persona.ts';
 import { approvalButtons, registerChatBridge, telegramReady } from './notify.ts';
 
 // Conversar com a Yui pelo Telegram (ideia do gateway do Hermes). Texto ou áudio do chat vinculado vira pedido
@@ -49,7 +51,7 @@ registerChatBridge({
   async speak(text) {
     // fala curta: a Yui responde em 1–3 frases; acima disso só o começo vira áudio
     const input = text.replace(/[*_`#>]/g, '').slice(0, 1200);
-    const opts = { model: 'gpt-4o-mini-tts', input, response_format: 'opus' as const, instructions: 'Fale em português do Brasil, calma e calorosa, ritmo natural.' };
+    const opts = { model: 'gpt-4o-mini-tts', input, response_format: 'opus' as const, instructions: ttsInstructions(config.persona) };
     // a voz da Yui ao vivo pode não existir no TTS: cai para marin
     const res = await openai.audio.speech.create({ ...opts, voice: String(getSetting('voice.name') || 'marin') as 'marin' }).catch(() => openai.audio.speech.create({ ...opts, voice: 'marin' }));
     trackOpenAI('telegram-voz', 'gpt-4o-mini-tts', { input_tokens: Math.ceil(input.length / 4), output_tokens: 0 });

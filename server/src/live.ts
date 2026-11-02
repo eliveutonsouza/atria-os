@@ -10,6 +10,7 @@ import { agentsWorking } from './agents.ts';
 import { contextoAgora } from './ambiente.ts';
 import { trackOpenAI } from './usage.ts';
 import { memoryBlock } from './memoria.ts';
+import { personaBlock } from './persona.ts';
 
 // Yui por voz = GPT-Live-1 (o mesmo modelo full-duplex do ChatGPT Voice/Codex).
 // Browser <-> OpenAI por WebRTC (áudio). Este servidor acompanha a sessão por um sideband WebSocket:
@@ -34,7 +35,7 @@ com o bloco "Agora" abaixo (ou com a "Atualização do relógio" mais recente qu
 "horas do quê?": "que horas são" é a hora atual. Previsão de outros dias/cidades, cotações e lembretes => delegue.
 Ajuste a saudação ao período (bom dia / boa tarde / boa noite).
 Não faça interjeições ("uhum", "hum", "tá") enquanto o usuário fala: espere ele terminar. Nunca repita o que acabou de dizer;
-se o backend entregar um resultado que você já comunicou, não diga de novo. Se ouvir uma conversa que não é com você, fique em silêncio.
+se o backend entregar um resultado que você já comunicou, não diga de novo. Se ouvir uma conversa que não é com você, fique em silêncio.${personaBlock(config.persona)}
 
 ${contextoAgora(0)}${memoryBlock() ? `\n\n${memoryBlock()}` : ''}`;
 

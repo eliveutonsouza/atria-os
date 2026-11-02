@@ -409,8 +409,50 @@ export function VoiceSection() {
         <input type="checkbox" checked={!!v['ui.reducedMotion']} onChange={(e) => set('ui.reducedMotion', e.target.checked)} />
         Reduzir movimento (animações mais calmas)
       </label>
+      <div style={{ fontSize: 13, fontWeight: 600, marginTop: 6 }}>Personalidade da Yui</div>
+      <div style={{ fontSize: 12, opacity: 0.7, marginTop: -6 }}>Vale na voz ao vivo e nas respostas faladas do Telegram. O padrão é o jeito de sempre.</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
+        <Field label="Calor e emoção">
+          <select value={String(v['persona.warmth'] ?? 'atual')} onChange={(e) => set('persona.warmth', e.target.value)} style={input}>
+            <option value="atual">Atual (calma e precisa)</option>
+            <option value="acolhedora">Acolhedora (empática, próxima)</option>
+            <option value="expressiva">Expressiva (entonação viva)</option>
+          </select>
+        </Field>
+        <Field label="Humor e informalidade">
+          <select value={String(v['persona.humor'] ?? 'atual')} onChange={(e) => set('persona.humor', e.target.value)} style={input}>
+            <option value="atual">Atual (neutra)</option>
+            <option value="leve">Leve (um toque de humor)</option>
+            <option value="descontraida">Descontraída (papo de amigo)</option>
+          </select>
+        </Field>
+        <Field label="Tamanho das respostas">
+          <select value={String(v['persona.length'] ?? 'curtas')} onChange={(e) => set('persona.length', e.target.value)} style={input}>
+            <option value="curtas">Curtas (como hoje)</option>
+            <option value="naturais">Naturais (mais conversa)</option>
+          </select>
+        </Field>
+        <Field label={`Ritmo da fala (${Number(v['persona.pace'] ?? 1).toFixed(2)}×)`}>
+          <input type="range" min={0.8} max={1.3} step={0.05} value={Number(v['persona.pace'] ?? 1)} onChange={(e) => set('persona.pace', Number(e.target.value))} />
+        </Field>
+      </div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5 }}>
+        <input type="checkbox" checked={!!v['persona.reactions']} onChange={(e) => set('persona.reactions', e.target.checked)} />
+        Reações e interjeições (“hmm”, “nossa”) depois que você termina de falar
+      </label>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <button type="button" className={bigCls(true)} style={bigBtn(true)} disabled={!data || saving} onClick={() => save({ 'voice.name': v['voice.name'], 'voice.idleMin': v['voice.idleMin'], 'voice.pttKey': v['voice.pttKey'], 'ui.particleDensity': v['ui.particleDensity'], 'ui.reducedMotion': !!v['ui.reducedMotion'] })}>{saving ? 'Salvando…' : 'Salvar'}</button>
+        <button
+          type="button"
+          className={bigCls(false)}
+          style={bigBtn(false)}
+          disabled={!data || saving}
+          onClick={() => setV((o) => ({ ...o, 'persona.warmth': 'atual', 'persona.humor': 'atual', 'persona.length': 'curtas', 'persona.pace': 1, 'persona.reactions': false }))}
+        >
+          Restaurar personalidade padrão
+        </button>
+      </div>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <button type="button" className={bigCls(true)} style={bigBtn(true)} disabled={!data || saving} onClick={() => save({ 'voice.name': v['voice.name'], 'voice.idleMin': v['voice.idleMin'], 'voice.pttKey': v['voice.pttKey'], 'ui.particleDensity': v['ui.particleDensity'], 'ui.reducedMotion': !!v['ui.reducedMotion'], 'persona.warmth': v['persona.warmth'] ?? 'atual', 'persona.humor': v['persona.humor'] ?? 'atual', 'persona.length': v['persona.length'] ?? 'curtas', 'persona.pace': Number(v['persona.pace'] ?? 1), 'persona.reactions': !!v['persona.reactions'] })}>{saving ? 'Salvando…' : 'Salvar'}</button>
         <SaveMsg msg={msg} />
       </div>
     </Section>

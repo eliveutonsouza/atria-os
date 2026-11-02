@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
+import { normalizePersona, type Persona } from './persona.ts';
 
 /** Lê a variável; para ATRIA_X vazia, usa a reserva YUI_X (instalações de antes do nome Atria OS). */
 export function readEnv(name: string): string | undefined {
@@ -65,6 +66,15 @@ export const config = {
   },
   get voice() {
     return dyn('voice.name', 'ATRIA_VOICE', 'marin');
+  },
+  get persona(): Persona {
+    return normalizePersona({
+      warmth: dyn('persona.warmth', 'ATRIA_PERSONA_WARMTH', ''),
+      humor: dyn('persona.humor', 'ATRIA_PERSONA_HUMOR', ''),
+      length: dyn('persona.length', 'ATRIA_PERSONA_LENGTH', ''),
+      pace: dyn('persona.pace', 'ATRIA_PERSONA_PACE', '1'),
+      reactions: dyn('persona.reactions', 'ATRIA_PERSONA_REACTIONS', ''),
+    });
   },
   get liveIdleMin() {
     return Number(dyn('voice.idleMin', 'ATRIA_LIVE_IDLE_MIN', '5')) || 5;
